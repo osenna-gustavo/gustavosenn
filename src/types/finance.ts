@@ -29,6 +29,7 @@ export interface Transaction {
   needsReview: boolean;
   importBatchId?: string;
   recurrenceId?: string;
+  recurrenceInstanceId?: string;
   createdAt: Date;
 }
 
@@ -62,6 +63,17 @@ export interface Recurrence {
   createdAt: Date;
 }
 
+export interface RecurrenceInstance {
+  id: string;
+  recurrenceId: string;
+  month: number;
+  year: number;
+  status: 'pending' | 'confirmed' | 'ignored';
+  linkedTransactionId?: string;
+  amount: number;
+  createdAt: Date;
+}
+
 export interface ImportBatch {
   id: string;
   name: string;
@@ -88,11 +100,38 @@ export interface Scenario {
   id: string;
   name: string;
   baselineType: 'planned' | 'realized' | 'average';
-  baselineMonth?: number;
-  baselineYear?: number;
-  modifications: ScenarioModification[];
+  baselineMonth: number;
+  baselineYear: number;
+  monthlyCommitments: ScenarioCommitment[];
+  oneTimeCosts: ScenarioOneTimeCost[];
+  categoryAdjustments: ScenarioCategoryAdjustment[];
   minimumBalance: number;
   createdAt: Date;
+}
+
+export interface ScenarioCommitment {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  subcategoryId?: string;
+  isFixed: boolean;
+}
+
+export interface ScenarioOneTimeCost {
+  id: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  subcategoryId?: string;
+  impactMonth: number;
+  impactYear: number;
+}
+
+export interface ScenarioCategoryAdjustment {
+  categoryId: string;
+  subcategoryId?: string;
+  adjustedAmount: number;
 }
 
 export interface ScenarioModification {
