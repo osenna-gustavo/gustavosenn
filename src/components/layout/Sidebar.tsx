@@ -15,6 +15,7 @@ import type { AppScreen } from '@/types/finance';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { ThemeToggle } from './ThemeToggle';
 
 const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
   { screen: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -46,13 +47,16 @@ export function Sidebar() {
           </div>
           <span className="font-semibold text-foreground">FluxoCaixa</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-        >
-          {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
+        <div className="flex items-center gap-2">
+          <ThemeToggle />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+          >
+            {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </Button>
+        </div>
       </header>
 
       {/* Mobile Menu Overlay */}
@@ -90,14 +94,17 @@ export function Sidebar() {
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex fixed left-0 top-0 z-40 h-screen w-64 flex-col bg-sidebar border-r border-sidebar-border">
         {/* Logo */}
-        <div className="flex h-16 items-center gap-3 px-6 border-b border-sidebar-border">
-          <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center glow-primary">
-            <span className="text-primary-foreground font-bold">FC</span>
+        <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center glow-primary">
+              <span className="text-primary-foreground font-bold">FC</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="font-semibold text-sidebar-foreground">FluxoCaixa</span>
+              <span className="text-xs text-muted-foreground">Gestão Financeira</span>
+            </div>
           </div>
-          <div className="flex flex-col">
-            <span className="font-semibold text-sidebar-foreground">FluxoCaixa</span>
-            <span className="text-xs text-muted-foreground">Gestão Financeira</span>
-          </div>
+          <ThemeToggle />
         </div>
 
         {/* Navigation */}

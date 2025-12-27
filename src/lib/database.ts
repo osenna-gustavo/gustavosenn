@@ -6,6 +6,7 @@ import type {
   Transaction, 
   Budget, 
   Recurrence, 
+  RecurrenceInstance,
   ImportBatch,
   Scenario 
 } from '@/types/finance';
@@ -39,6 +40,11 @@ interface FluxoCaixaDB extends DBSchema {
     key: string;
     value: Recurrence;
   };
+  recurrenceInstances: {
+    key: string;
+    value: RecurrenceInstance;
+    indexes: { 'by-recurrence': string; 'by-month-year': string };
+  };
   importBatches: {
     key: string;
     value: ImportBatch;
@@ -55,40 +61,65 @@ interface FluxoCaixaDB extends DBSchema {
 
 let dbInstance: IDBPDatabase<FluxoCaixaDB> | null = null;
 
+const DB_VERSION = 2;
+
 export async function getDB(): Promise<IDBPDatabase<FluxoCaixaDB>> {
   if (dbInstance) return dbInstance;
 
-  dbInstance = await openDB<FluxoCaixaDB>('fluxocaixa-db', 1, {
-    upgrade(db) {
+  dbInstance = await openDB<FluxoCaixaDB>('fluxocaixa-db', DB_VERSION, {
+    upgrade(db, oldVersion) {
       // Categories store
-      const categoryStore = db.createObjectStore('categories', { keyPath: 'id' });
-      categoryStore.createIndex('by-parent', 'parentId');
+      if (!db.objectStoreNames.contains('categories')) {
+        const categoryStore = db.createObjectStore('categories', { keyPath: 'id' });
+        categoryStore.createIndex('by-parent', 'parentId');
+      }
 
       // Subcategories store
-      const subcategoryStore = db.createObjectStore('subcategories', { keyPath: 'id' });
-      subcategoryStore.createIndex('by-category', 'categoryId');
+      if (!db.objectStoreNames.contains('subcategories')) {
+        const subcategoryStore = db.createObjectStore('subcategories', { keyPath: 'id' });
+        subcategoryStore.createIndex('by-category', 'categoryId');
+      }
 
       // Transactions store
-      const transactionStore = db.createObjectStore('transactions', { keyPath: 'id' });
-      transactionStore.createIndex('by-date', 'date');
-      transactionStore.createIndex('by-category', 'categoryId');
-      transactionStore.createIndex('by-month', 'monthKey');
+      if (!db.objectStoreNames.contains('transactions')) {
+        const transactionStore = db.createObjectStore('transactions', { keyPath: 'id' });
+        transactionStore.createIndex('by-date', 'date');
+        transactionStore.createIndex('by-category', 'categoryId');
+        transactionStore.createIndex('by-month', 'monthKey');
+      }
 
       // Budgets store
-      const budgetStore = db.createObjectStore('budgets', { keyPath: 'id' });
-      budgetStore.createIndex('by-month-year', 'monthYearKey');
+      if (!db.objectStoreNames.contains('budgets')) {
+        const budgetStore = db.createObjectStore('budgets', { keyPath: 'id' });
+        budgetStore.createIndex('by-month-year', 'monthYearKey');
+      }
 
       // Recurrences store
-      db.createObjectStore('recurrences', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('recurrences')) {
+        db.createObjectStore('recurrences', { keyPath: 'id' });
+      }
+
+      // RecurrenceInstances store (NEW in version 2)
+      if (!db.objectStoreNames.contains('recurrenceInstances')) {
+        const instanceStore = db.createObjectStore('recurrenceInstances', { keyPath: 'id' });
+        instanceStore.createIndex('by-recurrence', 'recurrenceId');
+        instanceStore.createIndex('by-month-year', 'monthYearKey');
+      }
 
       // Import batches store
-      db.createObjectStore('importBatches', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('importBatches')) {
+        db.createObjectStore('importBatches', { keyPath: 'id' });
+      }
 
       // Scenarios store
-      db.createObjectStore('scenarios', { keyPath: 'id' });
+      if (!db.objectStoreNames.contains('scenarios')) {
+        db.createObjectStore('scenarios', { keyPath: 'id' });
+      }
 
       // Settings store
-      db.createObjectStore('settings', { keyPath: 'key' });
+      if (!db.objectStoreNames.contains('settings')) {
+        db.createObjectStore('settings', { keyPath: 'key' });
+      }
     },
   });
 
@@ -198,6 +229,11 @@ export async function getTransactions(month?: number, year?: number): Promise<Tr
   return allTransactions;
 }
 
+export async function getAllTransactions(): Promise<Transaction[]> {
+  const db = await getDB();
+  return db.getAll('transactions');
+}
+
 export async function addTransaction(transaction: Omit<Transaction, 'id' | 'createdAt'>): Promise<Transaction> {
   const db = await getDB();
   const newTransaction: Transaction = {
@@ -224,6 +260,11 @@ export async function getBudget(month: number, year: number): Promise<Budget | u
   const db = await getDB();
   const allBudgets = await db.getAll('budgets');
   return allBudgets.find(b => b.month === month && b.year === year);
+}
+
+export async function getAllBudgets(): Promise<Budget[]> {
+  const db = await getDB();
+  return db.getAll('budgets');
 }
 
 export async function saveBudget(budget: Omit<Budget, 'id' | 'createdAt'> & { id?: string }): Promise<Budget> {
@@ -272,10 +313,48 @@ export async function deleteRecurrence(id: string): Promise<void> {
   await db.delete('recurrences', id);
 }
 
+// Recurrence Instance operations
+export async function getRecurrenceInstances(month: number, year: number): Promise<RecurrenceInstance[]> {
+  const db = await getDB();
+  const all = await db.getAll('recurrenceInstances');
+  return all.filter(i => i.month === month && i.year === year);
+}
+
+export async function getRecurrenceInstancesByRecurrence(recurrenceId: string): Promise<RecurrenceInstance[]> {
+  const db = await getDB();
+  return db.getAllFromIndex('recurrenceInstances', 'by-recurrence', recurrenceId);
+}
+
+export async function addRecurrenceInstance(instance: Omit<RecurrenceInstance, 'id' | 'createdAt'>): Promise<RecurrenceInstance> {
+  const db = await getDB();
+  const newInstance: RecurrenceInstance = {
+    ...instance,
+    id: uuidv4(),
+    createdAt: new Date(),
+  };
+  await db.add('recurrenceInstances', newInstance);
+  return newInstance;
+}
+
+export async function updateRecurrenceInstance(instance: RecurrenceInstance): Promise<void> {
+  const db = await getDB();
+  await db.put('recurrenceInstances', instance);
+}
+
+export async function deleteRecurrenceInstance(id: string): Promise<void> {
+  const db = await getDB();
+  await db.delete('recurrenceInstances', id);
+}
+
 // Scenario operations
 export async function getScenarios(): Promise<Scenario[]> {
   const db = await getDB();
   return db.getAll('scenarios');
+}
+
+export async function getScenario(id: string): Promise<Scenario | undefined> {
+  const db = await getDB();
+  return db.get('scenarios', id);
 }
 
 export async function addScenario(scenario: Omit<Scenario, 'id' | 'createdAt'>): Promise<Scenario> {

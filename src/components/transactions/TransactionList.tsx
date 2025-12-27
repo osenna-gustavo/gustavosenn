@@ -6,11 +6,10 @@ import {
   ArrowDownRight, 
   Search, 
   Filter,
-  Trash2,
-  AlertTriangle
+  AlertTriangle,
+  Pencil
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
@@ -18,33 +17,23 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { EditTransactionModal } from './EditTransactionModal';
 import { cn } from '@/lib/utils';
+import type { Transaction } from '@/types/finance';
 
 export function TransactionList() {
-  const { transactions, categories, deleteTransaction } = useApp();
+  const { transactions, categories } = useApp();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filteredTransactions = useMemo(() => {
     return transactions
       .filter(t => {
-        // Category filter
         if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) {
           return false;
         }
-        // Search filter
         if (searchQuery) {
           const query = searchQuery.toLowerCase();
           const category = categories.find(c => c.id === t.categoryId);
@@ -66,13 +55,6 @@ export function TransactionList() {
       .reduce((sum, t) => sum + t.amount, 0);
     return { income, expenses, balance: income - expenses };
   }, [filteredTransactions]);
-
-  const handleDelete = async () => {
-    if (deleteId) {
-      await deleteTransaction(deleteId);
-      setDeleteId(null);
-    }
-  };
 
   return (
     <div className="space-y-4">
@@ -147,7 +129,8 @@ export function TransactionList() {
             return (
               <div 
                 key={transaction.id}
-                className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors"
+                className="flex items-center justify-between p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                onClick={() => setEditingTransaction(transaction)}
               >
                 <div className="flex items-center gap-3">
                   <div className={cn(
@@ -161,6 +144,11 @@ export function TransactionList() {
                       <p className="font-medium">{category?.name || 'Sem categoria'}</p>
                       {transaction.needsReview && (
                         <AlertTriangle className="h-4 w-4 text-warning" />
+                      )}
+                      {transaction.origin === 'recurrence' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                          Recorrência
+                        </span>
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -177,14 +165,7 @@ export function TransactionList() {
                   )}>
                     {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
                   </span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                    onClick={() => setDeleteId(transaction.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <Pencil className="h-4 w-4 text-muted-foreground" />
                 </div>
               </div>
             );
@@ -192,23 +173,12 @@ export function TransactionList() {
         )}
       </div>
 
-      {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
-              Excluir
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Edit Modal */}
+      <EditTransactionModal
+        transaction={editingTransaction}
+        isOpen={!!editingTransaction}
+        onClose={() => setEditingTransaction(null)}
+      />
     </div>
   );
 }

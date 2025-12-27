@@ -1,3 +1,4 @@
+import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AppProvider, useApp } from '@/contexts/AppContext';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { FAB } from '@/components/transactions/FAB';
@@ -38,12 +39,12 @@ function AppContent() {
 
 function App() {
   return (
-    <div className="dark">
+    <ThemeProvider>
       <AppProvider>
         <AppContent />
         <Toaster />
       </AppProvider>
-    </div>
+    </ThemeProvider>
   );
 }
 

@@ -1,69 +1,115 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save } from 'lucide-react';
+import { Save, Copy } from 'lucide-react';
+import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
+import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
 
 export function BudgetPage() {
   const { 
     selectedMonth, 
     selectedYear, 
-    categories, 
+    categories,
+    subcategories, 
+    transactions,
     budget, 
-    saveBudget 
+    saveBudget,
+    refreshData 
   } = useApp();
   const { toast } = useToast();
 
-  const [plannedIncome, setPlannedIncome] = useState(
-    budget?.plannedIncome?.toString() || ''
-  );
-  const [plannedExpenses, setPlannedExpenses] = useState(
-    budget?.plannedExpenses?.toString() || ''
-  );
-  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>(
-    () => {
-      const initial: Record<string, string> = {};
-      categories.forEach(cat => {
-        const existing = budget?.categoryBudgets.find(cb => cb.categoryId === cat.id);
-        initial[cat.id] = existing?.plannedAmount?.toString() || '';
-      });
-      return initial;
-    }
-  );
+  const [plannedIncome, setPlannedIncome] = useState('');
+  const [plannedExpenses, setPlannedExpenses] = useState('');
+  const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>({});
+  const [subcategoryBudgets, setSubcategoryBudgets] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  // Update state when budget changes
-  useState(() => {
+  // Initialize from budget
+  useEffect(() => {
     if (budget) {
       setPlannedIncome(budget.plannedIncome?.toString() || '');
       setPlannedExpenses(budget.plannedExpenses?.toString() || '');
-      const newCatBudgets: Record<string, string> = {};
-      categories.forEach(cat => {
-        const existing = budget.categoryBudgets.find(cb => cb.categoryId === cat.id);
-        newCatBudgets[cat.id] = existing?.plannedAmount?.toString() || '';
+      
+      const catBudgets: Record<string, string> = {};
+      const subBudgets: Record<string, string> = {};
+      
+      budget.categoryBudgets.forEach(cb => {
+        if (cb.subcategoryId) {
+          subBudgets[cb.subcategoryId] = cb.plannedAmount.toString();
+        } else {
+          catBudgets[cb.categoryId] = cb.plannedAmount.toString();
+        }
       });
-      setCategoryBudgets(newCatBudgets);
+      
+      setCategoryBudgets(catBudgets);
+      setSubcategoryBudgets(subBudgets);
+    } else {
+      setPlannedIncome('');
+      setPlannedExpenses('');
+      setCategoryBudgets({});
+      setSubcategoryBudgets({});
     }
-  });
+  }, [budget, selectedMonth, selectedYear]);
 
-  const totalCategoryBudget = Object.values(categoryBudgets)
-    .reduce((sum, val) => sum + (parseFloat(val.replace(',', '.')) || 0), 0);
+  // Calculate realized amounts
+  const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
+    const byCategory: Record<string, number> = {};
+    const bySubcategory: Record<string, number> = {};
+    
+    transactions.filter(t => t.type === 'despesa').forEach(t => {
+      byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount;
+      if (t.subcategoryId) {
+        bySubcategory[t.subcategoryId] = (bySubcategory[t.subcategoryId] || 0) + t.amount;
+      }
+    });
+    
+    return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
+  }, [transactions]);
+
+  const totalCategoryBudget = useMemo(() => {
+    let total = 0;
+    categories.forEach(cat => {
+      const catSubs = subcategories.filter(s => s.categoryId === cat.id);
+      if (catSubs.length > 0) {
+        catSubs.forEach(sub => {
+          total += parseFloat(subcategoryBudgets[sub.id]?.replace(',', '.') || '0') || 0;
+        });
+      } else {
+        total += parseFloat(categoryBudgets[cat.id]?.replace(',', '.') || '0') || 0;
+      }
+    });
+    return total;
+  }, [categories, subcategories, categoryBudgets, subcategoryBudgets]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const parsedIncome = parseFloat(plannedIncome.replace(',', '.')) || 0;
-      const parsedExpenses = parseFloat(plannedExpenses.replace(',', '.')) || 0;
+      const parsedExpenses = parseFloat(plannedExpenses.replace(',', '.')) || totalCategoryBudget;
       
-      const categoryBudgetsArray = Object.entries(categoryBudgets)
-        .filter(([_, value]) => value && parseFloat(value.replace(',', '.')) > 0)
-        .map(([categoryId, value]) => ({
-          categoryId,
-          plannedAmount: parseFloat(value.replace(',', '.')) || 0,
-        }));
+      const categoryBudgetsArray = [
+        ...Object.entries(categoryBudgets)
+          .filter(([_, value]) => value && parseFloat(value.replace(',', '.')) > 0)
+          .map(([categoryId, value]) => ({
+            categoryId,
+            plannedAmount: parseFloat(value.replace(',', '.')) || 0,
+          })),
+        ...Object.entries(subcategoryBudgets)
+          .filter(([_, value]) => value && parseFloat(value.replace(',', '.')) > 0)
+          .map(([subcategoryId, value]) => {
+            const sub = subcategories.find(s => s.id === subcategoryId);
+            return {
+              categoryId: sub?.categoryId || '',
+              subcategoryId,
+              plannedAmount: parseFloat(value.replace(',', '.')) || 0,
+            };
+          }),
+      ];
 
       await saveBudget({
         month: selectedMonth,
@@ -91,17 +137,23 @@ export function BudgetPage() {
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl lg:text-3xl font-bold">Orçamento</h1>
           <p className="text-muted-foreground">
             Planejamento de {formatMonthYear(selectedMonth, selectedYear)}
           </p>
         </div>
-        <Button onClick={handleSave} disabled={isSaving} className="gap-2">
-          <Save className="h-4 w-4" />
-          {isSaving ? 'Salvando...' : 'Salvar'}
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowDuplicateModal(true)} className="gap-2">
+            <Copy className="h-4 w-4" />
+            Duplicar Mês Anterior
+          </Button>
+          <Button onClick={handleSave} disabled={isSaving} className="gap-2">
+            <Save className="h-4 w-4" />
+            {isSaving ? 'Salvando...' : 'Salvar'}
+          </Button>
+        </div>
       </div>
 
       {/* Total Budget */}
@@ -143,30 +195,19 @@ export function BudgetPage() {
       <div className="glass-card rounded-xl p-4 lg:p-6">
         <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria</h3>
         
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="space-y-3">
           {categories.map((cat) => (
-            <div key={cat.id} className="space-y-2">
-              <Label className="flex items-center gap-2 text-sm">
-                <span>{cat.icon}</span>
-                <span>{cat.name}</span>
-                {cat.isFixed && (
-                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                    Fixo
-                  </span>
-                )}
-              </Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                placeholder="0,00"
-                value={categoryBudgets[cat.id] || ''}
-                onChange={(e) => setCategoryBudgets(prev => ({
-                  ...prev,
-                  [cat.id]: e.target.value,
-                }))}
-                className="font-mono"
-              />
-            </div>
+            <SubcategoryBudgetEditor
+              key={cat.id}
+              category={cat}
+              subcategories={subcategories}
+              categoryBudgets={categoryBudgets}
+              subcategoryBudgets={subcategoryBudgets}
+              onCategoryChange={(id, value) => setCategoryBudgets(prev => ({ ...prev, [id]: value }))}
+              onSubcategoryChange={(id, value) => setSubcategoryBudgets(prev => ({ ...prev, [id]: value }))}
+              realizedByCategory={realizedByCategory}
+              realizedBySubcategory={realizedBySubcategory}
+            />
           ))}
         </div>
       </div>
@@ -178,11 +219,18 @@ export function BudgetPage() {
           <span className="text-xl font-mono font-bold">
             {formatCurrency(
               (parseFloat(plannedIncome.replace(',', '.')) || 0) -
-              (parseFloat(plannedExpenses.replace(',', '.')) || 0)
+              (parseFloat(plannedExpenses.replace(',', '.')) || totalCategoryBudget)
             )}
           </span>
         </div>
       </div>
+
+      {/* Duplicate Modal */}
+      <DuplicateBudgetModal
+        isOpen={showDuplicateModal}
+        onClose={() => setShowDuplicateModal(false)}
+        onSuccess={refreshData}
+      />
     </div>
   );
 }
