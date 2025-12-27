@@ -3,6 +3,7 @@ export type TransactionType = 'receita' | 'despesa';
 export interface Category {
   id: string;
   name: string;
+  type: TransactionType;
   icon?: string;
   isFixed: boolean;
   parentId?: string;
