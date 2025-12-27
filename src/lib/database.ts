@@ -128,16 +128,18 @@ export async function getDB(): Promise<IDBPDatabase<FluxoCaixaDB>> {
 
 // Default categories
 const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'createdAt'>[] = [
-  { name: 'Assinaturas', icon: '📱', isFixed: true },
-  { name: 'Moradia', icon: '🏠', isFixed: true },
-  { name: 'Transporte', icon: '🚗', isFixed: false },
-  { name: 'Alimentação', icon: '🍽️', isFixed: false },
-  { name: 'Saúde', icon: '💊', isFixed: false },
-  { name: 'Lazer', icon: '🎮', isFixed: false },
-  { name: 'Educação', icon: '📚', isFixed: false },
-  { name: 'Compras', icon: '🛒', isFixed: false },
-  { name: 'Contas/Taxas', icon: '📄', isFixed: true },
-  { name: 'Outros', icon: '📦', isFixed: false },
+  { name: 'Assinaturas', icon: '📱', isFixed: true, type: 'despesa' },
+  { name: 'Moradia', icon: '🏠', isFixed: true, type: 'despesa' },
+  { name: 'Transporte', icon: '🚗', isFixed: false, type: 'despesa' },
+  { name: 'Alimentação', icon: '🍽️', isFixed: false, type: 'despesa' },
+  { name: 'Saúde', icon: '💊', isFixed: false, type: 'despesa' },
+  { name: 'Lazer', icon: '🎮', isFixed: false, type: 'despesa' },
+  { name: 'Educação', icon: '📚', isFixed: false, type: 'despesa' },
+  { name: 'Compras', icon: '🛒', isFixed: false, type: 'despesa' },
+  { name: 'Contas/Taxas', icon: '📄', isFixed: true, type: 'despesa' },
+  { name: 'Outros', icon: '📦', isFixed: false, type: 'despesa' },
+  { name: 'Salário', icon: '💰', isFixed: true, type: 'receita' },
+  { name: 'Renda Extra', icon: '💵', isFixed: false, type: 'receita' },
 ];
 
 export async function initializeDefaultCategories(): Promise<void> {

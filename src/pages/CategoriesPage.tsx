@@ -47,17 +47,17 @@ export function CategoriesPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'category' | 'subcategory'; id: string } | null>(null);
   
-  const [formData, setFormData] = useState({ name: '', icon: '📦', isFixed: false });
+  const [formData, setFormData] = useState({ name: '', icon: '📦', isFixed: false, type: 'despesa' as 'receita' | 'despesa' });
   const [subFormData, setSubFormData] = useState({ name: '', isFixed: false });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const openCategoryForm = (category?: Category) => {
     if (category) {
       setEditingCategory(category);
-      setFormData({ name: category.name, icon: category.icon || '📦', isFixed: category.isFixed });
+      setFormData({ name: category.name, icon: category.icon || '📦', isFixed: category.isFixed, type: category.type });
     } else {
       setEditingCategory(null);
-      setFormData({ name: '', icon: '📦', isFixed: false });
+      setFormData({ name: '', icon: '📦', isFixed: false, type: 'despesa' });
     }
     setIsFormOpen(true);
   };
@@ -291,6 +291,27 @@ export function CategoriesPage() {
                 onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                 placeholder="Ex: Alimentação"
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Tipo</Label>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant={formData.type === 'despesa' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'despesa' }))}
+                >
+                  Despesa
+                </Button>
+                <Button
+                  type="button"
+                  variant={formData.type === 'receita' ? 'default' : 'outline'}
+                  className="flex-1"
+                  onClick={() => setFormData(prev => ({ ...prev, type: 'receita' }))}
+                >
+                  Receita
+                </Button>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Label>Custo Fixo (Previsto)</Label>
