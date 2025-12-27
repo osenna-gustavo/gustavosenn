@@ -1,6 +1,8 @@
 import { useApp } from '@/contexts/AppContext';
-import { formatCurrency, formatPercentage, formatMonthYear } from '@/lib/formatters';
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts';
+import { formatCurrency, formatPercentage } from '@/lib/formatters';
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip, Sector } from 'recharts';
+import { useState, useCallback } from 'react';
+import type { DrillDownFilter } from './DrillDownDrawer';
 
 const COLORS = [
   'hsl(152, 76%, 50%)',
@@ -13,8 +15,13 @@ const COLORS = [
   'hsl(45, 85%, 55%)',
 ];
 
-export function ExpenseChart() {
-  const { monthSummary, categories, selectedMonth, selectedYear } = useApp();
+interface ExpenseChartProps {
+  onDrillDown?: (filter: DrillDownFilter) => void;
+}
+
+export function ExpenseChart({ onDrillDown }: ExpenseChartProps) {
+  const { monthSummary, categories } = useApp();
+  const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
   if (!monthSummary) {
     return (
@@ -32,12 +39,23 @@ export function ExpenseChart() {
     .slice(0, 8)
     .map((cat, index) => ({
       name: cat.categoryName,
+      categoryId: cat.categoryId,
       value: cat.realized,
       percentage: monthSummary.realizedExpenses > 0 
         ? (cat.realized / monthSummary.realizedExpenses) * 100 
         : 0,
       color: COLORS[index % COLORS.length],
     }));
+
+  const handlePieClick = useCallback((data: any, index: number) => {
+    if (onDrillDown && data) {
+      onDrillDown({
+        type: 'expenses',
+        categoryId: data.categoryId,
+        title: `Despesas: ${data.name}`,
+      });
+    }
+  }, [onDrillDown]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
@@ -48,10 +66,27 @@ export function ExpenseChart() {
           <p className="text-sm text-muted-foreground">
             {formatCurrency(data.value)} ({formatPercentage(data.percentage, 1)})
           </p>
+          <p className="text-xs text-primary mt-1">Clique para ver detalhes</p>
         </div>
       );
     }
     return null;
+  };
+
+  const renderActiveShape = (props: any) => {
+    const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, fill } = props;
+    return (
+      <Sector
+        cx={cx}
+        cy={cy}
+        innerRadius={innerRadius}
+        outerRadius={outerRadius + 8}
+        startAngle={startAngle}
+        endAngle={endAngle}
+        fill={fill}
+        style={{ cursor: 'pointer', filter: 'brightness(1.1)' }}
+      />
+    );
   };
 
   return (
@@ -76,6 +111,12 @@ export function ExpenseChart() {
                 outerRadius={80}
                 paddingAngle={2}
                 dataKey="value"
+                activeIndex={activeIndex}
+                activeShape={renderActiveShape}
+                onMouseEnter={(_, index) => setActiveIndex(index)}
+                onMouseLeave={() => setActiveIndex(undefined)}
+                onClick={handlePieClick}
+                style={{ cursor: 'pointer' }}
               >
                 {chartData.map((entry, index) => (
                   <Cell key={`cell-${index}`} fill={entry.color} />
