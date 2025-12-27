@@ -1,13 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
+import { formatNumberToBRL, parseBRLToNumber } from '@/lib/currencyInput';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
 import { Save, Copy } from 'lucide-react';
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
+import { CurrencyInput } from '@/components/ui/currency-input';
 
 export function BudgetPage() {
   const { 
@@ -29,20 +30,20 @@ export function BudgetPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  // Initialize from budget
+  // Initialize from budget - format as BRL
   useEffect(() => {
     if (budget) {
-      setPlannedIncome(budget.plannedIncome?.toString() || '');
-      setPlannedExpenses(budget.plannedExpenses?.toString() || '');
+      setPlannedIncome(budget.plannedIncome > 0 ? formatNumberToBRL(budget.plannedIncome) : '');
+      setPlannedExpenses(budget.plannedExpenses > 0 ? formatNumberToBRL(budget.plannedExpenses) : '');
       
       const catBudgets: Record<string, string> = {};
       const subBudgets: Record<string, string> = {};
       
       budget.categoryBudgets.forEach(cb => {
         if (cb.subcategoryId) {
-          subBudgets[cb.subcategoryId] = cb.plannedAmount.toString();
+          subBudgets[cb.subcategoryId] = cb.plannedAmount > 0 ? formatNumberToBRL(cb.plannedAmount) : '';
         } else {
-          catBudgets[cb.categoryId] = cb.plannedAmount.toString();
+          catBudgets[cb.categoryId] = cb.plannedAmount > 0 ? formatNumberToBRL(cb.plannedAmount) : '';
         }
       });
       
@@ -71,42 +72,49 @@ export function BudgetPage() {
     return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
   }, [transactions]);
 
+  // Filter only expense categories for budget display
+  const expenseCategories = useMemo(() => {
+    return categories.filter(c => c.type === 'despesa');
+  }, [categories]);
+
   const totalCategoryBudget = useMemo(() => {
     let total = 0;
-    categories.forEach(cat => {
+    expenseCategories.forEach(cat => {
       const catSubs = subcategories.filter(s => s.categoryId === cat.id);
       if (catSubs.length > 0) {
+        // Sum subcategories
         catSubs.forEach(sub => {
-          total += parseFloat(subcategoryBudgets[sub.id]?.replace(',', '.') || '0') || 0;
+          total += parseBRLToNumber(subcategoryBudgets[sub.id] || '0');
         });
       } else {
-        total += parseFloat(categoryBudgets[cat.id]?.replace(',', '.') || '0') || 0;
+        // Use category value directly
+        total += parseBRLToNumber(categoryBudgets[cat.id] || '0');
       }
     });
-    return total;
-  }, [categories, subcategories, categoryBudgets, subcategoryBudgets]);
+    return Math.round(total * 100) / 100; // Round to avoid floating point issues
+  }, [expenseCategories, subcategories, categoryBudgets, subcategoryBudgets]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const parsedIncome = parseFloat(plannedIncome.replace(',', '.')) || 0;
-      const parsedExpenses = parseFloat(plannedExpenses.replace(',', '.')) || totalCategoryBudget;
+      const parsedIncome = parseBRLToNumber(plannedIncome);
+      const parsedExpenses = parseBRLToNumber(plannedExpenses) || totalCategoryBudget;
       
       const categoryBudgetsArray = [
         ...Object.entries(categoryBudgets)
-          .filter(([_, value]) => value && parseFloat(value.replace(',', '.')) > 0)
+          .filter(([_, value]) => value && parseBRLToNumber(value) > 0)
           .map(([categoryId, value]) => ({
             categoryId,
-            plannedAmount: parseFloat(value.replace(',', '.')) || 0,
+            plannedAmount: parseBRLToNumber(value),
           })),
         ...Object.entries(subcategoryBudgets)
-          .filter(([_, value]) => value && parseFloat(value.replace(',', '.')) > 0)
+          .filter(([_, value]) => value && parseBRLToNumber(value) > 0)
           .map(([subcategoryId, value]) => {
             const sub = subcategories.find(s => s.id === subcategoryId);
             return {
               categoryId: sub?.categoryId || '',
               subcategoryId,
-              plannedAmount: parseFloat(value.replace(',', '.')) || 0,
+              plannedAmount: parseBRLToNumber(value),
             };
           }),
       ];
@@ -162,28 +170,22 @@ export function BudgetPage() {
           <Label htmlFor="income" className="text-sm text-muted-foreground">
             Receita Planejada (R$)
           </Label>
-          <Input
+          <CurrencyInput
             id="income"
-            type="text"
-            inputMode="decimal"
-            placeholder="0,00"
             value={plannedIncome}
-            onChange={(e) => setPlannedIncome(e.target.value)}
-            className="mt-2 text-lg font-mono border-success/30 focus:border-success"
+            onChange={setPlannedIncome}
+            className="mt-2 text-lg border-success/30 focus:border-success"
           />
         </div>
         <div className="glass-card rounded-xl p-4">
           <Label htmlFor="expenses" className="text-sm text-muted-foreground">
             Despesas Planejadas (R$)
           </Label>
-          <Input
+          <CurrencyInput
             id="expenses"
-            type="text"
-            inputMode="decimal"
-            placeholder="0,00"
             value={plannedExpenses}
-            onChange={(e) => setPlannedExpenses(e.target.value)}
-            className="mt-2 text-lg font-mono border-destructive/30 focus:border-destructive"
+            onChange={setPlannedExpenses}
+            className="mt-2 text-lg border-destructive/30 focus:border-destructive"
           />
           <p className="text-xs text-muted-foreground mt-2">
             Soma das categorias: {formatCurrency(totalCategoryBudget)}
@@ -193,10 +195,10 @@ export function BudgetPage() {
 
       {/* Category Budgets */}
       <div className="glass-card rounded-xl p-4 lg:p-6">
-        <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria</h3>
+        <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria (Despesas)</h3>
         
         <div className="space-y-3">
-          {categories.map((cat) => (
+          {expenseCategories.map((cat) => (
             <SubcategoryBudgetEditor
               key={cat.id}
               category={cat}
@@ -218,8 +220,8 @@ export function BudgetPage() {
           <span className="text-muted-foreground">Saldo Planejado</span>
           <span className="text-xl font-mono font-bold">
             {formatCurrency(
-              (parseFloat(plannedIncome.replace(',', '.')) || 0) -
-              (parseFloat(plannedExpenses.replace(',', '.')) || totalCategoryBudget)
+              parseBRLToNumber(plannedIncome) -
+              (parseBRLToNumber(plannedExpenses) || totalCategoryBudget)
             )}
           </span>
         </div>

@@ -1,8 +1,13 @@
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
+import type { DrillDownFilter } from './DrillDownDrawer';
 
-export function CategoryProgress() {
+interface CategoryProgressProps {
+  onDrillDown?: (filter: DrillDownFilter) => void;
+}
+
+export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
   const { monthSummary, categories } = useApp();
 
   if (!monthSummary || categories.length === 0) {
@@ -26,6 +31,16 @@ export function CategoryProgress() {
     .sort((a, b) => b.realized - a.realized);
 
   const topCategories = sortedCategories.slice(0, 8);
+
+  const handleCategoryClick = (categoryId: string, categoryName: string) => {
+    if (onDrillDown) {
+      onDrillDown({
+        type: 'expenses',
+        categoryId,
+        title: `Despesas: ${categoryName}`,
+      });
+    }
+  };
 
   return (
     <div className="glass-card rounded-xl p-4 lg:p-6">
@@ -56,7 +71,11 @@ export function CategoryProgress() {
           {topCategories.map((cat) => {
             const category = categories.find(c => c.id === cat.categoryId);
             return (
-              <div key={cat.categoryId}>
+              <div 
+                key={cat.categoryId}
+                className="cursor-pointer hover:bg-muted/50 rounded-lg p-2 -mx-2 transition-colors"
+                onClick={() => handleCategoryClick(cat.categoryId, cat.categoryName)}
+              >
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
                     <span className="text-base">{category?.icon || '📦'}</span>
@@ -97,7 +116,7 @@ export function CategoryProgress() {
                     cat.status === 'warning' && "text-warning",
                     cat.status === 'exceeded' && "text-destructive"
                   )}>
-                    {formatPercentage(cat.percentage)}
+                    {formatPercentage(Math.round(cat.percentage))}
                   </span>
                 </div>
               </div>

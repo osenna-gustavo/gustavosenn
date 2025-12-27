@@ -11,8 +11,13 @@ import {
   ArrowDownRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { DrillDownFilter } from './DrillDownDrawer';
 
-export function DashboardKPIs() {
+interface DashboardKPIsProps {
+  onDrillDown?: (filter: DrillDownFilter) => void;
+}
+
+export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
   const { monthSummary } = useApp();
 
   if (!monthSummary) {
@@ -35,6 +40,7 @@ export function DashboardKPIs() {
       icon: Wallet,
       trend: monthSummary.balance >= 0 ? 'positive' : 'negative',
       description: monthSummary.balance >= 0 ? 'Positivo' : 'Negativo',
+      drillDownFilter: { type: 'all' as const, title: 'Todos os Lançamentos' },
     },
     {
       label: 'Planejado vs Realizado',
@@ -45,6 +51,7 @@ export function DashboardKPIs() {
       percentage: monthSummary.plannedExpenses > 0 
         ? (monthSummary.realizedExpenses / monthSummary.plannedExpenses) * 100 
         : 0,
+      drillDownFilter: { type: 'expenses' as const, title: 'Despesas do Mês' },
     },
     {
       label: 'Falta de Fixo',
@@ -52,6 +59,7 @@ export function DashboardKPIs() {
       icon: monthSummary.remainingFixed > 0 ? AlertTriangle : CheckCircle2,
       trend: monthSummary.remainingFixed > 0 ? 'warning' : 'positive',
       description: monthSummary.remainingFixed > 0 ? 'Ainda não coberto' : 'Fixos cobertos',
+      drillDownFilter: { type: 'fixed' as const, title: 'Despesas Fixas' },
     },
     {
       label: 'Disponível (Variável)',
@@ -59,8 +67,15 @@ export function DashboardKPIs() {
       icon: monthSummary.remainingVariable > 0 ? TrendingUp : TrendingDown,
       trend: monthSummary.remainingVariable > 0 ? 'positive' : 'negative',
       description: monthSummary.remainingVariable > 0 ? 'Pode gastar' : 'Limite atingido',
+      drillDownFilter: { type: 'variable' as const, title: 'Despesas Variáveis' },
     },
   ];
+
+  const handleClick = (filter: DrillDownFilter) => {
+    if (onDrillDown) {
+      onDrillDown(filter);
+    }
+  };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -70,11 +85,12 @@ export function DashboardKPIs() {
           <div 
             key={index} 
             className={cn(
-              "stat-card",
+              "stat-card cursor-pointer hover:scale-[1.02] transition-transform",
               kpi.trend === 'positive' && "border-l-4 border-l-success",
               kpi.trend === 'negative' && "border-l-4 border-l-destructive",
               kpi.trend === 'warning' && "border-l-4 border-l-warning"
             )}
+            onClick={() => handleClick(kpi.drillDownFilter)}
           >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
