@@ -4,9 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, X } from 'lucide-react';
-import { ScenarioOneTimeCost, Category, Subcategory } from '@/types/finance';
-import { formatCurrency } from '@/lib/formatters';
+import { formatCurrency, formatMonthYearShort } from '@/lib/formatters';
 import { v4 as uuid } from 'uuid';
+import type { ScenarioOneTimeCost, Category, Subcategory } from '@/types/finance';
 
 const MONTHS = [
   'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -28,7 +28,7 @@ export function ScenarioOneTimeCostForm({
   categories,
   subcategories,
   referenceMonth,
-  referenceYear
+  referenceYear,
 }: ScenarioOneTimeCostFormProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState('');
@@ -38,9 +38,11 @@ export function ScenarioOneTimeCostForm({
   const [impactMonth, setImpactMonth] = useState(referenceMonth);
   const [impactYear, setImpactYear] = useState(referenceYear);
 
+  // Get all expense categories
   const expenseCategories = categories.filter(c => c.type === 'despesa');
-  const filteredSubcategories = subcategories.filter(s => s.categoryId === categoryId);
-  const years = [referenceYear - 1, referenceYear, referenceYear + 1];
+  
+  // Get subcategories for selected category
+  const categorySubcategories = subcategories.filter(s => s.categoryId === categoryId);
 
   const handleAdd = () => {
     if (!name.trim() || !amount || !categoryId) return;
@@ -48,11 +50,11 @@ export function ScenarioOneTimeCostForm({
     const newCost: ScenarioOneTimeCost = {
       id: uuid(),
       name: name.trim(),
-      amount: parseFloat(amount),
+      amount: parseFloat(amount.replace(',', '.')) || 0,
       categoryId,
       subcategoryId: subcategoryId || undefined,
       impactMonth,
-      impactYear
+      impactYear,
     };
 
     onChange([...costs, newCost]);
@@ -73,66 +75,78 @@ export function ScenarioOneTimeCostForm({
     setIsAdding(false);
   };
 
-  const getCategoryName = (catId: string) => 
-    categories.find(c => c.id === catId)?.name || 'Categoria';
+  const getCategory = (id: string) => categories.find(c => c.id === id);
+  const getSubcategory = (id: string) => subcategories.find(s => s.id === id);
+
+  const currentYear = new Date().getFullYear();
+  const years = [currentYear - 1, currentYear, currentYear + 1, currentYear + 2];
 
   return (
     <div className="space-y-3">
-      {costs.length > 0 && (
-        <div className="space-y-2">
-          {costs.map((cost) => (
-            <div
-              key={cost.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
-            >
-              <div>
-                <p className="font-medium text-foreground">{cost.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatCurrency(cost.amount)} • {getCategoryName(cost.categoryId)}
-                  {' • '}{MONTHS[cost.impactMonth]}/{cost.impactYear}
-                </p>
+      {costs.map((cost) => {
+        const cat = getCategory(cost.categoryId);
+        const sub = cost.subcategoryId ? getSubcategory(cost.subcategoryId) : null;
+        
+        return (
+          <div key={cost.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{cost.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatMonthYearShort(cost.impactMonth, cost.impactYear)}
+                </span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleRemove(cost.id)}
-              >
+              <div className="text-xs text-muted-foreground">
+                {cat?.icon} {cat?.name}
+                {sub && ` → ${sub.name}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono font-medium text-destructive">
+                -{formatCurrency(cost.amount)}
+              </span>
+              <Button size="icon" variant="ghost" onClick={() => handleRemove(cost.id)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })}
 
-      {isAdding ? (
-        <div className="p-4 rounded-lg border bg-card space-y-4">
+      {!isAdding ? (
+        <Button variant="outline" className="w-full gap-2" onClick={() => setIsAdding(true)}>
+          <Plus className="h-4 w-4" />
+          Adicionar custo pontual
+        </Button>
+      ) : (
+        <div className="p-4 border border-border rounded-lg space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Nome</Label>
+            <div className="col-span-2 sm:col-span-1">
+              <Label className="text-xs">Nome</Label>
               <Input
+                placeholder="Ex: Entrada do carro"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Entrada do carro"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Valor (R$)</Label>
+            <div className="col-span-2 sm:col-span-1">
+              <Label className="text-xs">Valor (R$)</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
+                className="font-mono"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={categoryId} onValueChange={(v) => {
-                setCategoryId(v);
+            <div>
+              <Label className="text-xs">Categoria</Label>
+              <Select value={categoryId} onValueChange={(val) => {
+                setCategoryId(val);
                 setSubcategoryId('');
               }}>
                 <SelectTrigger>
@@ -141,27 +155,26 @@ export function ScenarioOneTimeCostForm({
                 <SelectContent>
                   {expenseCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
+                      {cat.icon} {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Subcategoria (opcional)</Label>
+            <div>
+              <Label className="text-xs">Subcategoria</Label>
               <Select 
                 value={subcategoryId} 
                 onValueChange={setSubcategoryId}
-                disabled={!categoryId || filteredSubcategories.length === 0}
+                disabled={!categoryId || categorySubcategories.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder={categorySubcategories.length === 0 ? "(Sem subcategorias)" : "Opcional"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredSubcategories.map(sub => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </SelectItem>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {categorySubcategories.map(sub => (
+                    <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -169,38 +182,28 @@ export function ScenarioOneTimeCostForm({
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Mês de Impacto</Label>
-              <Select 
-                value={impactMonth.toString()} 
-                onValueChange={(v) => setImpactMonth(parseInt(v))}
-              >
+            <div>
+              <Label className="text-xs">Mês de Impacto</Label>
+              <Select value={impactMonth.toString()} onValueChange={(val) => setImpactMonth(parseInt(val))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {MONTHS.map((m, i) => (
-                    <SelectItem key={i} value={i.toString()}>
-                      {m}
-                    </SelectItem>
+                  {MONTHS.map((month, index) => (
+                    <SelectItem key={index} value={index.toString()}>{month}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Ano</Label>
-              <Select 
-                value={impactYear.toString()} 
-                onValueChange={(v) => setImpactYear(parseInt(v))}
-              >
+            <div>
+              <Label className="text-xs">Ano</Label>
+              <Select value={impactYear.toString()} onValueChange={(val) => setImpactYear(parseInt(val))}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={y.toString()}>
-                      {y}
-                    </SelectItem>
+                  {years.map(year => (
+                    <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -208,28 +211,12 @@ export function ScenarioOneTimeCostForm({
           </div>
 
           <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={resetForm}>
-              Cancelar
-            </Button>
-            <Button 
-              size="sm" 
-              onClick={handleAdd}
-              disabled={!name.trim() || !amount || !categoryId}
-            >
+            <Button variant="ghost" size="sm" onClick={resetForm}>Cancelar</Button>
+            <Button size="sm" onClick={handleAdd} disabled={!name.trim() || !amount || !categoryId}>
               Adicionar
             </Button>
           </div>
         </div>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-2"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Custo Pontual
-        </Button>
       )}
     </div>
   );
