@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { Plus, X } from 'lucide-react';
-import { ScenarioCommitment, Category, Subcategory } from '@/types/finance';
 import { formatCurrency } from '@/lib/formatters';
 import { v4 as uuid } from 'uuid';
+import type { ScenarioCommitment, Category, Subcategory } from '@/types/finance';
 
 interface ScenarioCommitmentFormProps {
   commitments: ScenarioCommitment[];
@@ -20,7 +20,7 @@ export function ScenarioCommitmentForm({
   commitments,
   onChange,
   categories,
-  subcategories
+  subcategories,
 }: ScenarioCommitmentFormProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState('');
@@ -29,8 +29,11 @@ export function ScenarioCommitmentForm({
   const [subcategoryId, setSubcategoryId] = useState('');
   const [isFixed, setIsFixed] = useState(true);
 
+  // Get all expense categories
   const expenseCategories = categories.filter(c => c.type === 'despesa');
-  const filteredSubcategories = subcategories.filter(s => s.categoryId === categoryId);
+  
+  // Get subcategories for selected category
+  const categorySubcategories = subcategories.filter(s => s.categoryId === categoryId);
 
   const handleAdd = () => {
     if (!name.trim() || !amount || !categoryId) return;
@@ -38,10 +41,10 @@ export function ScenarioCommitmentForm({
     const newCommitment: ScenarioCommitment = {
       id: uuid(),
       name: name.trim(),
-      amount: parseFloat(amount),
+      amount: parseFloat(amount.replace(',', '.')) || 0,
       categoryId,
       subcategoryId: subcategoryId || undefined,
-      isFixed
+      isFixed,
     };
 
     onChange([...commitments, newCommitment]);
@@ -61,66 +64,77 @@ export function ScenarioCommitmentForm({
     setIsAdding(false);
   };
 
-  const getCategoryName = (catId: string) => 
-    categories.find(c => c.id === catId)?.name || 'Categoria';
+  const getCategory = (id: string) => categories.find(c => c.id === id);
+  const getSubcategory = (id: string) => subcategories.find(s => s.id === id);
 
   return (
     <div className="space-y-3">
-      {commitments.length > 0 && (
-        <div className="space-y-2">
-          {commitments.map((commitment) => (
-            <div
-              key={commitment.id}
-              className="flex items-center justify-between p-3 rounded-lg bg-muted/50 border"
-            >
-              <div>
-                <p className="font-medium text-foreground">{commitment.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {formatCurrency(commitment.amount)} • {getCategoryName(commitment.categoryId)}
-                  {commitment.isFixed ? ' • Fixo' : ' • Variável'}
-                </p>
+      {commitments.map((commitment) => {
+        const cat = getCategory(commitment.categoryId);
+        const sub = commitment.subcategoryId ? getSubcategory(commitment.subcategoryId) : null;
+        
+        return (
+          <div key={commitment.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="font-medium">{commitment.name}</span>
+                {commitment.isFixed && (
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                    Fixo
+                  </span>
+                )}
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => handleRemove(commitment.id)}
-              >
+              <div className="text-xs text-muted-foreground">
+                {cat?.icon} {cat?.name}
+                {sub && ` → ${sub.name}`}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <span className="font-mono font-medium text-destructive">
+                -{formatCurrency(commitment.amount)}
+              </span>
+              <Button size="icon" variant="ghost" onClick={() => handleRemove(commitment.id)}>
                 <X className="h-4 w-4" />
               </Button>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        );
+      })}
 
-      {isAdding ? (
-        <div className="p-4 rounded-lg border bg-card space-y-4">
+      {!isAdding ? (
+        <Button variant="outline" className="w-full gap-2" onClick={() => setIsAdding(true)}>
+          <Plus className="h-4 w-4" />
+          Adicionar compromisso
+        </Button>
+      ) : (
+        <div className="p-4 border border-border rounded-lg space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Nome</Label>
+            <div className="col-span-2 sm:col-span-1">
+              <Label className="text-xs">Nome</Label>
               <Input
+                placeholder="Ex: Financiamento carro"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Financiamento"
               />
             </div>
-            <div className="space-y-2">
-              <Label>Valor Mensal (R$)</Label>
+            <div className="col-span-2 sm:col-span-1">
+              <Label className="text-xs">Valor (R$)</Label>
               <Input
-                type="number"
-                min="0"
-                step="0.01"
+                type="text"
+                inputMode="decimal"
+                placeholder="0,00"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
-                placeholder="0,00"
+                className="font-mono"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select value={categoryId} onValueChange={(v) => {
-                setCategoryId(v);
+            <div>
+              <Label className="text-xs">Categoria</Label>
+              <Select value={categoryId} onValueChange={(val) => {
+                setCategoryId(val);
                 setSubcategoryId('');
               }}>
                 <SelectTrigger>
@@ -129,61 +143,45 @@ export function ScenarioCommitmentForm({
                 <SelectContent>
                   {expenseCategories.map(cat => (
                     <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
+                      {cat.icon} {cat.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label>Subcategoria (opcional)</Label>
+            <div>
+              <Label className="text-xs">Subcategoria</Label>
               <Select 
                 value={subcategoryId} 
                 onValueChange={setSubcategoryId}
-                disabled={!categoryId || filteredSubcategories.length === 0}
+                disabled={!categoryId || categorySubcategories.length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
+                  <SelectValue placeholder={categorySubcategories.length === 0 ? "(Sem subcategorias)" : "Opcional"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredSubcategories.map(sub => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </SelectItem>
+                  <SelectItem value="">Nenhuma</SelectItem>
+                  {categorySubcategories.map(sub => (
+                    <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Switch checked={isFixed} onCheckedChange={setIsFixed} />
-            <Label>Despesa fixa</Label>
-          </div>
-
-          <div className="flex justify-end gap-2">
-            <Button variant="outline" size="sm" onClick={resetForm}>
-              Cancelar
-            </Button>
-            <Button 
-              size="sm" 
-              onClick={handleAdd}
-              disabled={!name.trim() || !amount || !categoryId}
-            >
-              Adicionar
-            </Button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Switch checked={isFixed} onCheckedChange={setIsFixed} />
+              <Label className="text-sm">Despesa Fixa</Label>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="ghost" size="sm" onClick={resetForm}>Cancelar</Button>
+              <Button size="sm" onClick={handleAdd} disabled={!name.trim() || !amount || !categoryId}>
+                Adicionar
+              </Button>
+            </div>
           </div>
         </div>
-      ) : (
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full gap-2"
-          onClick={() => setIsAdding(true)}
-        >
-          <Plus className="h-4 w-4" />
-          Adicionar Compromisso Mensal
-        </Button>
       )}
     </div>
   );
