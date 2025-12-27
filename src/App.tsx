@@ -1,27 +1,50 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import NotFound from "./pages/NotFound";
+import { AppProvider, useApp } from '@/contexts/AppContext';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { FAB } from '@/components/transactions/FAB';
+import { DashboardPage } from '@/pages/DashboardPage';
+import { TransactionsPage } from '@/pages/TransactionsPage';
+import { BudgetPage } from '@/pages/BudgetPage';
+import { CategoriesPage } from '@/pages/CategoriesPage';
+import { RecurrencesPage } from '@/pages/RecurrencesPage';
+import { ImportPage } from '@/pages/ImportPage';
+import { ReportsPage } from '@/pages/ReportsPage';
+import { ScenariosPage } from '@/pages/ScenariosPage';
+import { Toaster } from '@/components/ui/toaster';
 
-const queryClient = new QueryClient();
+function AppContent() {
+  const { currentScreen } = useApp();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  const renderScreen = () => {
+    switch (currentScreen) {
+      case 'dashboard': return <DashboardPage />;
+      case 'transactions': return <TransactionsPage />;
+      case 'budget': return <BudgetPage />;
+      case 'categories': return <CategoriesPage />;
+      case 'recurrences': return <RecurrencesPage />;
+      case 'import': return <ImportPage />;
+      case 'reports': return <ReportsPage />;
+      case 'scenarios': return <ScenariosPage />;
+      default: return <DashboardPage />;
+    }
+  };
+
+  return (
+    <MainLayout>
+      {renderScreen()}
+      <FAB />
+    </MainLayout>
+  );
+}
+
+function App() {
+  return (
+    <div className="dark">
+      <AppProvider>
+        <AppContent />
+        <Toaster />
+      </AppProvider>
+    </div>
+  );
+}
 
 export default App;
