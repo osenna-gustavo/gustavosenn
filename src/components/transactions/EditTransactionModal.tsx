@@ -270,12 +270,15 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
             {filteredSubcategories.length > 0 && (
               <div className="space-y-2">
                 <Label>Subcategoria (opcional)</Label>
-                <Select value={subcategoryId} onValueChange={setSubcategoryId}>
+              <Select 
+                value={subcategoryId || "__none__"} 
+                onValueChange={(val) => setSubcategoryId(val === "__none__" ? "" : val)}
+              >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione..." />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Nenhuma</SelectItem>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
                     {filteredSubcategories.map((sub) => (
                       <SelectItem key={sub.id} value={sub.id}>
                         {sub.name}
