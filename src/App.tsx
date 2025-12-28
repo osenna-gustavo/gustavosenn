@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppProvider, useApp } from '@/contexts/AppContext';
+import { FilterProvider } from '@/contexts/FilterContext';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { FAB } from '@/components/transactions/FAB';
 import { DashboardPage } from '@/pages/DashboardPage';
@@ -249,10 +251,11 @@ function AuthenticatedApp() {
 
   return (
     <AppProvider>
-      <AppContent />
+      <FilterProvider>
+        <AppContent />
+      </FilterProvider>
     </AppProvider>
   );
-}
 
 function AppRouter() {
   const { user, isLoading } = useAuth();
@@ -274,12 +277,14 @@ function AppRouter() {
 
 function App() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <AppRouter />
-        <Toaster />
-      </AuthProvider>
-    </ThemeProvider>
+    <BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <AppRouter />
+          <Toaster />
+        </AuthProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   );
 }
 
