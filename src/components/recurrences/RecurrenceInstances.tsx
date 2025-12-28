@@ -3,11 +3,27 @@ import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, RefreshCw } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
-import type { RecurrenceInstance, Recurrence } from '@/types/finance';
+import type { RecurrenceInstance, Recurrence, Subcategory } from '@/types/finance';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 export function RecurrenceInstances() {
   const { 
@@ -15,6 +31,7 @@ export function RecurrenceInstances() {
     selectedYear, 
     recurrences, 
     categories,
+    subcategories,
     addTransaction,
     refreshData 
   } = useApp();
@@ -22,6 +39,19 @@ export function RecurrenceInstances() {
   
   const [instances, setInstances] = useState<RecurrenceInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [selectedInstance, setSelectedInstance] = useState<RecurrenceInstance | null>(null);
+  const [confirmData, setConfirmData] = useState({
+    categoryId: '',
+    subcategoryId: '',
+    amount: '',
+    date: '',
+  });
+
+  // Get subcategories for selected category
+  const filteredSubcategories = subcategories.filter(
+    s => s.categoryId === confirmData.categoryId
+  );
 
   // Generate or fetch instances for current month
   useEffect(() => {
@@ -71,18 +101,82 @@ export function RecurrenceInstances() {
     loadInstances();
   }, [selectedMonth, selectedYear, recurrences]);
 
-  const handleConfirm = async (instance: RecurrenceInstance) => {
+  const openConfirmModal = (instance: RecurrenceInstance) => {
     const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+    if (!recurrence) return;
+    
+    setSelectedInstance(instance);
+    setConfirmData({
+      categoryId: recurrence.categoryId,
+      subcategoryId: recurrence.subcategoryId || '',
+      amount: instance.amount.toString(),
+      date: new Date(selectedYear, selectedMonth, new Date(recurrence.startDate).getDate() || 1)
+        .toISOString().split('T')[0],
+    });
+    setConfirmModalOpen(true);
+  };
+
+  const handleConfirm = async () => {
+    if (!selectedInstance) return;
+    
+    const recurrence = recurrences.find(r => r.id === selectedInstance.recurrenceId);
     if (!recurrence) return;
     
     try {
       // Check if transaction already linked
+      if (selectedInstance.linkedTransactionId) {
+        toast({ title: 'Já confirmado', description: 'Este lançamento já foi confirmado.' });
+        return;
+      }
+      
+      const parsedAmount = parseFloat(confirmData.amount.replace(',', '.'));
+      if (isNaN(parsedAmount) || parsedAmount <= 0) {
+        toast({ title: 'Valor inválido', variant: 'destructive' });
+        return;
+      }
+      
+      // Create transaction
+      const newTransaction = await addTransaction({
+        date: new Date(confirmData.date),
+        amount: parsedAmount,
+        type: recurrence.type,
+        categoryId: confirmData.categoryId,
+        subcategoryId: confirmData.subcategoryId || undefined,
+        description: recurrence.name,
+        origin: 'recurrence',
+        needsReview: false,
+        recurrenceId: recurrence.id,
+        recurrenceInstanceId: selectedInstance.id,
+      });
+      
+      // Update instance
+      const updatedInstance: RecurrenceInstance = {
+        ...selectedInstance,
+        status: 'confirmed',
+        linkedTransactionId: newTransaction.id,
+        amount: parsedAmount,
+      };
+      await db.updateRecurrenceInstance(updatedInstance);
+      
+      setInstances(prev => prev.map(i => i.id === selectedInstance.id ? updatedInstance : i));
+      setConfirmModalOpen(false);
+      
+      toast({ title: 'Recorrência confirmada!', description: 'Lançamento criado com sucesso.' });
+    } catch (error) {
+      toast({ title: 'Erro ao confirmar', variant: 'destructive' });
+    }
+  };
+
+  const handleQuickConfirm = async (instance: RecurrenceInstance) => {
+    const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+    if (!recurrence) return;
+    
+    try {
       if (instance.linkedTransactionId) {
         toast({ title: 'Já confirmado', description: 'Este lançamento já foi confirmado.' });
         return;
       }
       
-      // Create transaction
       const newTransaction = await addTransaction({
         date: new Date(selectedYear, selectedMonth, new Date(recurrence.startDate).getDate() || 1),
         amount: instance.amount,
@@ -96,7 +190,6 @@ export function RecurrenceInstances() {
         recurrenceInstanceId: instance.id,
       });
       
-      // Update instance
       const updatedInstance: RecurrenceInstance = {
         ...instance,
         status: 'confirmed',
@@ -171,6 +264,7 @@ export function RecurrenceInstances() {
           {pendingInstances.map(instance => {
             const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
             const category = categories.find(c => c.id === recurrence?.categoryId);
+            const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
             if (!recurrence) return null;
             
             return (
@@ -186,6 +280,7 @@ export function RecurrenceInstances() {
                     <div className="font-medium">{recurrence.name}</div>
                     <div className="text-sm text-muted-foreground">
                       {category?.icon} {category?.name}
+                      {subcategory && ` → ${subcategory.name}`}
                     </div>
                   </div>
                 </div>
@@ -201,9 +296,18 @@ export function RecurrenceInstances() {
                     <Button
                       size="sm"
                       variant="ghost"
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                      onClick={() => openConfirmModal(instance)}
+                      title="Confirmar com detalhes"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       className="h-8 w-8 p-0 text-success hover:text-success hover:bg-success/10"
-                      onClick={() => handleConfirm(instance)}
-                      title="Confirmar"
+                      onClick={() => handleQuickConfirm(instance)}
+                      title="Confirmar rápido"
                     >
                       <Check className="h-4 w-4" />
                     </Button>
@@ -233,6 +337,7 @@ export function RecurrenceInstances() {
           {confirmedInstances.map(instance => {
             const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
             const category = categories.find(c => c.id === recurrence?.categoryId);
+            const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
             if (!recurrence) return null;
             
             return (
@@ -248,6 +353,7 @@ export function RecurrenceInstances() {
                     <div className="font-medium">{recurrence.name}</div>
                     <div className="text-sm text-muted-foreground">
                       {category?.icon} {category?.name}
+                      {subcategory && ` → ${subcategory.name}`}
                     </div>
                   </div>
                 </div>
@@ -314,6 +420,93 @@ export function RecurrenceInstances() {
           })}
         </div>
       )}
+
+      {/* Confirm with Details Modal */}
+      <Dialog open={confirmModalOpen} onOpenChange={setConfirmModalOpen}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle>Confirmar Recorrência</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Select 
+                value={confirmData.categoryId} 
+                onValueChange={(val) => setConfirmData(prev => ({ 
+                  ...prev, 
+                  categoryId: val,
+                  subcategoryId: '' 
+                }))}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {filteredSubcategories.length > 0 && (
+              <div className="space-y-2">
+                <Label>Subcategoria (opcional)</Label>
+                <Select 
+                  value={confirmData.subcategoryId || "__none__"} 
+                  onValueChange={(val) => setConfirmData(prev => ({ 
+                    ...prev, 
+                    subcategoryId: val === "__none__" ? '' : val 
+                  }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {filteredSubcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label>Valor (R$)</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={confirmData.amount}
+                onChange={(e) => setConfirmData(prev => ({ ...prev, amount: e.target.value }))}
+                placeholder="0,00"
+                className="font-mono"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Data</Label>
+              <Input
+                type="date"
+                value={confirmData.date}
+                onChange={(e) => setConfirmData(prev => ({ ...prev, date: e.target.value }))}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmModalOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleConfirm}>
+              Confirmar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

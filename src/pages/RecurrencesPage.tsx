@@ -36,7 +36,7 @@ import { cn } from '@/lib/utils';
 import { RecurrenceInstances } from '@/components/recurrences/RecurrenceInstances';
 
 export function RecurrencesPage() {
-  const { categories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence } = useApp();
+  const { categories, subcategories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence } = useApp();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -48,11 +48,17 @@ export function RecurrencesPage() {
     type: 'despesa' as TransactionType,
     amount: '',
     categoryId: '',
+    subcategoryId: '',
     frequency: 'monthly' as 'daily' | 'weekly' | 'monthly',
     startDate: new Date().toISOString().split('T')[0],
     endDate: '',
     isActive: true,
   });
+
+  // Filter subcategories based on selected category
+  const filteredSubcategories = subcategories.filter(
+    s => s.categoryId === formData.categoryId
+  );
 
   const openForm = (recurrence?: Recurrence) => {
     if (recurrence) {
@@ -62,6 +68,7 @@ export function RecurrencesPage() {
         type: recurrence.type,
         amount: recurrence.amount.toString(),
         categoryId: recurrence.categoryId,
+        subcategoryId: recurrence.subcategoryId || '',
         frequency: recurrence.frequency,
         startDate: new Date(recurrence.startDate).toISOString().split('T')[0],
         endDate: recurrence.endDate ? new Date(recurrence.endDate).toISOString().split('T')[0] : '',
@@ -74,6 +81,7 @@ export function RecurrencesPage() {
         type: 'despesa',
         amount: '',
         categoryId: '',
+        subcategoryId: '',
         frequency: 'monthly',
         startDate: new Date().toISOString().split('T')[0],
         endDate: '',
@@ -101,6 +109,7 @@ export function RecurrencesPage() {
         type: formData.type,
         amount: parsedAmount,
         categoryId: formData.categoryId,
+        subcategoryId: formData.subcategoryId || undefined,
         frequency: formData.frequency,
         startDate: new Date(formData.startDate),
         endDate: formData.endDate ? new Date(formData.endDate) : undefined,
@@ -320,7 +329,7 @@ export function RecurrencesPage() {
               <Label>Categoria</Label>
               <Select 
                 value={formData.categoryId} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, categoryId: value, subcategoryId: '' }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
@@ -334,6 +343,29 @@ export function RecurrencesPage() {
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Subcategory - only show when category is selected and has subcategories */}
+            {formData.categoryId && filteredSubcategories.length > 0 && (
+              <div className="space-y-2">
+                <Label>Subcategoria (opcional)</Label>
+                <Select 
+                  value={formData.subcategoryId || "__none__"} 
+                  onValueChange={(val) => setFormData(prev => ({ ...prev, subcategoryId: val === "__none__" ? '' : val }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Nenhuma</SelectItem>
+                    {filteredSubcategories.map((sub) => (
+                      <SelectItem key={sub.id} value={sub.id}>
+                        {sub.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label>Frequência</Label>

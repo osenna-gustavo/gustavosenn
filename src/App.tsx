@@ -256,6 +256,7 @@ function AuthenticatedApp() {
       </FilterProvider>
     </AppProvider>
   );
+}
 
 function AppRouter() {
   const { user, isLoading } = useAuth();

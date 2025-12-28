@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs';
 import { CategoryProgress } from '@/components/dashboard/CategoryProgress';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
@@ -7,10 +7,14 @@ import { DrillDownDrawer, type DrillDownFilter } from '@/components/dashboard/Dr
 import { PlannedVsRealizedDrawer } from '@/components/dashboard/PlannedVsRealizedDrawer';
 import { FixedPendingDrawer } from '@/components/dashboard/FixedPendingDrawer';
 import { useApp } from '@/contexts/AppContext';
+import { useFilters } from '@/contexts/FilterContext';
 import { formatMonthYear } from '@/lib/formatters';
+import { FilterPanel } from '@/components/filters';
 
 export function DashboardPage() {
-  const { selectedMonth, selectedYear } = useApp();
+  const { selectedMonth, selectedYear, categories, subcategories } = useApp();
+  const { hasActiveFilters } = useFilters();
+  
   const [drillDownFilter, setDrillDownFilter] = useState<DrillDownFilter | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isPlannedVsRealizedOpen, setIsPlannedVsRealizedOpen] = useState(false);
@@ -45,6 +49,13 @@ export function DashboardPage() {
           Resumo financeiro de {formatMonthYear(selectedMonth, selectedYear)}
         </p>
       </div>
+
+      {/* Filters */}
+      <FilterPanel
+        screen="dashboard"
+        categories={categories}
+        subcategories={subcategories}
+      />
 
       {/* KPIs */}
       <DashboardKPIs onDrillDown={handleDrillDown} />
