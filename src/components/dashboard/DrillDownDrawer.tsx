@@ -30,10 +30,8 @@ export function DrillDownDrawer({ isOpen, onClose, filter }: DrillDownDrawerProp
     setCurrentScreen 
   } = useApp();
 
-  if (!filter) return null;
-
   // Filter transactions based on drill-down criteria
-  const filteredTransactions = transactions.filter(t => {
+  const filteredTransactions = filter ? transactions.filter(t => {
     // Filter by type
     if (filter.type === 'expenses' && t.type !== 'despesa') return false;
     if (filter.type === 'income' && t.type !== 'receita') return false;
@@ -55,7 +53,9 @@ export function DrillDownDrawer({ isOpen, onClose, filter }: DrillDownDrawerProp
     if (filter.subcategoryId && t.subcategoryId !== filter.subcategoryId) return false;
     
     return true;
-  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
+
+  if (!filter) return null;
 
   // Calculate total
   const total = filteredTransactions.reduce((sum, t) => {
