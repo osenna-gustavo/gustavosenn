@@ -164,15 +164,15 @@ export function ScenarioOneTimeCostForm({
             <div>
               <Label className="text-xs">Subcategoria</Label>
               <Select 
-                value={subcategoryId} 
-                onValueChange={setSubcategoryId}
+                value={subcategoryId || "__none__"} 
+                onValueChange={(val) => setSubcategoryId(val === "__none__" ? "" : val)}
                 disabled={!categoryId || categorySubcategories.length === 0}
               >
                 <SelectTrigger>
                   <SelectValue placeholder={categorySubcategories.length === 0 ? "(Sem subcategorias)" : "Opcional"} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Nenhuma</SelectItem>
+                  <SelectItem value="__none__">Nenhuma</SelectItem>
                   {categorySubcategories.map(sub => (
                     <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                   ))}

@@ -406,9 +406,9 @@ export function ImportPage() {
                         <div>
                           <Label className="text-xs">Subcategoria</Label>
                           <Select
-                            value={item.suggestedSubcategoryId || ''}
+                            value={item.suggestedSubcategoryId || "__none__"}
                             onValueChange={(val) => updateSuggestion(item.id, { 
-                              suggestedSubcategoryId: val || undefined 
+                              suggestedSubcategoryId: val === "__none__" ? undefined : val 
                             })}
                             disabled={categorySubcategories.length === 0}
                           >
@@ -416,7 +416,7 @@ export function ImportPage() {
                               <SelectValue placeholder={categorySubcategories.length === 0 ? "(Sem subcategorias)" : "Opcional"} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Nenhuma</SelectItem>
+                              <SelectItem value="__none__">Nenhuma</SelectItem>
                               {categorySubcategories.map(sub => (
                                 <SelectItem key={sub.id} value={sub.id}>{sub.name}</SelectItem>
                               ))}
