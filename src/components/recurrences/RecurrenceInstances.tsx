@@ -3,19 +3,18 @@ import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Check, X, ExternalLink, RefreshCw } from 'lucide-react';
+import { Check, X, RefreshCw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import * as db from '@/lib/database';
-import type { RecurrenceInstance, Recurrence, Transaction } from '@/types/finance';
+import * as db from '@/lib/supabase-database';
+import type { RecurrenceInstance, Recurrence } from '@/types/finance';
 
 export function RecurrenceInstances() {
   const { 
     selectedMonth, 
     selectedYear, 
     recurrences, 
-    categories, 
-    transactions,
+    categories,
     addTransaction,
     refreshData 
   } = useApp();

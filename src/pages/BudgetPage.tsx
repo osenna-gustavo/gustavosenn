@@ -5,10 +5,13 @@ import { formatNumberToBRL, parseBRLToNumber } from '@/lib/currencyInput';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Copy } from 'lucide-react';
+import { Save, Copy, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
+import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList';
+import { ApplyRecurrencesModal } from '@/components/budget/ApplyRecurrencesModal';
 import { CurrencyInput } from '@/components/ui/currency-input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 export function BudgetPage() {
   const { 
@@ -17,7 +20,9 @@ export function BudgetPage() {
     categories,
     subcategories, 
     transactions,
-    budget, 
+    budget,
+    recurrences,
+    recurrenceInstances,
     saveBudget,
     refreshData 
   } = useApp();
@@ -29,16 +34,37 @@ export function BudgetPage() {
   const [subcategoryBudgets, setSubcategoryBudgets] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [showApplyRecurrencesModal, setShowApplyRecurrencesModal] = useState(false);
+  const [showRecurrences, setShowRecurrences] = useState(true);
 
-  // Initialize from budget - format as BRL
+  // Initialize from budget AND ensure all categories are represented
   useEffect(() => {
+    // Set income/expenses from budget
     if (budget) {
       setPlannedIncome(budget.plannedIncome > 0 ? formatNumberToBRL(budget.plannedIncome) : '');
       setPlannedExpenses(budget.plannedExpenses > 0 ? formatNumberToBRL(budget.plannedExpenses) : '');
-      
-      const catBudgets: Record<string, string> = {};
-      const subBudgets: Record<string, string> = {};
-      
+    } else {
+      setPlannedIncome('');
+      setPlannedExpenses('');
+    }
+    
+    // Initialize ALL expense categories with budget values or empty
+    const catBudgets: Record<string, string> = {};
+    const subBudgets: Record<string, string> = {};
+    
+    // First, initialize all expense categories with empty values
+    const expenseCats = categories.filter(c => c.type === 'despesa');
+    expenseCats.forEach(cat => {
+      catBudgets[cat.id] = '';
+    });
+    
+    // Initialize all subcategories with empty values
+    subcategories.forEach(sub => {
+      subBudgets[sub.id] = '';
+    });
+    
+    // Then overlay with budget values if they exist
+    if (budget) {
       budget.categoryBudgets.forEach(cb => {
         if (cb.subcategoryId) {
           subBudgets[cb.subcategoryId] = cb.plannedAmount > 0 ? formatNumberToBRL(cb.plannedAmount) : '';
@@ -46,16 +72,11 @@ export function BudgetPage() {
           catBudgets[cb.categoryId] = cb.plannedAmount > 0 ? formatNumberToBRL(cb.plannedAmount) : '';
         }
       });
-      
-      setCategoryBudgets(catBudgets);
-      setSubcategoryBudgets(subBudgets);
-    } else {
-      setPlannedIncome('');
-      setPlannedExpenses('');
-      setCategoryBudgets({});
-      setSubcategoryBudgets({});
     }
-  }, [budget, selectedMonth, selectedYear]);
+    
+    setCategoryBudgets(catBudgets);
+    setSubcategoryBudgets(subBudgets);
+  }, [budget, categories, subcategories, selectedMonth, selectedYear]);
 
   // Calculate realized amounts
   const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
@@ -72,9 +93,9 @@ export function BudgetPage() {
     return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
   }, [transactions]);
 
-  // Filter only expense categories for budget display
+  // Filter only expense categories for budget display - show ALL of them
   const expenseCategories = useMemo(() => {
-    return categories.filter(c => c.type === 'despesa');
+    return categories.filter(c => c.type === 'despesa').sort((a, b) => a.name.localeCompare(b.name));
   }, [categories]);
 
   const totalCategoryBudget = useMemo(() => {
@@ -142,6 +163,33 @@ export function BudgetPage() {
     }
   };
 
+  const handleApplyRecurrences = (mode: 'sum' | 'replace', amounts: Record<string, number>) => {
+    const newCatBudgets = { ...categoryBudgets };
+    const newSubBudgets = { ...subcategoryBudgets };
+    
+    Object.entries(amounts).forEach(([key, amount]) => {
+      if (key.startsWith('cat_')) {
+        const catId = key.replace('cat_', '');
+        const current = parseBRLToNumber(newCatBudgets[catId] || '0');
+        const newValue = mode === 'sum' ? current + amount : amount;
+        newCatBudgets[catId] = formatNumberToBRL(newValue);
+      } else if (key.startsWith('sub_')) {
+        const subId = key.replace('sub_', '');
+        const current = parseBRLToNumber(newSubBudgets[subId] || '0');
+        const newValue = mode === 'sum' ? current + amount : amount;
+        newSubBudgets[subId] = formatNumberToBRL(newValue);
+      }
+    });
+    
+    setCategoryBudgets(newCatBudgets);
+    setSubcategoryBudgets(newSubBudgets);
+    
+    toast({
+      title: 'Recorrências aplicadas!',
+      description: `Valores ${mode === 'sum' ? 'somados ao' : 'substituídos no'} orçamento.`,
+    });
+  };
+
   return (
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
@@ -152,10 +200,18 @@ export function BudgetPage() {
             Planejamento de {formatMonthYear(selectedMonth, selectedYear)}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowApplyRecurrencesModal(true)} 
+            className="gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Aplicar Recorrências
+          </Button>
           <Button variant="outline" onClick={() => setShowDuplicateModal(true)} className="gap-2">
             <Copy className="h-4 w-4" />
-            Duplicar Mês Anterior
+            Duplicar Mês
           </Button>
           <Button onClick={handleSave} disabled={isSaving} className="gap-2">
             <Save className="h-4 w-4" />
@@ -193,25 +249,62 @@ export function BudgetPage() {
         </div>
       </div>
 
+      {/* Recurrences Block */}
+      <Collapsible open={showRecurrences} onOpenChange={setShowRecurrences}>
+        <div className="glass-card rounded-xl overflow-hidden">
+          <CollapsibleTrigger asChild>
+            <button className="w-full flex items-center justify-between p-4 lg:p-6 hover:bg-muted/50 transition-colors">
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 text-primary" />
+                <h3 className="text-lg font-semibold">Recorrências do Mês</h3>
+              </div>
+              {showRecurrences ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
+              ) : (
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
+              )}
+            </button>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="px-4 pb-4 lg:px-6 lg:pb-6">
+              <BudgetRecurrencesList
+                recurrences={recurrences}
+                instances={recurrenceInstances}
+                categories={categories}
+                subcategories={subcategories}
+                selectedMonth={selectedMonth}
+                selectedYear={selectedYear}
+              />
+            </div>
+          </CollapsibleContent>
+        </div>
+      </Collapsible>
+
       {/* Category Budgets */}
       <div className="glass-card rounded-xl p-4 lg:p-6">
         <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria (Despesas)</h3>
         
-        <div className="space-y-3">
-          {expenseCategories.map((cat) => (
-            <SubcategoryBudgetEditor
-              key={cat.id}
-              category={cat}
-              subcategories={subcategories}
-              categoryBudgets={categoryBudgets}
-              subcategoryBudgets={subcategoryBudgets}
-              onCategoryChange={(id, value) => setCategoryBudgets(prev => ({ ...prev, [id]: value }))}
-              onSubcategoryChange={(id, value) => setSubcategoryBudgets(prev => ({ ...prev, [id]: value }))}
-              realizedByCategory={realizedByCategory}
-              realizedBySubcategory={realizedBySubcategory}
-            />
-          ))}
-        </div>
+        {expenseCategories.length === 0 ? (
+          <p className="text-center text-muted-foreground py-6">
+            Nenhuma categoria de despesa cadastrada.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {expenseCategories.map((cat) => (
+              <SubcategoryBudgetEditor
+                key={cat.id}
+                category={cat}
+                subcategories={subcategories}
+                categoryBudgets={categoryBudgets}
+                subcategoryBudgets={subcategoryBudgets}
+                onCategoryChange={(id, value) => setCategoryBudgets(prev => ({ ...prev, [id]: value }))}
+                onSubcategoryChange={(id, value) => setSubcategoryBudgets(prev => ({ ...prev, [id]: value }))}
+                realizedByCategory={realizedByCategory}
+                realizedBySubcategory={realizedBySubcategory}
+              />
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Summary */}
@@ -227,11 +320,23 @@ export function BudgetPage() {
         </div>
       </div>
 
-      {/* Duplicate Modal */}
+      {/* Modals */}
       <DuplicateBudgetModal
         isOpen={showDuplicateModal}
         onClose={() => setShowDuplicateModal(false)}
         onSuccess={refreshData}
+      />
+      
+      <ApplyRecurrencesModal
+        isOpen={showApplyRecurrencesModal}
+        onClose={() => setShowApplyRecurrencesModal(false)}
+        recurrences={recurrences}
+        instances={recurrenceInstances}
+        categories={categories}
+        subcategories={subcategories}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+        onApply={handleApplyRecurrences}
       />
     </div>
   );

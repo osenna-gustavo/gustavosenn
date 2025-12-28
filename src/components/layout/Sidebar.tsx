@@ -1,4 +1,5 @@
 import { useApp } from '@/contexts/AppContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { 
   LayoutDashboard, 
   Receipt, 
@@ -9,7 +10,8 @@ import {
   BarChart3, 
   Lightbulb,
   Menu,
-  X
+  X,
+  LogOut
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
 import { useState } from 'react';
@@ -30,11 +32,16 @@ const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = 
 
 export function Sidebar() {
   const { currentScreen, setCurrentScreen } = useApp();
+  const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const handleNavigation = (screen: AppScreen) => {
     setCurrentScreen(screen);
     setIsMobileMenuOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await signOut();
   };
 
   return (
@@ -69,10 +76,10 @@ export function Sidebar() {
 
       {/* Mobile Menu */}
       <nav className={cn(
-        "lg:hidden fixed top-14 right-0 z-50 h-[calc(100vh-3.5rem)] w-64 bg-card border-l border-border transform transition-transform duration-300 ease-in-out",
+        "lg:hidden fixed top-14 right-0 z-50 h-[calc(100vh-3.5rem)] w-64 bg-card border-l border-border transform transition-transform duration-300 ease-in-out flex flex-col",
         isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
       )}>
-        <div className="p-4 space-y-1">
+        <div className="flex-1 p-4 space-y-1">
           {navItems.map((item) => (
             <button
               key={item.screen}
@@ -88,6 +95,18 @@ export function Sidebar() {
               {item.label}
             </button>
           ))}
+        </div>
+        
+        {/* Mobile Logout */}
+        <div className="p-4 border-t border-border">
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-5 w-5" />
+            Sair
+          </Button>
         </div>
       </nav>
 
@@ -126,10 +145,23 @@ export function Sidebar() {
           ))}
         </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-sidebar-border">
+        {/* Footer with user info and logout */}
+        <div className="p-4 border-t border-sidebar-border space-y-3">
+          {user && (
+            <div className="text-xs text-muted-foreground truncate px-2">
+              {user.email}
+            </div>
+          )}
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4" />
+            Sair
+          </Button>
           <p className="text-xs text-muted-foreground text-center">
-            v1.0.0 • Dados locais
+            v1.0.0 • Dados na nuvem ☁️
           </p>
         </div>
       </aside>

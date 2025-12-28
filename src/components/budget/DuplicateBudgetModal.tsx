@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { Copy, Percent } from 'lucide-react';
-import * as db from '@/lib/database';
+import * as db from '@/lib/supabase-database';
 import type { Budget, CategoryBudget } from '@/types/finance';
 
 interface DuplicateBudgetModalProps {

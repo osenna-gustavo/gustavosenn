@@ -5,11 +5,13 @@ import type {
   Transaction, 
   Budget, 
   Recurrence,
+  RecurrenceInstance,
   MonthSummary,
   AppScreen 
 } from '@/types/finance';
-import * as db from '@/lib/database';
+import * as db from '@/lib/supabase-database';
 import { getCurrentMonthYear } from '@/lib/formatters';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface AppContextType {
   // Navigation
@@ -27,6 +29,7 @@ interface AppContextType {
   transactions: Transaction[];
   budget: Budget | null;
   recurrences: Recurrence[];
+  recurrenceInstances: RecurrenceInstance[];
   monthSummary: MonthSummary | null;
   
   // Loading states
@@ -57,6 +60,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
   const [selectedMonth, setSelectedMonthState] = useState(currentMonth);
@@ -67,6 +71,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
+  const [recurrenceInstances, setRecurrenceInstances] = useState<RecurrenceInstance[]>([]);
   const [monthSummary, setMonthSummary] = useState<MonthSummary | null>(null);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -82,6 +87,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     cats: Category[],
     trans: Transaction[],
     budg: Budget | null,
+    recs: Recurrence[],
+    instances: RecurrenceInstance[],
     month: number,
     year: number
   ): MonthSummary => {
@@ -110,9 +117,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const realizedVariable = realizedExpenses - realizedFixed;
 
-    const plannedFixed = budg?.categoryBudgets
+    // Calculate planned fixed from budget + recurrences
+    let plannedFixed = budg?.categoryBudgets
       .filter(cb => fixedCategoryIds.includes(cb.categoryId))
       .reduce((sum, cb) => sum + cb.plannedAmount, 0) ?? 0;
+
+    // Add pending recurrences to planned fixed
+    const pendingRecurrences = instances.filter(i => i.status === 'pending');
+    for (const instance of pendingRecurrences) {
+      const rec = recs.find(r => r.id === instance.recurrenceId);
+      if (rec && rec.type === 'despesa') {
+        const cat = cats.find(c => c.id === rec.categoryId);
+        if (cat?.isFixed) {
+          plannedFixed += instance.amount;
+        }
+      }
+    }
 
     const plannedVariable = plannedExpenses - plannedFixed;
 
@@ -159,14 +179,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const refreshData = useCallback(async () => {
+    if (!user) return;
+    
     setIsLoading(true);
     try {
-      const [cats, subs, trans, budg, recs] = await Promise.all([
+      const [cats, subs, trans, budg, recs, instances] = await Promise.all([
         db.getCategories(),
         db.getSubcategories(),
         db.getTransactions(selectedMonth, selectedYear),
         db.getBudget(selectedMonth, selectedYear),
         db.getRecurrences(),
+        db.getRecurrenceInstances(selectedMonth, selectedYear),
       ]);
       
       setCategories(cats);
@@ -174,19 +197,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setTransactions(trans);
       setBudget(budg ?? null);
       setRecurrences(recs);
+      setRecurrenceInstances(instances);
       
-      const summary = calculateMonthSummary(cats, trans, budg ?? null, selectedMonth, selectedYear);
+      const summary = calculateMonthSummary(cats, trans, budg ?? null, recs, instances, selectedMonth, selectedYear);
       setMonthSummary(summary);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth, selectedYear, calculateMonthSummary]);
+  }, [user, selectedMonth, selectedYear, calculateMonthSummary]);
 
-  // Initialize app
+  // Initialize app when user is authenticated
   useEffect(() => {
     const init = async () => {
+      if (!user) return;
+      
       try {
         await db.initializeDefaultCategories();
         await db.setAppInitialized();
@@ -197,14 +223,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
     init();
-  }, []);
+  }, [user]);
 
   // Refresh when month changes
   useEffect(() => {
-    if (isInitialized) {
+    if (isInitialized && user) {
       refreshData();
     }
-  }, [selectedMonth, selectedYear, isInitialized, refreshData]);
+  }, [selectedMonth, selectedYear, isInitialized, user, refreshData]);
 
   // Transaction actions
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
@@ -294,6 +320,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       transactions,
       budget,
       recurrences,
+      recurrenceInstances,
       monthSummary,
       isLoading,
       isInitialized,

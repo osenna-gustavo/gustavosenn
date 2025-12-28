@@ -676,9 +676,9 @@ export async function updateScenario(scenario: Scenario): Promise<void> {
       baseline_type: scenario.baselineType,
       baseline_month: scenario.baselineMonth,
       baseline_year: scenario.baselineYear,
-      monthly_commitments: scenario.monthlyCommitments,
-      one_time_costs: scenario.oneTimeCosts,
-      category_adjustments: scenario.categoryAdjustments,
+      monthly_commitments: JSON.parse(JSON.stringify(scenario.monthlyCommitments)),
+      one_time_costs: JSON.parse(JSON.stringify(scenario.oneTimeCosts)),
+      category_adjustments: JSON.parse(JSON.stringify(scenario.categoryAdjustments)),
       minimum_balance: scenario.minimumBalance,
     })
     .eq('id', scenario.id);
