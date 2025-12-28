@@ -6,7 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useApp } from '@/contexts/AppContext';
 import { Scenario, ScenarioCommitment, ScenarioOneTimeCost, ScenarioCategoryAdjustment } from '@/types/finance';
-import * as db from '@/lib/database';
+import * as db from '@/lib/supabase-database';
 import { ScenarioCard } from '@/components/scenarios/ScenarioCard';
 import { ScenarioFormModal } from '@/components/scenarios/ScenarioFormModal';
 import { ScenarioCommitmentForm } from '@/components/scenarios/ScenarioCommitmentForm';
