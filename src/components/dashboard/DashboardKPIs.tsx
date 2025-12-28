@@ -22,8 +22,8 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
 
   if (!monthSummary) {
     return (
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[...Array(4)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[...Array(3)].map((_, i) => (
           <div key={i} className="stat-card animate-pulse">
             <div className="h-4 bg-muted rounded w-24 mb-2" />
             <div className="h-8 bg-muted rounded w-32" />
@@ -51,7 +51,7 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
       percentage: monthSummary.plannedExpenses > 0 
         ? (monthSummary.realizedExpenses / monthSummary.plannedExpenses) * 100 
         : 0,
-      drillDownFilter: { type: 'expenses' as const, title: 'Despesas do Mês' },
+      drillDownFilter: { type: 'planned-vs-realized' as const, title: 'Planejado vs Realizado' },
     },
     {
       label: 'Falta de Fixo',
@@ -59,15 +59,7 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
       icon: monthSummary.remainingFixed > 0 ? AlertTriangle : CheckCircle2,
       trend: monthSummary.remainingFixed > 0 ? 'warning' : 'positive',
       description: monthSummary.remainingFixed > 0 ? 'Ainda não coberto' : 'Fixos cobertos',
-      drillDownFilter: { type: 'fixed' as const, title: 'Despesas Fixas' },
-    },
-    {
-      label: 'Disponível (Variável)',
-      value: monthSummary.remainingVariable,
-      icon: monthSummary.remainingVariable > 0 ? TrendingUp : TrendingDown,
-      trend: monthSummary.remainingVariable > 0 ? 'positive' : 'negative',
-      description: monthSummary.remainingVariable > 0 ? 'Pode gastar' : 'Limite atingido',
-      drillDownFilter: { type: 'variable' as const, title: 'Despesas Variáveis' },
+      drillDownFilter: { type: 'fixed-pending' as const, title: 'Falta de Fixo' },
     },
   ];
 
@@ -78,7 +70,7 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
   };
 
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
