@@ -29,8 +29,12 @@ export function TransactionList() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filteredTransactions = useMemo(() => {
+    // Safely handle cases where transactions might be empty or have invalid entries
+    if (!Array.isArray(transactions)) return [];
+    
     return transactions
       .filter(t => {
+        if (!t || !t.id) return false; // Skip invalid entries
         if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) {
           return false;
         }
@@ -43,16 +47,20 @@ export function TransactionList() {
         }
         return true;
       })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      .sort((a, b) => {
+        const dateA = a.date instanceof Date ? a.date : new Date(a.date);
+        const dateB = b.date instanceof Date ? b.date : new Date(b.date);
+        return dateB.getTime() - dateA.getTime();
+      });
   }, [transactions, categories, searchQuery, categoryFilter]);
 
   const totals = useMemo(() => {
     const income = filteredTransactions
       .filter(t => t.type === 'receita')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (typeof t.amount === 'number' && !isNaN(t.amount) ? t.amount : 0), 0);
     const expenses = filteredTransactions
       .filter(t => t.type === 'despesa')
-      .reduce((sum, t) => sum + t.amount, 0);
+      .reduce((sum, t) => sum + (typeof t.amount === 'number' && !isNaN(t.amount) ? t.amount : 0), 0);
     return { income, expenses, balance: income - expenses };
   }, [filteredTransactions]);
 
@@ -126,6 +134,14 @@ export function TransactionList() {
             const category = categories.find(c => c.id === transaction.categoryId);
             const isIncome = transaction.type === 'receita';
             
+            // Safe formatting - handle null/undefined/invalid values
+            const safeAmount = typeof transaction.amount === 'number' && !isNaN(transaction.amount) 
+              ? transaction.amount 
+              : 0;
+            const safeDate = transaction.date instanceof Date && !isNaN(transaction.date.getTime())
+              ? transaction.date
+              : new Date();
+            
             return (
               <div 
                 key={transaction.id}
@@ -152,7 +168,7 @@ export function TransactionList() {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground">
-                      {formatDate(transaction.date)}
+                      {formatDate(safeDate)}
                       {transaction.description && ` • ${transaction.description}`}
                     </p>
                   </div>
@@ -163,7 +179,7 @@ export function TransactionList() {
                     "font-mono font-medium",
                     isIncome ? "text-success" : "text-foreground"
                   )}>
-                    {isIncome ? '+' : '-'}{formatCurrency(transaction.amount)}
+                    {isIncome ? '+' : '-'}{formatCurrency(safeAmount)}
                   </span>
                   <Pencil className="h-4 w-4 text-muted-foreground" />
                 </div>

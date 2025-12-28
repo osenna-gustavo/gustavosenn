@@ -56,13 +56,27 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
   // Populate form when transaction changes
   useEffect(() => {
     if (transaction) {
-      setType(transaction.type);
-      setAmount(transaction.amount.toString().replace('.', ','));
-      setDate(new Date(transaction.date).toISOString().split('T')[0]);
-      setCategoryId(transaction.categoryId);
+      setType(transaction.type || 'despesa');
+      const safeAmount = typeof transaction.amount === 'number' && !isNaN(transaction.amount) 
+        ? transaction.amount 
+        : 0;
+      setAmount(safeAmount.toString().replace('.', ','));
+      
+      // Handle date safely
+      let safeDate: Date;
+      if (transaction.date instanceof Date && !isNaN(transaction.date.getTime())) {
+        safeDate = transaction.date;
+      } else if (typeof transaction.date === 'string') {
+        safeDate = new Date(transaction.date);
+      } else {
+        safeDate = new Date();
+      }
+      setDate(safeDate.toISOString().split('T')[0]);
+      
+      setCategoryId(transaction.categoryId || '');
       setSubcategoryId(transaction.subcategoryId || '');
       setDescription(transaction.description || '');
-      setNeedsReview(transaction.needsReview);
+      setNeedsReview(transaction.needsReview || false);
     }
   }, [transaction]);
 
@@ -73,6 +87,7 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
     
     if (!transaction) return;
     
+    // Validate required fields
     if (!amount || !categoryId) {
       toast({
         title: 'Campos obrigatórios',
@@ -82,7 +97,19 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
       return;
     }
 
-    const parsedAmount = parseFloat(amount.replace(',', '.'));
+    if (!date) {
+      toast({
+        title: 'Data inválida',
+        description: 'Selecione uma data válida.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    // Parse amount safely (handles pt-BR format)
+    const cleanedAmount = amount.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
+    const parsedAmount = parseFloat(cleanedAmount);
+    
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
       toast({
         title: 'Valor inválido',
@@ -96,7 +123,7 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
     try {
       await updateTransaction({
         ...transaction,
-        date: new Date(date),
+        date: new Date(date + 'T12:00:00'), // Use noon to avoid timezone issues
         amount: parsedAmount,
         type,
         categoryId,
@@ -111,30 +138,40 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
 
       onClose();
     } catch (error) {
+      console.error('Error updating transaction:', error);
       toast({
-        title: 'Erro ao salvar',
+        title: 'Falha ao salvar',
         description: 'Tente novamente.',
         variant: 'destructive',
       });
+      // Keep modal open on error - don't call onClose()
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const handleDelete = async () => {
     if (!transaction) return;
     
+    setIsDeleting(true);
     try {
       await deleteTransaction(transaction.id);
       toast({ title: 'Lançamento excluído!' });
       setShowDeleteConfirm(false);
       onClose();
     } catch (error) {
+      console.error('Error deleting transaction:', error);
       toast({
-        title: 'Erro ao excluir',
+        title: 'Não foi possível excluir',
         description: 'Tente novamente.',
         variant: 'destructive',
       });
+      setShowDeleteConfirm(false);
+      // Keep modal open - don't call onClose()
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -304,21 +341,27 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
       </Dialog>
 
       {/* Delete Confirmation */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <AlertDialog open={showDeleteConfirm} onOpenChange={(open) => !isDeleting && setShowDeleteConfirm(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Excluir lançamento?</AlertDialogTitle>
+            <AlertDialogTitle>Tem certeza que deseja excluir este lançamento?</AlertDialogTitle>
             <AlertDialogDescription>
               Esta ação não pode ser desfeita.
+              {transaction?.recurrenceInstanceId && (
+                <span className="block mt-2 text-warning">
+                  Este lançamento está vinculado a uma recorrência. Ao excluir, a instância voltará para "Pendente".
+                </span>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDelete} 
+              disabled={isDeleting}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
-              Excluir
+              {isDeleting ? 'Excluindo...' : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
