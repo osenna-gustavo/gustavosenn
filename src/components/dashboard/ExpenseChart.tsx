@@ -23,6 +23,16 @@ export function ExpenseChart({ onDrillDown }: ExpenseChartProps) {
   const { monthSummary, categories } = useApp();
   const [activeIndex, setActiveIndex] = useState<number | undefined>(undefined);
 
+  const handlePieClick = useCallback((data: any, index: number) => {
+    if (onDrillDown && data) {
+      onDrillDown({
+        type: 'expenses',
+        categoryId: data.categoryId,
+        title: `Despesas: ${data.name}`,
+      });
+    }
+  }, [onDrillDown]);
+
   if (!monthSummary) {
     return (
       <div className="glass-card rounded-xl p-4 lg:p-6 h-[300px] flex items-center justify-center">
@@ -46,16 +56,6 @@ export function ExpenseChart({ onDrillDown }: ExpenseChartProps) {
         : 0,
       color: COLORS[index % COLORS.length],
     }));
-
-  const handlePieClick = useCallback((data: any, index: number) => {
-    if (onDrillDown && data) {
-      onDrillDown({
-        type: 'expenses',
-        categoryId: data.categoryId,
-        title: `Despesas: ${data.name}`,
-      });
-    }
-  }, [onDrillDown]);
 
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
