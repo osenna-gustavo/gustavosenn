@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ interface TransactionFormProps {
 export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   const { categories, subcategories, addTransaction, lastUsedCategoryId } = useApp();
   const { toast } = useToast();
+  const amountInputRef = useRef<HTMLInputElement>(null);
   
   const [type, setType] = useState<TransactionType>('despesa');
   const [amount, setAmount] = useState('');
@@ -40,7 +41,7 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   const [needsReview, setNeedsReview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form when opened
+  // Reset form completely when opened (only on open, not on subsequent saves)
   useEffect(() => {
     if (isOpen) {
       setType('despesa');
@@ -54,6 +55,17 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   }, [isOpen, lastUsedCategoryId]);
 
   const filteredSubcategories = subcategories.filter(s => s.categoryId === categoryId);
+
+  // Reset only value/description fields after successful save (keep type, category, subcategory, date)
+  const resetForNextEntry = () => {
+    setAmount('');
+    setDescription('');
+    setNeedsReview(false);
+    // Focus on amount field for next entry
+    setTimeout(() => {
+      amountInputRef.current?.focus();
+    }, 100);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,17 +103,19 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
       });
 
       toast({
-        title: 'Lançamento salvo!',
+        title: 'Lançamento salvo',
         description: `${type === 'receita' ? 'Receita' : 'Despesa'} de R$ ${parsedAmount.toFixed(2)} adicionada.`,
       });
 
-      onClose();
+      // Reset only specific fields, keep modal open for next entry
+      resetForNextEntry();
     } catch (error) {
       toast({
-        title: 'Erro ao salvar',
+        title: 'Falha ao salvar',
         description: 'Tente novamente.',
         variant: 'destructive',
       });
+      // Keep modal open and data intact on error
     } finally {
       setIsSubmitting(false);
     }
@@ -147,6 +161,7 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
           <div className="space-y-2">
             <Label htmlFor="amount">Valor (R$)</Label>
             <Input
+              ref={amountInputRef}
               id="amount"
               type="text"
               inputMode="decimal"
