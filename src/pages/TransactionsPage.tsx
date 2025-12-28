@@ -1,14 +1,28 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { useApp } from '@/contexts/AppContext';
+import { useFilters } from '@/contexts/FilterContext';
 import { formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { FilterPanel } from '@/components/filters';
+import { applyTransactionFilters } from '@/lib/filter-utils';
 
 export function TransactionsPage() {
-  const { selectedMonth, selectedYear } = useApp();
+  const { selectedMonth, selectedYear, transactions, categories, subcategories } = useApp();
+  const { filters } = useFilters();
   const [isFormOpen, setIsFormOpen] = useState(false);
+
+  // Apply filters to transactions
+  const filteredTransactions = useMemo(() => {
+    return applyTransactionFilters(
+      transactions,
+      filters.transactions,
+      categories,
+      subcategories
+    );
+  }, [transactions, filters.transactions, categories, subcategories]);
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -26,7 +40,14 @@ export function TransactionsPage() {
         </Button>
       </div>
 
-      <TransactionList />
+      {/* Filters */}
+      <FilterPanel
+        screen="transactions"
+        categories={categories}
+        subcategories={subcategories}
+      />
+
+      <TransactionList filteredTransactions={filteredTransactions} />
 
       <TransactionForm 
         isOpen={isFormOpen} 

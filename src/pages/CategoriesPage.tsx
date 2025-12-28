@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { useFilters } from '@/contexts/FilterContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +25,8 @@ import { Plus, Pencil, Trash2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Category, Subcategory } from '@/types/finance';
 import { cn } from '@/lib/utils';
+import { FilterPanel } from '@/components/filters';
+import { applyCategoryFilters } from '@/lib/filter-utils';
 
 const EMOJI_OPTIONS = ['📱', '🏠', '🚗', '🍽️', '💊', '🎮', '📚', '🛒', '📄', '📦', '💰', '✈️', '👕', '🎁', '🔧', '💼'];
 
@@ -31,6 +34,8 @@ export function CategoriesPage() {
   const { 
     categories, 
     subcategories, 
+    transactions,
+    budget,
     addCategory, 
     updateCategory, 
     deleteCategory,
@@ -38,6 +43,7 @@ export function CategoriesPage() {
     updateSubcategory,
     deleteSubcategory
   } = useApp();
+  const { filters } = useFilters();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -50,6 +56,24 @@ export function CategoriesPage() {
   const [formData, setFormData] = useState({ name: '', icon: '📦', isFixed: false, type: 'despesa' as 'receita' | 'despesa' });
   const [subFormData, setSubFormData] = useState({ name: '', isFixed: false });
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+
+  // Build set of categories with budget
+  const budgetCategories = useMemo(() => {
+    const set = new Set<string>();
+    budget?.categoryBudgets.forEach(cb => set.add(cb.categoryId));
+    return set;
+  }, [budget]);
+
+  // Apply filters to categories
+  const filteredCategories = useMemo(() => {
+    return applyCategoryFilters(
+      categories,
+      filters.categories,
+      subcategories,
+      transactions,
+      budgetCategories
+    );
+  }, [categories, filters.categories, subcategories, transactions, budgetCategories]);
 
   const openCategoryForm = (category?: Category) => {
     if (category) {
@@ -146,14 +170,22 @@ export function CategoriesPage() {
         </Button>
       </div>
 
+      {/* Filters */}
+      <FilterPanel
+        screen="categories"
+        categories={categories}
+        subcategories={subcategories}
+        showFixedFilters={true}
+      />
+
       {/* Categories List */}
       <div className="glass-card rounded-xl divide-y divide-border">
-        {categories.length === 0 ? (
+        {filteredCategories.length === 0 ? (
           <div className="p-8 text-center text-muted-foreground">
-            Nenhuma categoria criada.
+            Nenhuma categoria encontrada.
           </div>
         ) : (
-          categories.map((category) => {
+          filteredCategories.map((category) => {
             const subs = subcategories.filter(s => s.categoryId === category.id);
             const isExpanded = expandedCategory === category.id;
             

@@ -21,7 +21,11 @@ import { EditTransactionModal } from './EditTransactionModal';
 import { cn } from '@/lib/utils';
 import type { Transaction } from '@/types/finance';
 
-export function TransactionList() {
+interface TransactionListProps {
+  filteredTransactions?: Transaction[];
+}
+
+export function TransactionList({ filteredTransactions: externalFiltered }: TransactionListProps) {
   const { transactions, categories } = useApp();
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -29,10 +33,13 @@ export function TransactionList() {
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   const filteredTransactions = useMemo(() => {
-    // Safely handle cases where transactions might be empty or have invalid entries
-    if (!Array.isArray(transactions)) return [];
+    // Use external filtered transactions if provided, otherwise filter internally
+    const baseTransactions = externalFiltered ?? transactions;
     
-    return transactions
+    // Safely handle cases where transactions might be empty or have invalid entries
+    if (!Array.isArray(baseTransactions)) return [];
+    
+    return baseTransactions
       .filter(t => {
         if (!t || !t.id) return false; // Skip invalid entries
         if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) {
@@ -52,7 +59,7 @@ export function TransactionList() {
         const dateB = b.date instanceof Date ? b.date : new Date(b.date);
         return dateB.getTime() - dateA.getTime();
       });
-  }, [transactions, categories, searchQuery, categoryFilter]);
+  }, [transactions, externalFiltered, categories, searchQuery, categoryFilter]);
 
   const totals = useMemo(() => {
     const income = filteredTransactions
