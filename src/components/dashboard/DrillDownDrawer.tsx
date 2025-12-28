@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import type { Transaction, TransactionType } from '@/types/finance';
 
 export interface DrillDownFilter {
-  type: 'all' | 'expenses' | 'income' | 'fixed' | 'variable';
+  type: 'all' | 'expenses' | 'income' | 'fixed' | 'variable' | 'planned-vs-realized' | 'fixed-pending';
   categoryId?: string;
   subcategoryId?: string;
   title: string;
