@@ -309,6 +309,32 @@ export async function updateTransaction(transaction: Transaction): Promise<void>
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
+  // First, check if this transaction is linked to a recurrence instance
+  const { data: transaction, error: fetchError } = await supabase
+    .from('transactions')
+    .select('recurrence_instance_id')
+    .eq('id', id)
+    .maybeSingle();
+  
+  if (fetchError) throw fetchError;
+  
+  // If linked to a recurrence instance, reset the instance to pending
+  if (transaction?.recurrence_instance_id) {
+    const { error: instanceError } = await supabase
+      .from('recurrence_instances')
+      .update({
+        status: 'pending',
+        linked_transaction_id: null,
+      })
+      .eq('id', transaction.recurrence_instance_id);
+    
+    if (instanceError) {
+      console.error('Error resetting recurrence instance:', instanceError);
+      // Continue with deletion anyway
+    }
+  }
+  
+  // Now delete the transaction
   const { error } = await supabase
     .from('transactions')
     .delete()

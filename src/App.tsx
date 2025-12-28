@@ -13,18 +13,26 @@ import { ImportPage } from '@/pages/ImportPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ScenariosPage } from '@/pages/ScenariosPage';
 import { AuthPage } from '@/pages/AuthPage';
-
+import { TransactionsErrorBoundary } from '@/components/transactions/TransactionsErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
 import { Loader2 } from 'lucide-react';
 import * as localDb from '@/lib/database';
 
 function AppContent() {
-  const { currentScreen } = useApp();
+  const { currentScreen, setCurrentScreen } = useApp();
+
+  const handleNavigateToDashboard = () => {
+    setCurrentScreen('dashboard');
+  };
 
   const renderScreen = () => {
     switch (currentScreen) {
       case 'dashboard': return <DashboardPage />;
-      case 'transactions': return <TransactionsPage />;
+      case 'transactions': return (
+        <TransactionsErrorBoundary onNavigateToDashboard={handleNavigateToDashboard}>
+          <TransactionsPage />
+        </TransactionsErrorBoundary>
+      );
       case 'budget': return <BudgetPage />;
       case 'categories': return <CategoriesPage />;
       case 'recurrences': return <RecurrencesPage />;
