@@ -14,6 +14,76 @@ export type Database = {
   }
   public: {
     Tables: {
+      budget_allocations: {
+        Row: {
+          amount: number
+          category_id: string
+          created_at: string | null
+          direction: string
+          id: string
+          month: number
+          rule_id: string | null
+          source: string
+          source_id: string | null
+          subcategory_id: string | null
+          updated_at: string | null
+          user_id: string
+          year: number
+        }
+        Insert: {
+          amount?: number
+          category_id: string
+          created_at?: string | null
+          direction: string
+          id?: string
+          month: number
+          rule_id?: string | null
+          source: string
+          source_id?: string | null
+          subcategory_id?: string | null
+          updated_at?: string | null
+          user_id: string
+          year: number
+        }
+        Update: {
+          amount?: number
+          category_id?: string
+          created_at?: string | null
+          direction?: string
+          id?: string
+          month?: number
+          rule_id?: string | null
+          source?: string
+          source_id?: string | null
+          subcategory_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "budget_allocations_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_allocations_rule_id_fkey"
+            columns: ["rule_id"]
+            isOneToOne: false
+            referencedRelation: "recurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "budget_allocations_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       budget_items: {
         Row: {
           budget_id: string
@@ -263,6 +333,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      saved_filters: {
+        Row: {
+          created_at: string | null
+          filters: Json
+          id: string
+          name: string
+          screen: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          filters?: Json
+          id?: string
+          name: string
+          screen: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          filters?: Json
+          id?: string
+          name?: string
+          screen?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       scenarios: {
         Row: {
