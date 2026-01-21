@@ -3,8 +3,11 @@ import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { Button } from '@/components/ui/button';
 import { List, Layers, ChevronDown, ChevronRight } from 'lucide-react';
 import type { DrillDownFilter } from './DrillDownDrawer';
+
+const INITIAL_LIMIT = 8;
 
 interface CategoryProgressProps {
   onDrillDown?: (filter: DrillDownFilter) => void;
@@ -38,6 +41,7 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
   const { monthSummary, categories, subcategories: allSubcategories, transactions, budget } = useApp();
   const [viewMode, setViewMode] = useState<ViewMode>('simple');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [showAll, setShowAll] = useState(false);
 
   if (!monthSummary || categories.length === 0) {
     return (
@@ -115,7 +119,9 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
     .filter(c => c.planned > 0 || c.realized > 0)
     .sort((a, b) => b.realized - a.realized);
 
-  const topCategories = groupedCategories.slice(0, 8);
+  const displayCategories = showAll ? groupedCategories : groupedCategories.slice(0, INITIAL_LIMIT);
+  const hasMore = groupedCategories.length > INITIAL_LIMIT;
+  const hiddenCount = groupedCategories.length - INITIAL_LIMIT;
 
   const handleCategoryClick = (categoryId: string, categoryName: string) => {
     if (onDrillDown) {
@@ -189,14 +195,14 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
         </span>
       </div>
 
-      {topCategories.length === 0 ? (
+      {displayCategories.length === 0 ? (
         <p className="text-muted-foreground text-sm text-center py-8">
           Nenhum lançamento ou orçamento definido para este mês.
         </p>
       ) : viewMode === 'simple' ? (
         // Simple view - flat list
         <div className="space-y-4">
-          {topCategories.map((cat) => (
+          {displayCategories.map((cat) => (
             <div 
               key={cat.categoryId}
               className="cursor-pointer hover:bg-muted/50 rounded-lg p-2 -mx-2 transition-colors"
@@ -247,11 +253,33 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
               </div>
             </div>
           ))}
+          
+          {/* Ver mais / Ver menos button */}
+          {hasMore && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll ? (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1 rotate-[-90deg]" />
+                  Ver menos
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1 rotate-90" />
+                  Ver mais {hiddenCount} {hiddenCount === 1 ? 'categoria' : 'categorias'}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       ) : (
         // Grouped view - with expandable subcategories
         <div className="space-y-2">
-          {topCategories.map((cat) => (
+          {displayCategories.map((cat) => (
             <div key={cat.categoryId} className="rounded-lg border border-border overflow-hidden">
               {/* Category header */}
               <div 
@@ -345,6 +373,28 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
               )}
             </div>
           ))}
+          
+          {/* Ver mais / Ver menos button */}
+          {hasMore && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-muted-foreground hover:text-foreground"
+              onClick={() => setShowAll(!showAll)}
+            >
+              {showAll ? (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1 rotate-[-90deg]" />
+                  Ver menos
+                </>
+              ) : (
+                <>
+                  <ChevronRight className="h-4 w-4 mr-1 rotate-90" />
+                  Ver mais {hiddenCount} {hiddenCount === 1 ? 'categoria' : 'categorias'}
+                </>
+              )}
+            </Button>
+          )}
         </div>
       )}
     </div>
