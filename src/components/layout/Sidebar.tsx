@@ -11,13 +11,17 @@ import {
   Lightbulb,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Clock
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
+import { supabase } from '@/integrations/supabase/client';
+import { formatDistanceToNow } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 
 const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
   { screen: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -34,6 +38,39 @@ export function Sidebar() {
   const { currentScreen, setCurrentScreen } = useApp();
   const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [lastActivity, setLastActivity] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchLastActivity = async () => {
+      const [transRes, instanceRes] = await Promise.all([
+        supabase
+          .from('transactions')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1),
+        supabase
+          .from('recurrence_instances')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false })
+          .limit(1),
+      ]);
+
+      const dates: Date[] = [];
+      if (transRes.data?.[0]?.created_at) dates.push(new Date(transRes.data[0].created_at));
+      if (instanceRes.data?.[0]?.created_at) dates.push(new Date(instanceRes.data[0].created_at));
+
+      if (dates.length > 0) {
+        const latest = new Date(Math.max(...dates.map(d => d.getTime())));
+        setLastActivity(formatDistanceToNow(latest, { addSuffix: true, locale: ptBR }));
+      }
+    };
+
+    fetchLastActivity();
+  }, [user]);
 
   const handleNavigation = (screen: AppScreen) => {
     setCurrentScreen(screen);
@@ -97,8 +134,14 @@ export function Sidebar() {
           ))}
         </div>
         
-        {/* Mobile Logout */}
-        <div className="p-4 border-t border-border">
+        {/* Mobile Footer */}
+        <div className="p-4 border-t border-border space-y-3">
+          {lastActivity && (
+            <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span>Última atividade {lastActivity}</span>
+            </div>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-destructive"
@@ -147,6 +190,12 @@ export function Sidebar() {
 
         {/* Footer with user info and logout */}
         <div className="p-4 border-t border-sidebar-border space-y-3">
+          {lastActivity && (
+            <div className="flex items-center gap-2 px-2 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              <span>Última atividade {lastActivity}</span>
+            </div>
+          )}
           {user && (
             <div className="text-xs text-muted-foreground truncate px-2">
               {user.email}
