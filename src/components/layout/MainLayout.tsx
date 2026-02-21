@@ -1,8 +1,12 @@
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MonthSelector } from './MonthSelector';
 import { useApp } from '@/contexts/AppContext';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Calculator, StickyNote } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { FloatingCalculator } from '@/components/tools/FloatingCalculator';
+import { FloatingNotepad } from '@/components/tools/FloatingNotepad';
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -10,6 +14,8 @@ interface MainLayoutProps {
 
 export function MainLayout({ children }: MainLayoutProps) {
   const { isLoading, isInitialized } = useApp();
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [notepadOpen, setNotepadOpen] = useState(false);
 
   if (!isInitialized) {
     return (
@@ -52,6 +58,40 @@ export function MainLayout({ children }: MainLayoutProps) {
           {children}
         </div>
       </main>
+
+      {/* Floating Tools */}
+      <TooltipProvider>
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-11 w-11 rounded-full shadow-lg bg-background"
+                onClick={() => setNotepadOpen(true)}
+              >
+                <StickyNote className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Bloco de Notas</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                className="h-11 w-11 rounded-full shadow-lg"
+                onClick={() => setCalcOpen(true)}
+              >
+                <Calculator className="h-5 w-5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="left">Calculadora</TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
+
+      <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
+      <FloatingNotepad open={notepadOpen} onClose={() => setNotepadOpen(false)} />
     </div>
   );
 }
