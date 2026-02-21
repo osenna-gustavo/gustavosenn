@@ -20,8 +20,8 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { ThemeToggle } from './ThemeToggle';
 import { supabase } from '@/integrations/supabase/client';
-import { formatDistanceToNow } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format } from 'date-fns';
+
 
 const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
   { screen: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
@@ -65,7 +65,7 @@ export function Sidebar() {
 
       if (dates.length > 0) {
         const latest = new Date(Math.max(...dates.map(d => d.getTime())));
-        setLastActivity(formatDistanceToNow(latest, { addSuffix: true, locale: ptBR }));
+        setLastActivity(format(latest, "dd/MM/yyyy 'às' HH:mm"));
       }
     };
 
