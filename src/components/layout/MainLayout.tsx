@@ -61,7 +61,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* Floating Tools */}
       <TooltipProvider>
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+        <div className="fixed bottom-24 right-6 z-50 flex flex-col gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
