@@ -36,14 +36,14 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      
+
       {/* Main Content */}
       <main className="lg:pl-64 pt-14 lg:pt-0 min-h-screen">
         {/* Header */}
         <header className="sticky top-14 lg:top-0 z-30 h-16 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="h-full px-4 lg:px-6 flex items-center justify-between">
             <MonthSelector />
-            
+
             {isLoading && (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -61,7 +61,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       {/* Floating Tools */}
       <TooltipProvider>
-        <div className="fixed bottom-24 right-6 z-50 flex flex-col gap-2">
+        <div className="fixed bottom-6 right-24 z-50 flex flex-row items-center gap-2">
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
