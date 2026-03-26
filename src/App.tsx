@@ -5,7 +5,6 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { AppProvider, useApp } from '@/contexts/AppContext';
 import { FilterProvider } from '@/contexts/FilterContext';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { FAB } from '@/components/transactions/FAB';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { TransactionsPage } from '@/pages/TransactionsPage';
 import { BudgetPage } from '@/pages/BudgetPage';
@@ -48,7 +47,6 @@ function AppContent() {
   return (
     <MainLayout>
       {renderScreen()}
-      <FAB />
     </MainLayout>
   );
 }

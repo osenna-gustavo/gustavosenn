@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
-import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { Button } from '@/components/ui/button';
-import { List, Layers, ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { DrillDownFilter } from './DrillDownDrawer';
 
 const INITIAL_LIMIT = 8;
@@ -12,8 +11,6 @@ const INITIAL_LIMIT = 8;
 interface CategoryProgressProps {
   onDrillDown?: (filter: DrillDownFilter) => void;
 }
-
-type ViewMode = 'simple' | 'grouped';
 
 interface SubcategoryData {
   subcategoryId: string;
@@ -39,7 +36,6 @@ interface GroupedCategoryData {
 
 export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
   const { monthSummary, categories, subcategories: allSubcategories, transactions, budget } = useApp();
-  const [viewMode, setViewMode] = useState<ViewMode>('simple');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [showAll, setShowAll] = useState(false);
 
@@ -159,25 +155,8 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
 
   return (
     <div className="glass-card rounded-xl p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Categorias do Mês</h3>
-        <div className="flex items-center gap-3">
-          <ToggleGroup 
-            type="single" 
-            value={viewMode} 
-            onValueChange={(v) => v && setViewMode(v as ViewMode)}
-            className="bg-muted rounded-lg p-0.5"
-          >
-            <ToggleGroupItem value="simple" aria-label="Lista simples" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background">
-              <List className="h-3 w-3" />
-              Simples
-            </ToggleGroupItem>
-            <ToggleGroupItem value="grouped" aria-label="Agrupar por categoria" className="px-2 py-1 text-xs gap-1 data-[state=on]:bg-background">
-              <Layers className="h-3 w-3" />
-              Agrupado
-            </ToggleGroupItem>
-          </ToggleGroup>
-        </div>
       </div>
 
       <div className="flex gap-3 text-xs mb-4">
@@ -199,85 +178,7 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
         <p className="text-muted-foreground text-sm text-center py-8">
           Nenhum lançamento ou orçamento definido para este mês.
         </p>
-      ) : viewMode === 'simple' ? (
-        // Simple view - flat list
-        <div className="space-y-4">
-          {displayCategories.map((cat) => (
-            <div 
-              key={cat.categoryId}
-              className="cursor-pointer hover:bg-muted/50 rounded-lg p-2 -mx-2 transition-colors"
-              onClick={() => handleCategoryClick(cat.categoryId, cat.categoryName)}
-            >
-              <div className="flex items-center justify-between mb-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-base">{cat.icon || '📦'}</span>
-                  <span className="font-medium text-sm">{cat.categoryName}</span>
-                  {cat.isFixed && (
-                    <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      Fixo
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <span className="font-mono font-medium">
-                    {formatCurrency(cat.realized)}
-                  </span>
-                  {cat.planned > 0 && (
-                    <span className="text-muted-foreground">
-                      / {formatCurrency(cat.planned)}
-                    </span>
-                  )}
-                </div>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={cn(
-                      "h-full rounded-full transition-all duration-500",
-                      cat.status === 'ok' && "bg-success",
-                      cat.status === 'warning' && "bg-warning",
-                      cat.status === 'exceeded' && "bg-destructive"
-                    )}
-                    style={{ width: `${Math.min(cat.percentage, 100)}%` }}
-                  />
-                </div>
-                <span className={cn(
-                  "text-xs font-medium w-12 text-right",
-                  cat.status === 'ok' && "text-success",
-                  cat.status === 'warning' && "text-warning",
-                  cat.status === 'exceeded' && "text-destructive"
-                )}>
-                  {formatPercentage(Math.round(cat.percentage))}
-                </span>
-              </div>
-            </div>
-          ))}
-          
-          {/* Ver mais / Ver menos button */}
-          {hasMore && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground hover:text-foreground"
-              onClick={() => setShowAll(!showAll)}
-            >
-              {showAll ? (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1 rotate-[-90deg]" />
-                  Ver menos
-                </>
-              ) : (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1 rotate-90" />
-                  Ver mais {hiddenCount} {hiddenCount === 1 ? 'categoria' : 'categorias'}
-                </>
-              )}
-            </Button>
-          )}
-        </div>
       ) : (
-        // Grouped view - with expandable subcategories
         <div className="space-y-2">
           {displayCategories.map((cat) => (
             <div key={cat.categoryId} className="rounded-lg border border-border overflow-hidden">

@@ -2,10 +2,11 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MonthSelector } from './MonthSelector';
 import { useApp } from '@/contexts/AppContext';
-import { Loader2, Calculator, StickyNote } from 'lucide-react';
+import { Loader2, Calculator, StickyNote, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FloatingCalculator } from '@/components/tools/FloatingCalculator';
 import { FloatingNotepad } from '@/components/tools/FloatingNotepad';
+import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
 interface MainLayoutProps {
@@ -16,6 +17,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isLoading, isInitialized } = useApp();
   const [calcOpen, setCalcOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   if (!isInitialized) {
     return (
@@ -44,12 +46,53 @@ export function MainLayout({ children }: MainLayoutProps) {
           <div className="h-full px-4 lg:px-6 flex items-center justify-between">
             <MonthSelector />
 
-            {isLoading && (
-              <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="h-4 w-4 animate-spin" />
-                <span className="hidden sm:inline">Atualizando...</span>
-              </div>
-            )}
+            <div className="flex items-center gap-2">
+              {isLoading && (
+                <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="hidden sm:inline">Atualizando...</span>
+                </div>
+              )}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-9 w-9 rounded-full bg-background"
+                      onClick={() => setNotepadOpen(true)}
+                    >
+                      <StickyNote className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Bloco de Notas</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      className="h-9 w-9 rounded-full"
+                      onClick={() => setCalcOpen(true)}
+                    >
+                      <Calculator className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Calculadora</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
+                      className="h-9 w-9 rounded-full glow-primary animate-pulse-glow"
+                      onClick={() => setIsFormOpen(true)}
+                    >
+                      <Plus className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Novo Lançamento</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
           </div>
         </header>
 
@@ -59,39 +102,9 @@ export function MainLayout({ children }: MainLayoutProps) {
         </div>
       </main>
 
-      {/* Floating Tools */}
-      <TooltipProvider>
-        <div className="fixed bottom-6 right-24 z-50 flex flex-row items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-11 w-11 rounded-full shadow-lg bg-background"
-                onClick={() => setNotepadOpen(true)}
-              >
-                <StickyNote className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Bloco de Notas</TooltipContent>
-          </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                className="h-11 w-11 rounded-full shadow-lg"
-                onClick={() => setCalcOpen(true)}
-              >
-                <Calculator className="h-5 w-5" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent side="left">Calculadora</TooltipContent>
-          </Tooltip>
-        </div>
-      </TooltipProvider>
-
       <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
       <FloatingNotepad open={notepadOpen} onClose={() => setNotepadOpen(false)} />
+      <TransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
     </div>
   );
 }

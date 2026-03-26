@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
 import { TransactionList } from '@/components/transactions/TransactionList';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { BulkImportModal } from '@/components/transactions/BulkImportModal';
 import { useApp } from '@/contexts/AppContext';
 import { useFilters } from '@/contexts/FilterContext';
 import { formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
+import { Plus, Upload } from 'lucide-react';
 import { FilterPanel } from '@/components/filters';
 import { applyTransactionFilters } from '@/lib/filter-utils';
 
@@ -13,6 +14,7 @@ export function TransactionsPage() {
   const { selectedMonth, selectedYear, transactions, categories, subcategories } = useApp();
   const { filters } = useFilters();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
 
   // Apply filters to transactions
   const filteredTransactions = useMemo(() => {
@@ -34,10 +36,16 @@ export function TransactionsPage() {
             {formatMonthYear(selectedMonth, selectedYear)}
           </p>
         </div>
-        <Button onClick={() => setIsFormOpen(true)} className="hidden lg:flex gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Lançamento
-        </Button>
+        <div className="hidden lg:flex items-center gap-2">
+          <Button variant="outline" onClick={() => setIsBulkImportOpen(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            Lançamento em Massa
+          </Button>
+          <Button onClick={() => setIsFormOpen(true)} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Lançamento
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -49,9 +57,13 @@ export function TransactionsPage() {
 
       <TransactionList filteredTransactions={filteredTransactions} />
 
-      <TransactionForm 
-        isOpen={isFormOpen} 
-        onClose={() => setIsFormOpen(false)} 
+      <TransactionForm
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+      />
+      <BulkImportModal
+        isOpen={isBulkImportOpen}
+        onClose={() => setIsBulkImportOpen(false)}
       />
     </div>
   );
