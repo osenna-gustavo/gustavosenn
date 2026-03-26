@@ -15,8 +15,8 @@ import type { SuggestedTransaction, TransactionType } from '@/types/finance';
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
-// Configure PDF.js worker
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+// Configure PDF.js worker (v4.x uses .mjs, use jsdelivr for reliability)
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
 type ImportStatus = 'idle' | 'uploading' | 'processing' | 'ready' | 'error';
 
