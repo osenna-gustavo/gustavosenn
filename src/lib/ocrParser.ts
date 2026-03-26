@@ -8,6 +8,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'restaurante', 'lanchonete', 'mercado', 'supermercado', 'padaria',
     'ifood', 'ifd*', 'uber eats', 'rappi', 'acougue', 'hortifruti',
     'pizzaria', 'hamburguer', 'sushi', 'delivery', 'acai', 'sorveteria',
+    'spoleto', 'coco bambu', 'madero', 'churrascaria',
   ],
   'Transporte': [
     'uber', '99app', '99pop', 'combustivel', 'gasolina', 'etanol',
@@ -17,7 +18,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Moradia': [
     'aluguel', 'condominio', 'iptu', 'energia', 'enel', 'cemig', 'copel',
     'agua', 'sabesp', 'copasa', 'gas', 'internet', 'vivo', 'claro',
-    'tim fixo', 'net combo',
+    'tim fixo', 'net combo', 'galante',
   ],
   'Saúde': [
     'farmacia', 'drogaria', 'droga', 'medico', 'consulta', 'exame',
@@ -28,6 +29,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'cinema', 'teatro', 'show', 'netflix', 'spotify', 'amazon prime',
     'disney', 'hbo', 'bar ', 'balada', 'parque', 'ingresso',
     'globoplay', 'paramount', 'deezer', 'youtube premium',
+    'clube cultura', 'swarovski',
   ],
   'Educação': [
     'escola', 'faculdade', 'curso', 'livro', 'colegio', 'universidade',
@@ -37,20 +39,22 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'loja', 'shopping', 'roupa', 'calcado', 'eletronico', 'eletrodomestico',
     'movel', 'magazine', 'renner', 'riachuelo', 'c&a', 'americanas',
     'shoptime', 'amazon', 'mercado livre', 'shein', 'zara', 'hm',
+    'shop center', 'iguatemi',
   ],
   'Assinaturas': [
     'applecombill', 'apple.com', 'apple ', 'ebn *spotify', 'ebn*spotify',
     'clube livelo', 'microsoft', 'google storage', 'adobe', 'canva',
-    'assinatura', 'streaming',
+    'assinatura', 'streaming', 'cooperativa',
   ],
   'Contas/Taxas': [
     'taxa', 'tarifa', 'anuidade', 'iof', 'juros', 'multa', 'imposto',
-    'ipva', 'licenciamento',
+    'ipva', 'licenciamento', 'pagamento de boleto',
   ],
   'Salário': ['salario', 'remuneracao', 'holerite', 'contracheque', 'clt'],
   'Renda Extra': [
     'freelance', 'bonus', 'comissao', 'dividendo', 'rendimento',
-    'transferencia recebida', 'pix recebido',
+    'transferencia recebida', 'pix recebido', 'pix enviado recebido',
+    'credito em conta', 'estorno', 'restituicao',
   ],
 };
 
@@ -58,6 +62,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 // NOTE: written WITHOUT accents — comparison is done after stripping diacritics
 
 const EXCLUSION_KEYWORDS = [
+  // Section totals (Itaú extrato)
+  'total de entradas', 'total de saidas', 'total de saídas',
+  // Credit card statement
   'saldo anterior', 'saldo final', 'saldo em ', 'saldo disponivel',
   'limite total', 'limite disponivel', 'limite de credito',
   'saque no credito', 'saque no debito',
@@ -126,7 +133,7 @@ export function parseOCRText(text: string, categories: Category[]): SuggestedTra
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
-  // Strategy 1: line-by-line (PDF preserves row structure)
+  // Strategy 1: line-by-line (PDF preserves row structure, each line starts with date)
   const lineResults: ParsedItem[] = [];
   for (const line of byLines) {
     if (!lineStartsWithDate(line)) continue;
@@ -139,7 +146,14 @@ export function parseOCRText(text: string, categories: Category[]): SuggestedTra
   const flatText = byLines.join(' ');
   const chunkResults: ParsedItem[] = parseChunks(flatText, currentYear);
 
-  const raw = chunkResults.length > lineResults.length ? chunkResults : lineResults;
+  // Strategy 3: grouped by date header (Itaú extrato / bank statement style)
+  // Date appears in section header "DD/MM/YYYY Total de saídas -X.XXX,XX"
+  // Individual transactions listed below without their own date
+  const groupedResults: ParsedItem[] = parseGroupedByDateHeader(byLines, currentYear);
+
+  // Pick the strategy that produces the most results
+  const candidates = [lineResults, chunkResults, groupedResults];
+  const raw = candidates.reduce((best, cur) => cur.length > best.length ? cur : best);
 
   const seen = new Set<string>();
   const results: SuggestedTransaction[] = [];
@@ -250,17 +264,83 @@ function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
   return results;
 }
 
+// ─── Strategy 3: grouped by date header ──────────────────────────────────────
+//
+// Handles bank statements like Itaú extrato where structure is:
+//   01/03/2026   Total de saídas   -3.693,42
+//   Transferência enviada pelo Pix   FULANO   60,00
+//   Pagamento de boleto efetuado   GALANTE CONDOMÍNIOS   1.283,04
+//   ...
+//   09/03/2026   Total de saídas   -1.597,40
+//   Compra no débito   SPOLETO   90,40
+//
+// The date is ONLY on the section header line; individual transactions inherit it.
+
+function parseGroupedByDateHeader(lines: string[], currentYear: number): ParsedItem[] {
+  const results: ParsedItem[] = [];
+  let currentDate: Date | null = null;
+  let currentIsIncome = false;
+
+  for (const line of lines) {
+    const normLine = norm(line);
+
+    // Detect date header: starts with a date AND contains "total de"
+    if (lineStartsWithDate(line) && normLine.includes('total de')) {
+      const dateResult = extractLeadingDate(line, currentYear);
+      if (dateResult) {
+        currentDate = dateResult.date;
+        // "total de entradas" → income section; "total de saidas" → expense section
+        currentIsIncome = normLine.includes('total de entradas');
+      }
+      continue; // Always skip the header line itself
+    }
+
+    // If line starts with a date but is NOT a header, reset context
+    // (another statement format takes over — avoid polluting date context)
+    if (lineStartsWithDate(line)) {
+      currentDate = null;
+      continue;
+    }
+
+    // No date context yet
+    if (!currentDate) continue;
+
+    // Skip section summary / boilerplate
+    if (containsExclusionKeyword(line)) continue;
+
+    // Must contain a BRL amount (last one = right-aligned column)
+    const amtResult = extractAmount(line, false);
+    if (!amtResult) continue;
+
+    const description = cleanDescription(amtResult.descriptionRaw);
+    // Allow up to 100 chars — recipient names can be long in bank statements
+    if (!description || description.length < 3 || description.length > 100) continue;
+
+    results.push({
+      amount: amtResult.amount,
+      date: currentDate,
+      description,
+      rawLine: line,
+      isIncome: currentIsIncome,
+    });
+  }
+
+  return results;
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function extractLeadingDate(
   line: string,
   currentYear: number,
 ): { date: Date; consumed: number } | null {
+  // DD/MM or DD/MM/YYYY or DD-MM-YYYY
   const slashM = line.match(/^(\d{2})[\/\-](\d{2})(?:[\/\-](\d{2,4}))?/);
   if (slashM) {
     const date = parseDateFromGroups(slashM[1], slashM[2], slashM[3], currentYear);
     if (date) return { date, consumed: slashM[0].length };
   }
+  // DD MMM or DD MMM YYYY
   const monthM = line.match(new RegExp(`^(\\d{2})\\s+(${MONTH_KEYS})(?:\\s+(\\d{4}))?`, 'i'));
   if (monthM) {
     const date = parseDateFromGroups(monthM[1], monthM[2], monthM[3], currentYear);
@@ -355,14 +435,15 @@ function extractAmount(text: string, useFirst: boolean): AmountResult | null {
 
 function cleanDescription(raw: string): string {
   return raw
-    .replace(/\.\.\.\.\s*\d{4}/g, '')     // card fragment ".... 0799"
-    .replace(/\*{4}\s*\d{4}/g, '')        // masked card "**** 1234"
-    .replace(/R\$\s*[\d.,]+/gi, '')       // residual R$ amounts
-    .replace(/\d{8,}/g, '')               // long digit sequences
+    .replace(/\.\.\.\.\s*\d{4}/g, '')          // card fragment ".... 0799"
+    .replace(/\*{4}\s*\d{4}/g, '')             // masked card "**** 1234"
+    .replace(/[•*]{2,}[\d•*.\/\-]+/g, '')      // masked CPF/CNPJ "•••.110.598.••"
+    .replace(/R\$\s*[\d.,]+/gi, '')            // residual R$ amounts
+    .replace(/\d{8,}/g, '')                    // long digit sequences (account numbers)
     .replace(/[\[\]{}()]/g, '')
     .replace(/\s+/g, ' ')
-    .replace(/^[\s•\-–—|:,;.\d]+/, '')    // leading punct / lone digits
-    .replace(/[\s•\-–—|:,;.]+$/, '')      // trailing punct
+    .replace(/^[\s•\-–—|:,;.\d]+/, '')         // leading punct / lone digits
+    .replace(/[\s•\-–—|:,;.]+$/, '')           // trailing punct
     .trim();
 }
 
