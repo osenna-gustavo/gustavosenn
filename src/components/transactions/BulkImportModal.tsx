@@ -22,7 +22,7 @@ import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
 
-// ─── Learning (localStorage) ──────────────────────────────────────────────────
+// ─── Category learning (localStorage) ─────────────────────────────────────────
 
 const MAPPINGS_KEY = 'fluxocaixa_category_mappings';
 
@@ -87,6 +87,52 @@ function learnFromItem(
   return updated;
 }
 
+// ─── Recurrence learning (localStorage) ───────────────────────────────────────
+
+const RECURRENCE_MAPPINGS_KEY = 'fluxocaixa_recurrence_mappings';
+type RecurrenceMappings = Record<string, string>; // keyword → recurrenceId
+
+function loadRecurrenceMappings(): RecurrenceMappings {
+  try { return JSON.parse(localStorage.getItem(RECURRENCE_MAPPINGS_KEY) || '{}'); } catch { return {}; }
+}
+function saveRecurrenceMappings(m: RecurrenceMappings): void {
+  localStorage.setItem(RECURRENCE_MAPPINGS_KEY, JSON.stringify(m));
+}
+function learnRecurrenceMapping(
+  description: string,
+  recurrenceId: string,
+  mappings: RecurrenceMappings,
+): RecurrenceMappings {
+  const updated = { ...mappings };
+  for (const kw of extractKeywords(description)) {
+    updated[kw] = recurrenceId;
+  }
+  return updated;
+}
+function applyLearnedRecurrenceMappings(
+  suggestion: SuggestedTransaction,
+  recurrenceMappings: RecurrenceMappings,
+  recurrences: Recurrence[],
+  instances: RecurrenceInstance[],
+  month: number,
+  year: number,
+): { recurrence: Recurrence; instance: RecurrenceInstance } | null {
+  if (!suggestion.description) return null;
+  for (const kw of extractKeywords(suggestion.description)) {
+    const recurrenceId = recurrenceMappings[kw];
+    if (recurrenceId) {
+      const rec = recurrences.find(r => r.id === recurrenceId && r.isActive);
+      if (rec) {
+        const instance = instances.find(
+          i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
+        );
+        if (instance) return { recurrence: rec, instance };
+      }
+    }
+  }
+  return null;
+}
+
 // ─── Duplicate detection ──────────────────────────────────────────────────────
 
 function isDuplicate(suggestion: SuggestedTransaction, existing: Transaction[]): boolean {
@@ -99,7 +145,7 @@ function isDuplicate(suggestion: SuggestedTransaction, existing: Transaction[]):
   });
 }
 
-// ─── Recurrence matching ──────────────────────────────────────────────────────
+// ─── Recurrence auto-matching ─────────────────────────────────────────────────
 
 function norm(s: string): string {
   return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -118,17 +164,14 @@ function matchRecurrence(
   for (const rec of recurrences) {
     if (!rec.isActive) continue;
 
-    // Amount must be close (within 5%)
     const amtMatch = Math.abs(rec.amount - suggestion.amount) / rec.amount <= 0.05;
     if (!amtMatch) continue;
 
-    // Name words must overlap with description
     const recWords = norm(rec.name).split(/\s+/).filter(w => w.length > 3);
     const descWords = descNorm.split(/\s+/).filter(w => w.length > 3);
     const overlap = recWords.some(rw => descWords.some(dw => dw.includes(rw) || rw.includes(dw)));
     if (!overlap) continue;
 
-    // Find pending instance for this month/year
     const instance = instances.find(
       i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
     );
@@ -230,13 +273,16 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
       let parsed = parseOCRText(extractedText, categories);
       if (parsed.length === 0) throw new Error('Nenhum lançamento identificado. Verifique se o arquivo contém valores monetários.');
 
-      // Apply learned mappings
+      // Apply learned category mappings
       const mappings = loadMappings();
       parsed = applyLearnedMappings(parsed, mappings);
 
+      // Apply recurrence matching: auto-match first, then learned keyword fallback
+      const recMappings = loadRecurrenceMappings();
       const enhanced: EnhancedSuggestion[] = parsed.map(s => {
         const dup = isDuplicate(s, transactions);
-        const match = matchRecurrence(s, recurrences, recurrenceInstances, selectedMonth, selectedYear);
+        const match = matchRecurrence(s, recurrences, recurrenceInstances, selectedMonth, selectedYear)
+          ?? applyLearnedRecurrenceMappings(s, recMappings, recurrences, recurrenceInstances, selectedMonth, selectedYear);
         return {
           ...s,
           isDuplicate: dup,
@@ -299,10 +345,10 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
     }
 
     let mappings = loadMappings();
+    let recMappings = loadRecurrenceMappings();
 
     try {
       for (const item of toImport) {
-        // Add the transaction
         const newTx = await addTransaction({
           date: item.date || new Date(),
           amount: item.amount || 0,
@@ -314,7 +360,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
           needsReview: item.needsReview,
         });
 
-        // If matched with a recurrence instance, mark it confirmed
+        // Mark recurrence instance as confirmed + learn the keyword mapping
         if (item.matchedInstance) {
           try {
             await updateRecurrenceInstance({
@@ -325,15 +371,19 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
           } catch {
             // non-fatal: transaction was added, just the recurrence link failed
           }
+          if (item.description) {
+            recMappings = learnRecurrenceMapping(item.description, item.matchedInstance.recurrenceId, recMappings);
+          }
         }
 
-        // Learn from this confirmation
+        // Learn category mapping
         if (item.description && item.suggestedCategoryId) {
           mappings = learnFromItem(item.description, item.suggestedCategoryId, item.suggestedSubcategoryId, item.type, mappings);
         }
       }
 
       saveMappings(mappings);
+      saveRecurrenceMappings(recMappings);
 
       const linkedCount = toImport.filter(i => i.matchedInstance).length;
       toast({
@@ -366,6 +416,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
 
   const expenseCategories = categories.filter(c => c.type === 'despesa');
   const incomeCategories = categories.filter(c => c.type === 'receita');
+  const activeRecurrences = recurrences.filter(r => r.isActive);
   const toImportCount = suggestions.filter(s => !s.skipImport).length;
   const dupCount = suggestions.filter(s => s.isDuplicate).length;
   const recCount = suggestions.filter(s => s.matchedRecurrence && !s.skipImport).length;
@@ -529,6 +580,51 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                             </Select>
                           </div>
                         </div>
+
+                        {/* Recurrence linking */}
+                        <div>
+                          <Label className="text-xs flex items-center gap-1">
+                            <RefreshCw className="h-3 w-3" />
+                            Vincular Recorrência
+                          </Label>
+                          <Select
+                            value={item.matchedRecurrence?.id || '__none__'}
+                            onValueChange={val => {
+                              if (val === '__none__') {
+                                updateSuggestion(item.id, { matchedRecurrence: undefined, matchedInstance: undefined });
+                              } else {
+                                const rec = activeRecurrences.find(r => r.id === val);
+                                const inst = recurrenceInstances.find(
+                                  i => i.recurrenceId === val && i.month === selectedMonth && i.year === selectedYear && i.status === 'pending',
+                                );
+                                updateSuggestion(item.id, { matchedRecurrence: rec, matchedInstance: inst });
+                              }
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Nenhuma recorrência vinculada" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">Nenhuma</SelectItem>
+                              {activeRecurrences.map(rec => (
+                                <SelectItem key={rec.id} value={rec.id}>
+                                  {rec.name} — {formatCurrency(rec.amount)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {item.matchedRecurrence && !item.matchedInstance && (
+                            <p className="text-xs text-warning mt-1">
+                              ⚠ Sem instância pendente para {selectedMonth}/{selectedYear}. O vínculo não será marcado como confirmado.
+                            </p>
+                          )}
+                          {item.matchedRecurrence && item.matchedInstance && (
+                            <p className="text-xs text-info mt-1">
+                              ✓ A recorrência será marcada como confirmada ao importar.
+                            </p>
+                          )}
+                        </div>
+
                         <div className="flex justify-end">
                           <Button size="sm" variant="outline" onClick={() => setEditingId(null)}>Concluir edição</Button>
                         </div>
