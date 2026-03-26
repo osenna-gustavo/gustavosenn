@@ -1,6 +1,10 @@
 import type { SuggestedTransaction, Category, TransactionType } from '@/types/finance';
 import { v4 as uuid } from 'uuid';
 
+// ─── Statement type ────────────────────────────────────────────────────────────
+
+export type StatementType = 'fatura' | 'extrato' | 'auto';
+
 // ─── Category keyword map ─────────────────────────────────────────────────────
 
 const CATEGORY_KEYWORDS: Record<string, string[]> = {
@@ -53,18 +57,22 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Salário': ['salario', 'remuneracao', 'holerite', 'contracheque', 'clt'],
   'Renda Extra': [
     'freelance', 'bonus', 'comissao', 'dividendo', 'rendimento',
-    'transferencia recebida', 'pix recebido', 'pix enviado recebido',
+    'transferencia recebida', 'pix recebido',
     'credito em conta', 'estorno', 'restituicao',
   ],
 };
 
-// ─── Exclusion keywords (non-transaction text) ────────────────────────────────
-// NOTE: written WITHOUT accents — comparison is done after stripping diacritics
+// ─── Exclusion keywords ───────────────────────────────────────────────────────
+// Used to filter out non-transaction lines (section headers, summaries, etc.)
+// Written WITHOUT accents — comparisons are done after stripping diacritics.
+//
+// IMPORTANT: These are checked at the DESCRIPTION level, not at window level,
+// so we don't accidentally discard entire date sections.
 
 const EXCLUSION_KEYWORDS = [
-  // Section totals (Itaú extrato)
-  'total de entradas', 'total de saidas', 'total de saídas',
-  // Credit card statement
+  // Section totals (Itaú/bank extratos)
+  'total de entradas', 'total de saidas',
+  // Credit card statement boilerplate
   'saldo anterior', 'saldo final', 'saldo em ', 'saldo disponivel',
   'limite total', 'limite disponivel', 'limite de credito',
   'saque no credito', 'saque no debito',
@@ -74,8 +82,7 @@ const EXCLUSION_KEYWORDS = [
   'total a pagar',
   'resumo da fatura', 'resumo do extrato',
   'pagamento minimo', 'valor minimo', 'pagamento em ',
-  'minimo para nao ficar',
-  'nao ficar em atraso',
+  'minimo para nao ficar', 'nao ficar em atraso',
   'sua fatura', 'fatura de ', 'fatura do cartao',
   'emissao da fatura', 'data de vencimento', 'vencimento:',
   'alternativas de pagamento', 'formas de pagamento', 'codigo de barras',
@@ -91,12 +98,8 @@ const EXCLUSION_KEYWORDS = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Strip Portuguese/Spanish diacritics and lowercase. */
 function norm(s: string): string {
-  return s
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase();
+  return s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
 function containsExclusionKeyword(text: string): boolean {
@@ -124,7 +127,11 @@ interface ParsedItem {
 
 // ─── Main entry point ─────────────────────────────────────────────────────────
 
-export function parseOCRText(text: string, categories: Category[]): SuggestedTransaction[] {
+export function parseOCRText(
+  text: string,
+  categories: Category[],
+  statementType: StatementType = 'auto',
+): SuggestedTransaction[] {
   const currentYear = new Date().getFullYear();
 
   const byLines = text
@@ -133,33 +140,38 @@ export function parseOCRText(text: string, categories: Category[]): SuggestedTra
     .map(l => l.trim())
     .filter(l => l.length > 0);
 
-  // Strategy 1: line-by-line (PDF preserves row structure, each line starts with date)
-  const lineResults: ParsedItem[] = [];
-  for (const line of byLines) {
-    if (!lineStartsWithDate(line)) continue;
-    if (containsExclusionKeyword(line)) continue;
-    const item = parseTransactionLine(line, currentYear);
-    if (item) lineResults.push(item);
-  }
-
-  // Strategy 2: chunk-based (PDF text is one big flat string per page)
   const flatText = byLines.join(' ');
-  const chunkResults: ParsedItem[] = parseChunks(flatText, currentYear);
 
-  // Strategy 3: grouped by date header (Itaú extrato / bank statement style)
-  // Date appears in section header "DD/MM/YYYY Total de saídas -X.XXX,XX"
-  // Individual transactions listed below without their own date
-  const groupedResults: ParsedItem[] = parseGroupedByDateHeader(byLines, currentYear);
+  let raw: ParsedItem[] = [];
 
-  // Pick the strategy that produces the most results
-  const candidates = [lineResults, chunkResults, groupedResults];
-  const raw = candidates.reduce((best, cur) => cur.length > best.length ? cur : best);
+  if (statementType === 'fatura') {
+    // Credit card bills: each line/chunk starts with a date
+    // Use chunk strategy (best for Nubank, C6 faturas)
+    const lineResults = parseLineByLine(byLines, currentYear);
+    const chunkResults = parseChunks(flatText, currentYear);
+    raw = chunkResults.length > lineResults.length ? chunkResults : lineResults;
+
+  } else if (statementType === 'extrato') {
+    // Bank account statements: transactions grouped under date headers
+    // Use grouped strategies (lines + flat text)
+    const groupedLineResults = parseGroupedLines(byLines, currentYear);
+    const groupedChunkResults = parseGroupedChunks(flatText, currentYear);
+    raw = groupedChunkResults.length > groupedLineResults.length ? groupedChunkResults : groupedLineResults;
+
+  } else {
+    // Auto: run all 4 strategies, pick the one with most results
+    const lineResults = parseLineByLine(byLines, currentYear);
+    const chunkResults = parseChunks(flatText, currentYear);
+    const groupedLineResults = parseGroupedLines(byLines, currentYear);
+    const groupedChunkResults = parseGroupedChunks(flatText, currentYear);
+    const all = [lineResults, chunkResults, groupedLineResults, groupedChunkResults];
+    raw = all.reduce((best, cur) => cur.length > best.length ? cur : best);
+  }
 
   const seen = new Set<string>();
   const results: SuggestedTransaction[] = [];
 
   for (const item of raw) {
-    if (containsExclusionKeyword(item.rawLine)) continue;
     if (containsExclusionKeyword(item.description)) continue;
 
     const key = `${item.amount.toFixed(2)}|${norm(item.description)}`;
@@ -184,7 +196,8 @@ export function parseOCRText(text: string, categories: Category[]): SuggestedTra
   return results;
 }
 
-// ─── Strategy 1: line-by-line ─────────────────────────────────────────────────
+// ─── Strategy A: line-by-line (each line starts with date) ───────────────────
+// Works for: PDFs where each row is preserved as a line (some bank exports)
 
 function lineStartsWithDate(line: string): boolean {
   if (/^\d{2}[\/\-]\d{2}([\/\-]\d{2,4})?/.test(line)) return true;
@@ -192,13 +205,22 @@ function lineStartsWithDate(line: string): boolean {
   return false;
 }
 
+function parseLineByLine(lines: string[], currentYear: number): ParsedItem[] {
+  const results: ParsedItem[] = [];
+  for (const line of lines) {
+    if (!lineStartsWithDate(line)) continue;
+    const item = parseTransactionLine(line, currentYear);
+    if (item && !containsExclusionKeyword(item.description)) results.push(item);
+  }
+  return results;
+}
+
 function parseTransactionLine(line: string, currentYear: number): ParsedItem | null {
   const dateResult = extractLeadingDate(line, currentYear);
   if (!dateResult) return null;
 
   const rest = line.slice(dateResult.consumed).trim();
-  // For line-by-line, pick the LAST amount (right-aligned columns)
-  const amtResult = extractAmount(rest, false);
+  const amtResult = extractAmount(rest, false); // LAST amount (right-aligned)
   if (!amtResult) return null;
 
   const description = cleanDescription(amtResult.descriptionRaw);
@@ -213,7 +235,8 @@ function parseTransactionLine(line: string, currentYear: number): ParsedItem | n
   };
 }
 
-// ─── Strategy 2: chunk-based ──────────────────────────────────────────────────
+// ─── Strategy B: chunk-based (flat text, one date per chunk) ─────────────────
+// Works for: Nubank fatura PDF (PDF.js flattens all text, dates like "19 MAR")
 
 function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
   const DATE_RE = new RegExp(
@@ -238,19 +261,18 @@ function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
   for (let i = 0; i < anchors.length; i++) {
     const a = anchors[i];
     const nextIndex = anchors[i + 1]?.index ?? flatText.length;
-
-    // Cap window at 150 chars to avoid crossing into the next section
     const windowEnd = Math.min(nextIndex, a.end + 150);
     const window = flatText.slice(a.end, windowEnd);
 
-    if (containsExclusionKeyword(window)) continue;
-
-    // For chunk-based, pick the FIRST amount (transaction value, not section totals)
+    // Pick FIRST amount in window (the transaction value)
     const amtResult = extractAmount(window, true);
     if (!amtResult) continue;
 
     const description = cleanDescription(amtResult.descriptionRaw);
     if (!description || description.length < 3 || description.length > 70) continue;
+
+    // Check exclusion at description level only (not the whole window)
+    if (containsExclusionKeyword(description)) continue;
 
     results.push({
       amount: amtResult.amount,
@@ -264,19 +286,15 @@ function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
   return results;
 }
 
-// ─── Strategy 3: grouped by date header ──────────────────────────────────────
+// ─── Strategy C: grouped lines (date headers, per-line) ──────────────────────
+// Works for: Itaú extrato screenshots/OCR where each visual row is one line
 //
-// Handles bank statements like Itaú extrato where structure is:
-//   01/03/2026   Total de saídas   -3.693,42
-//   Transferência enviada pelo Pix   FULANO   60,00
-//   Pagamento de boleto efetuado   GALANTE CONDOMÍNIOS   1.283,04
-//   ...
-//   09/03/2026   Total de saídas   -1.597,40
-//   Compra no débito   SPOLETO   90,40
-//
-// The date is ONLY on the section header line; individual transactions inherit it.
+// Format:
+//   01/03/2026   Total de saídas   -3.693,42          ← date header (sets context)
+//   Transferência enviada pelo Pix   FULANO   60,00   ← transaction (inherits date)
+//   Pagamento de boleto   GALANTE CONDOMÍNIOS   1.283,04
 
-function parseGroupedByDateHeader(lines: string[], currentYear: number): ParsedItem[] {
+function parseGroupedLines(lines: string[], currentYear: number): ParsedItem[] {
   const results: ParsedItem[] = [];
   let currentDate: Date | null = null;
   let currentIsIncome = false;
@@ -284,36 +302,30 @@ function parseGroupedByDateHeader(lines: string[], currentYear: number): ParsedI
   for (const line of lines) {
     const normLine = norm(line);
 
-    // Detect date header: starts with a date AND contains "total de"
+    // Line starts with date + "total de" → it's a section header
     if (lineStartsWithDate(line) && normLine.includes('total de')) {
       const dateResult = extractLeadingDate(line, currentYear);
       if (dateResult) {
         currentDate = dateResult.date;
-        // "total de entradas" → income section; "total de saidas" → expense section
         currentIsIncome = normLine.includes('total de entradas');
       }
-      continue; // Always skip the header line itself
+      continue; // Skip the header line itself
     }
 
-    // If line starts with a date but is NOT a header, reset context
-    // (another statement format takes over — avoid polluting date context)
+    // Line starts with a date but is NOT a section header → different format, reset
     if (lineStartsWithDate(line)) {
       currentDate = null;
       continue;
     }
 
-    // No date context yet
     if (!currentDate) continue;
-
-    // Skip section summary / boilerplate
     if (containsExclusionKeyword(line)) continue;
 
-    // Must contain a BRL amount (last one = right-aligned column)
+    // Must have a BRL amount (LAST = right-aligned column)
     const amtResult = extractAmount(line, false);
     if (!amtResult) continue;
 
     const description = cleanDescription(amtResult.descriptionRaw);
-    // Allow up to 100 chars — recipient names can be long in bank statements
     if (!description || description.length < 3 || description.length > 100) continue;
 
     results.push({
@@ -328,19 +340,94 @@ function parseGroupedByDateHeader(lines: string[], currentYear: number): ParsedI
   return results;
 }
 
+// ─── Strategy D: grouped chunks (date headers, flat text) ────────────────────
+// Works for: Itaú extrato PDF (PDF.js flattens entire page to one string)
+//
+// Each date anchor is followed by "Total de saídas/entradas" (section header).
+// All amounts between consecutive date anchors are individual transactions.
+
+function parseGroupedChunks(flatText: string, currentYear: number): ParsedItem[] {
+  const DATE_RE = new RegExp(
+    `(?<![\\d])(\\d{2})[\\s\\/\\-](${MONTH_KEYS}|\\d{2})(?:[\\s\\/\\-](\\d{2,4}))?(?![\\d])`,
+    'gi',
+  );
+
+  interface Anchor { index: number; end: number; date: Date }
+  const anchors: Anchor[] = [];
+  let m: RegExpExecArray | null;
+  DATE_RE.lastIndex = 0;
+
+  while ((m = DATE_RE.exec(flatText)) !== null) {
+    const date = parseDateFromGroups(m[1], m[2], m[3], currentYear);
+    if (!date) continue;
+    if (dateIsInRange(flatText, m.index)) continue;
+    anchors.push({ index: m.index, end: m.index + m[0].length, date });
+  }
+
+  const results: ParsedItem[] = [];
+
+  for (let i = 0; i < anchors.length; i++) {
+    const a = anchors[i];
+    const nextStart = anchors[i + 1]?.index ?? flatText.length;
+
+    // Check if this anchor is a section header (followed by "total de")
+    const headerWindow = norm(flatText.slice(a.end, a.end + 100));
+    const isGroupedHeader =
+      headerWindow.includes('total de saidas') ||
+      headerWindow.includes('total de entradas');
+    if (!isGroupedHeader) continue;
+
+    const isIncome = headerWindow.includes('total de entradas');
+
+    // Parse ALL amounts in the section between this anchor and the next
+    const sectionText = flatText.slice(a.end, nextStart);
+    const AMT_RE = /([+\-]?\s*|[CD]\s+)?(?:R\$\s*)?([\d]{1,3}(?:\.[\d]{3})*,[\d]{2}|[\d]{1,6},[\d]{2})(?:\s*[+\-CDcd])?/gi;
+
+    const amtMatches: Array<{ index: number; end: number; amount: number }> = [];
+    let am: RegExpExecArray | null;
+    AMT_RE.lastIndex = 0;
+    while ((am = AMT_RE.exec(sectionText)) !== null) {
+      const rawVal = am[2].replace(/\./g, '').replace(',', '.');
+      const amount = parseFloat(rawVal);
+      if (!isNaN(amount) && amount > 0 && amount < 500_000) {
+        amtMatches.push({ index: am.index, end: am.index + am[0].length, amount });
+      }
+    }
+
+    // For each amount, description = text between previous amount end and this amount
+    let prevEnd = 0;
+    for (const amt of amtMatches) {
+      const descRaw = sectionText.slice(prevEnd, amt.index).trim();
+      prevEnd = amt.end;
+
+      if (containsExclusionKeyword(descRaw)) continue; // skip "Total de saídas" line
+      const description = cleanDescription(descRaw);
+      if (!description || description.length < 3 || description.length > 100) continue;
+
+      results.push({
+        amount: amt.amount,
+        date: a.date,
+        description,
+        rawLine: `${flatText.slice(a.index, a.end)} ${descRaw}`.slice(0, 200),
+        isIncome,
+      });
+    }
+  }
+
+  return results;
+}
+
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
 function extractLeadingDate(
   line: string,
   currentYear: number,
 ): { date: Date; consumed: number } | null {
-  // DD/MM or DD/MM/YYYY or DD-MM-YYYY
   const slashM = line.match(/^(\d{2})[\/\-](\d{2})(?:[\/\-](\d{2,4}))?/);
   if (slashM) {
     const date = parseDateFromGroups(slashM[1], slashM[2], slashM[3], currentYear);
     if (date) return { date, consumed: slashM[0].length };
   }
-  // DD MMM or DD MMM YYYY
   const monthM = line.match(new RegExp(`^(\\d{2})\\s+(${MONTH_KEYS})(?:\\s+(\\d{4}))?`, 'i'));
   if (monthM) {
     const date = parseDateFromGroups(monthM[1], monthM[2], monthM[3], currentYear);
@@ -376,19 +463,10 @@ function parseDateFromGroups(
   return new Date(year, month, day);
 }
 
-/**
- * Returns true if the date at `index` is part of a range expression
- * ("de 20 FEV a 20 MAR") or follows a date-label ("Vencimento: 20/03").
- */
 function dateIsInRange(text: string, index: number): boolean {
   const before = norm(text.slice(Math.max(0, index - 25), index));
-
-  // Range expressions: "de " or " a " immediately before date
   if (/\bde\s+$/.test(before) || /\ba\s+$/.test(before)) return true;
-
-  // Date labels: vencimento, emissao, data, periodo, competencia
-  if (/(?:vencimento|emissao|emissão|data|periodo|competencia|emissao)\s*[:\-]?\s*$/.test(before)) return true;
-
+  if (/(?:vencimento|emissao|data|periodo|competencia)\s*[:\-]?\s*$/.test(before)) return true;
   return false;
 }
 
@@ -400,11 +478,6 @@ interface AmountResult {
   descriptionRaw: string;
 }
 
-/**
- * Finds a BRL-formatted value in `text`.
- * @param useFirst  true → return the FIRST match (chunk mode)
- *                  false → return the LAST match (line mode, right-aligned)
- */
 function extractAmount(text: string, useFirst: boolean): AmountResult | null {
   const pattern = /([+\-]?\s*|[CD]\s+)?(?:R\$\s*)?([\d]{1,3}(?:\.[\d]{3})*,[\d]{2}|[\d]{1,6},[\d]{2})(?:\s*[+\-CDcd])?/gi;
 
@@ -424,7 +497,6 @@ function extractAmount(text: string, useFirst: boolean): AmountResult | null {
 
   const isIncome = prefix === '+' || prefix === 'C';
 
-  // Description: everything BEFORE this match in the original text
   const matchStart = text.indexOf(chosen[0]);
   const descriptionRaw = matchStart >= 0 ? text.slice(0, matchStart) : text;
 
@@ -439,7 +511,7 @@ function cleanDescription(raw: string): string {
     .replace(/\*{4}\s*\d{4}/g, '')             // masked card "**** 1234"
     .replace(/[•*]{2,}[\d•*.\/\-]+/g, '')      // masked CPF/CNPJ "•••.110.598.••"
     .replace(/R\$\s*[\d.,]+/gi, '')            // residual R$ amounts
-    .replace(/\d{8,}/g, '')                    // long digit sequences (account numbers)
+    .replace(/\d{8,}/g, '')                    // long account/document numbers
     .replace(/[\[\]{}()]/g, '')
     .replace(/\s+/g, ' ')
     .replace(/^[\s•\-–—|:,;.\d]+/, '')         // leading punct / lone digits

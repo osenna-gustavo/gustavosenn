@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import {
   Upload, FileImage, FileText, Loader2, CheckCircle2,
-  AlertCircle, Trash2, Edit2, Copy, RefreshCw,
+  AlertCircle, Trash2, Edit2, Copy, RefreshCw, CreditCard, Building2, Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency, formatDateShort } from '@/lib/formatters';
-import { parseOCRText } from '@/lib/ocrParser';
+import { parseOCRText, type StatementType } from '@/lib/ocrParser';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { parseBRLToNumber } from '@/lib/currencyInput';
 import { cn } from '@/lib/utils';
@@ -21,6 +21,34 @@ import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+
+// ─── Statement type options ────────────────────────────────────────────────────
+
+const STATEMENT_TYPES: {
+  value: StatementType;
+  label: string;
+  description: string;
+  icon: React.ReactNode;
+}[] = [
+  {
+    value: 'fatura',
+    label: 'Fatura de Cartão',
+    description: 'Nubank, C6, Itaú, etc.',
+    icon: <CreditCard className="h-5 w-5" />,
+  },
+  {
+    value: 'extrato',
+    label: 'Extrato de Conta',
+    description: 'Conta corrente ou poupança',
+    icon: <Building2 className="h-5 w-5" />,
+  },
+  {
+    value: 'auto',
+    label: 'Detectar Automaticamente',
+    description: 'Tenta identificar o formato',
+    icon: <Sparkles className="h-5 w-5" />,
+  },
+];
 
 // ─── Category learning (localStorage) ─────────────────────────────────────────
 
@@ -79,10 +107,7 @@ function learnFromItem(
 ): LearnedMappings {
   const updated = { ...mappings };
   for (const kw of extractKeywords(description)) {
-    updated[kw] = {
-      categoryId, subcategoryId, type,
-      confidence: (updated[kw]?.confidence ?? 0) + 1,
-    };
+    updated[kw] = { categoryId, subcategoryId, type, confidence: (updated[kw]?.confidence ?? 0) + 1 };
   }
   return updated;
 }
@@ -90,7 +115,7 @@ function learnFromItem(
 // ─── Recurrence learning (localStorage) ───────────────────────────────────────
 
 const RECURRENCE_MAPPINGS_KEY = 'fluxocaixa_recurrence_mappings';
-type RecurrenceMappings = Record<string, string>; // keyword → recurrenceId
+type RecurrenceMappings = Record<string, string>;
 
 function loadRecurrenceMappings(): RecurrenceMappings {
   try { return JSON.parse(localStorage.getItem(RECURRENCE_MAPPINGS_KEY) || '{}'); } catch { return {}; }
@@ -98,15 +123,9 @@ function loadRecurrenceMappings(): RecurrenceMappings {
 function saveRecurrenceMappings(m: RecurrenceMappings): void {
   localStorage.setItem(RECURRENCE_MAPPINGS_KEY, JSON.stringify(m));
 }
-function learnRecurrenceMapping(
-  description: string,
-  recurrenceId: string,
-  mappings: RecurrenceMappings,
-): RecurrenceMappings {
+function learnRecurrenceMapping(description: string, recurrenceId: string, mappings: RecurrenceMappings): RecurrenceMappings {
   const updated = { ...mappings };
-  for (const kw of extractKeywords(description)) {
-    updated[kw] = recurrenceId;
-  }
+  for (const kw of extractKeywords(description)) { updated[kw] = recurrenceId; }
   return updated;
 }
 function applyLearnedRecurrenceMappings(
@@ -163,15 +182,12 @@ function matchRecurrence(
 
   for (const rec of recurrences) {
     if (!rec.isActive) continue;
-
     const amtMatch = Math.abs(rec.amount - suggestion.amount) / rec.amount <= 0.05;
     if (!amtMatch) continue;
-
     const recWords = norm(rec.name).split(/\s+/).filter(w => w.length > 3);
     const descWords = descNorm.split(/\s+/).filter(w => w.length > 3);
     const overlap = recWords.some(rw => descWords.some(dw => dw.includes(rw) || rw.includes(dw)));
     if (!overlap) continue;
-
     const instance = instances.find(
       i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
     );
@@ -205,6 +221,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
   } = useApp();
   const { toast } = useToast();
 
+  const [statementType, setStatementType] = useState<StatementType>('auto');
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
@@ -270,14 +287,12 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
 
       if (!extractedText.trim()) throw new Error('Não foi possível extrair texto do arquivo.');
 
-      let parsed = parseOCRText(extractedText, categories);
-      if (parsed.length === 0) throw new Error('Nenhum lançamento identificado. Verifique se o arquivo contém valores monetários.');
+      let parsed = parseOCRText(extractedText, categories, statementType);
+      if (parsed.length === 0) throw new Error('Nenhum lançamento identificado. Verifique se o arquivo contém valores monetários e o tipo de extrato selecionado está correto.');
 
-      // Apply learned category mappings
       const mappings = loadMappings();
       parsed = applyLearnedMappings(parsed, mappings);
 
-      // Apply recurrence matching: auto-match first, then learned keyword fallback
       const recMappings = loadRecurrenceMappings();
       const enhanced: EnhancedSuggestion[] = parsed.map(s => {
         const dup = isDuplicate(s, transactions);
@@ -312,7 +327,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
       setErrorMessage(msg);
       toast({ title: 'Erro no processamento', description: msg, variant: 'destructive' });
     }
-  }, [categories, processOCR, extractTextFromPDF, transactions, recurrences, recurrenceInstances, selectedMonth, selectedYear, toast]);
+  }, [categories, statementType, processOCR, extractTextFromPDF, transactions, recurrences, recurrenceInstances, selectedMonth, selectedYear, toast]);
 
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -360,7 +375,6 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
           needsReview: item.needsReview,
         });
 
-        // Mark recurrence instance as confirmed + learn the keyword mapping
         if (item.matchedInstance) {
           try {
             await updateRecurrenceInstance({
@@ -368,15 +382,12 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
               status: 'confirmed',
               linkedTransactionId: newTx.id,
             });
-          } catch {
-            // non-fatal: transaction was added, just the recurrence link failed
-          }
+          } catch { /* non-fatal */ }
           if (item.description) {
             recMappings = learnRecurrenceMapping(item.description, item.matchedInstance.recurrenceId, recMappings);
           }
         }
 
-        // Learn category mapping
         if (item.description && item.suggestedCategoryId) {
           mappings = learnFromItem(item.description, item.suggestedCategoryId, item.suggestedSubcategoryId, item.type, mappings);
         }
@@ -432,7 +443,31 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
 
         {/* Upload */}
         {status === 'idle' && (
-          <>
+          <div className="space-y-4">
+            {/* Statement type selector */}
+            <div>
+              <Label className="text-xs text-muted-foreground mb-2 block">Tipo de arquivo</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {STATEMENT_TYPES.map(opt => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setStatementType(opt.value)}
+                    className={cn(
+                      'flex flex-col items-center gap-1.5 p-3 rounded-lg border text-center transition-colors',
+                      statementType === opt.value
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-border hover:border-primary/50 text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    {opt.icon}
+                    <span className="text-xs font-medium leading-tight">{opt.label}</span>
+                    <span className="text-[10px] leading-tight opacity-70">{opt.description}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Drop zone */}
             <div
               className="rounded-xl p-8 border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
               onDrop={handleDrop}
@@ -455,7 +490,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
             <p className="text-xs text-muted-foreground text-center">
               Identifica automaticamente receitas, despesas, categorias, duplicatas e recorrências. Aprende com cada confirmação.
             </p>
-          </>
+          </div>
         )}
 
         {/* Processing */}
@@ -476,14 +511,16 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
             <AlertCircle className="h-10 w-10 text-destructive" />
             <p className="font-medium">Erro no processamento</p>
             <p className="text-sm text-muted-foreground text-center">{errorMessage}</p>
-            <Button onClick={handleReset}>Tentar novamente</Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleReset}>Tentar com outro tipo</Button>
+              <Button onClick={handleReset}>Tentar novamente</Button>
+            </div>
           </div>
         )}
 
         {/* Review */}
         {status === 'ready' && suggestions.length > 0 && (
           <div className="space-y-4">
-            {/* Summary bar */}
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex gap-3 text-sm text-muted-foreground flex-wrap">
                 <span>{suggestions.length} identificado(s)</span>
@@ -601,9 +638,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                               }
                             }}
                           >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Nenhuma recorrência vinculada" />
-                            </SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder="Nenhuma recorrência vinculada" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="__none__">Nenhuma</SelectItem>
                               {activeRecurrences.map(rec => (
@@ -615,7 +650,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                           </Select>
                           {item.matchedRecurrence && !item.matchedInstance && (
                             <p className="text-xs text-warning mt-1">
-                              ⚠ Sem instância pendente para {selectedMonth}/{selectedYear}. O vínculo não será marcado como confirmado.
+                              ⚠ Sem instância pendente para {selectedMonth}/{selectedYear}.
                             </p>
                           )}
                           {item.matchedRecurrence && item.matchedInstance && (
@@ -644,8 +679,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                             )}
                             {item.matchedRecurrence && (
                               <span className="flex items-center gap-1 text-xs text-info font-medium">
-                                <RefreshCw className="h-3 w-3" />
-                                {item.matchedRecurrence.name}
+                                <RefreshCw className="h-3 w-3" />{item.matchedRecurrence.name}
                               </span>
                             )}
                             {item.isDuplicate && (
