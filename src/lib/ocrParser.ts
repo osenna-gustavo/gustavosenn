@@ -53,12 +53,14 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   'Contas/Taxas': [
     'taxa', 'tarifa', 'anuidade', 'iof', 'juros', 'multa', 'imposto',
     'ipva', 'licenciamento', 'pagamento de boleto',
+    'aplicacao rdb', 'debito em conta', 'resgate de emprestimo',
   ],
   'Salário': ['salario', 'remuneracao', 'holerite', 'contracheque', 'clt'],
   'Renda Extra': [
     'freelance', 'bonus', 'comissao', 'dividendo', 'rendimento',
-    'transferencia recebida', 'pix recebido',
+    'transferencia recebida', 'transferencia recebida pelo pix', 'pix recebido',
     'credito em conta', 'estorno', 'restituicao',
+    'resgate rdb',
   ],
 };
 
@@ -377,7 +379,9 @@ function parseGroupedChunks(flatText: string, currentYear: number): ParsedItem[]
       headerWindow.includes('total de entradas');
     if (!isGroupedHeader) continue;
 
-    const isIncome = headerWindow.includes('total de entradas');
+    // currentIsIncome tracks direction and may flip mid-section when a date has
+    // both "Total de entradas" AND "Total de saídas" sub-headers
+    let currentIsIncome = headerWindow.includes('total de entradas');
 
     // Parse ALL amounts in the section between this anchor and the next
     const sectionText = flatText.slice(a.end, nextStart);
@@ -400,7 +404,12 @@ function parseGroupedChunks(flatText: string, currentYear: number): ParsedItem[]
       const descRaw = sectionText.slice(prevEnd, amt.index).trim();
       prevEnd = amt.end;
 
-      if (containsExclusionKeyword(descRaw)) continue; // skip "Total de saídas" line
+      const descNorm = norm(descRaw);
+      // Update income direction when a sub-section header is encountered mid-section
+      if (descNorm.includes('total de entradas')) { currentIsIncome = true; continue; }
+      if (descNorm.includes('total de saidas')) { currentIsIncome = false; continue; }
+
+      if (containsExclusionKeyword(descRaw)) continue;
       const description = cleanDescription(descRaw);
       if (!description || description.length < 3 || description.length > 100) continue;
 
@@ -409,7 +418,7 @@ function parseGroupedChunks(flatText: string, currentYear: number): ParsedItem[]
         date: a.date,
         description,
         rawLine: `${flatText.slice(a.index, a.end)} ${descRaw}`.slice(0, 200),
-        isIncome,
+        isIncome: currentIsIncome,
       });
     }
   }
@@ -511,6 +520,9 @@ function cleanDescription(raw: string): string {
     .replace(/\*{4}\s*\d{4}/g, '')             // masked card "**** 1234"
     .replace(/[•*]{2,}[\d•*.\/\-]+/g, '')      // masked CPF/CNPJ "•••.110.598.••"
     .replace(/R\$\s*[\d.,]+/gi, '')            // residual R$ amounts
+    .replace(/\d{2}\.\d{3}\.\d{3}\/\d{4}-?\d{0,2}/g, '')  // CNPJ "14.226.756/0001-68"
+    .replace(/Agência:\s*\d+\s*Conta:\s*[\d\-]+/gi, '')     // routing "Agência: 1234 Conta: 5678-9"
+    .replace(/\s*-\s*(NU PAGAMENTOS|ITAÚ UNIBANCO|BCO C6|NUBANK|ADYEN)[^,\n]*/gi, '') // bank suffixes
     .replace(/\d{8,}/g, '')                    // long account/document numbers
     .replace(/[\[\]{}()]/g, '')
     .replace(/\s+/g, ' ')
