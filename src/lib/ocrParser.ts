@@ -54,6 +54,7 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
     'taxa', 'tarifa', 'anuidade', 'iof', 'juros', 'multa', 'imposto',
     'ipva', 'licenciamento', 'pagamento de boleto',
     'aplicacao rdb', 'debito em conta', 'resgate de emprestimo',
+    'iof transacoes exterior',
   ],
   'Salário': ['salario', 'remuneracao', 'holerite', 'contracheque', 'clt'],
   'Renda Extra': [
@@ -74,6 +75,9 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
 const EXCLUSION_KEYWORDS = [
   // Section totals (Itaú/bank extratos)
   'total de entradas', 'total de saidas',
+  // C6 bank fatura boilerplate / payment entries
+  'pag fatura boleto', 'inclusao de pagamento',
+  'iof transacoes exterior',
   // Credit card statement boilerplate
   'saldo anterior', 'saldo final', 'saldo em ', 'saldo disponivel',
   'limite total', 'limite disponivel', 'limite de credito',
@@ -266,9 +270,16 @@ function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
     const windowEnd = Math.min(nextIndex, a.end + 150);
     const window = flatText.slice(a.end, windowEnd);
 
+    // Remove USD exchange-rate sub-amounts before extracting BRL value
+    // e.g. "LOVABLE DO USD 26,75 | Cotação USD: R$5,54 141,17" → "LOVABLE DO 141,17"
+    const cleanWindow = window.replace(/USD\s+[\d.,]+\s*\|\s*Cota[çc][aã]o\s+USD:\s*R\$[\d.,]+/gi, '');
+
     // Pick FIRST amount in window (the transaction value)
-    const amtResult = extractAmount(window, true);
+    const amtResult = extractAmount(cleanWindow, true);
     if (!amtResult) continue;
+
+    // Detect C6 estorno (refund/chargeback) — mark as income
+    const isEstorno = norm(amtResult.descriptionRaw).includes('estorno');
 
     const description = cleanDescription(amtResult.descriptionRaw);
     if (!description || description.length < 3 || description.length > 70) continue;
@@ -281,7 +292,7 @@ function parseChunks(flatText: string, currentYear: number): ParsedItem[] {
       date: a.date,
       description,
       rawLine: flatText.slice(a.index, windowEnd),
-      isIncome: amtResult.isIncome,
+      isIncome: amtResult.isIncome || isEstorno,
     });
   }
 
@@ -474,8 +485,8 @@ function parseDateFromGroups(
 
 function dateIsInRange(text: string, index: number): boolean {
   const before = norm(text.slice(Math.max(0, index - 25), index));
-  if (/\bde\s+$/.test(before) || /\ba\s+$/.test(before)) return true;
-  if (/(?:vencimento|emissao|data|periodo|competencia)\s*[:\-]?\s*$/.test(before)) return true;
+  if (/\b(?:de|a|ate)\s+$/.test(before)) return true;
+  if (/(?:vencimento|emissao|data|periodo|competencia|fechamento)\s*[:\-]?\s*$/.test(before)) return true;
   return false;
 }
 
@@ -520,6 +531,8 @@ function cleanDescription(raw: string): string {
     .replace(/\*{4}\s*\d{4}/g, '')             // masked card "**** 1234"
     .replace(/[•*]{2,}[\d•*.\/\-]+/g, '')      // masked CPF/CNPJ "•••.110.598.••"
     .replace(/R\$\s*[\d.,]+/gi, '')            // residual R$ amounts
+    .replace(/\s*USD\s+[\d.,]+\s*\|\s*Cota[çc][aã]o\s+USD:\s*R\$[\d.,]+/gi, '') // C6 international "USD 26,75 | Cotação USD: R$5,54"
+    .replace(/\s*-\s*[Ee]storno\b/g, '')       // C6 refund suffix "- Estorno" (income captured separately)
     .replace(/\d{2}\.\d{3}\.\d{3}\/\d{4}-?\d{0,2}/g, '')  // CNPJ "14.226.756/0001-68"
     .replace(/Agência:\s*\d+\s*Conta:\s*[\d\-]+/gi, '')     // routing "Agência: 1234 Conta: 5678-9"
     .replace(/\s*-\s*(NU PAGAMENTOS|ITAÚ UNIBANCO|BCO C6|NUBANK|ADYEN)[^,\n]*/gi, '') // bank suffixes
