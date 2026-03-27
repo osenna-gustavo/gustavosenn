@@ -77,7 +77,6 @@ const EXCLUSION_KEYWORDS = [
   'total de entradas', 'total de saidas',
   // C6 bank fatura boilerplate / payment entries
   'pag fatura boleto', 'inclusao de pagamento',
-  'iof transacoes exterior',
   // Credit card statement boilerplate
   'saldo anterior', 'saldo final', 'saldo em ', 'saldo disponivel',
   'limite total', 'limite disponivel', 'limite de credito',
