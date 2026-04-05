@@ -15,13 +15,26 @@ const PT_MONTHS: Record<string, number> = {
 };
 const PT_MONTH_KEYS = Object.keys(PT_MONTHS).join('|');
 
-// ─── Transaction date pattern: "04 jan" or "18 fev" or "17 mar" ──────────────
-// Also handles "DD/MM" as fallback
-const DATE_PT_RE = new RegExp(
+// ─── Date patterns ────────────────────────────────────────────────────────────
+
+// C6 PDF.js format: day and month are concatenated without space
+// Examples: "25fev", "O2mar", "Olmar" (OCR artifacts: 0→O, 01→Ol)
+const DATE_C6_CONCAT_RE = new RegExp(
+  `^([0-9Ol]{1,2})(${PT_MONTH_KEYS})\\s+`,
+  'i',
+);
+
+// Classic "04 jan" format (with space between day and month)
+const DATE_PT_SPACE_RE = new RegExp(
   `^(\\d{1,2})\\s+(${PT_MONTH_KEYS})\\b`,
   'i',
 );
+
+// Fallback "DD/MM" or "DD/MM/YYYY"
 const DATE_SLASH_RE = /^(\d{2})\/(\d{2})(?:\/(\d{2,4}))?\s+/;
+
+// Keep DATE_PT_RE as alias so section triggers still work
+const DATE_PT_RE = DATE_PT_SPACE_RE;
 
 // ─── Amount pattern: 92,36 or 1.234,56 at end of line ────────────────────────
 const BRL_TRAILING_RE = /(\d{1,3}(?:\.\d{3})*,\d{2})\s*$/;
@@ -71,7 +84,23 @@ const SKIP_LINES: RegExp[] = [
   /\blimite\b.*R\$/i,
   /IOF\s+consolidado/i,
   /^[0-9]{5}\.[0-9]{5}/,            // barcode
+  /^Lembrando:/i,                   // C6 informational note
 ];
+
+// ─── OCR artifact normalization ──────────────────────────────────────────────
+
+/** Normalize OCR artifacts in day string: capital O → 0, lowercase l → 1 */
+function normalizeOCRDay(s: string): number {
+  return parseInt(s.replace(/O/g, '0').replace(/l/g, '1'), 10);
+}
+
+/** Strip the checkbox glyph prefix that C6 PDF.js renders before dates.
+ *  Examples: "OD 25fev ...", "D Olmar ...", "OD O2mar ..."
+ *  The prefix is 1–3 uppercase ASCII letters followed by a single space.
+ */
+function stripCheckboxPrefix(line: string): string {
+  return line.replace(/^[A-Z]{1,3} /, '');
+}
 
 // ─── Merchant normalization ───────────────────────────────────────────────────
 
@@ -119,8 +148,18 @@ interface DateResult {
 }
 
 function extractLeadingDate(line: string, year: number): DateResult | null {
-  // Format: "04 jan" or "18 fev"
-  const ptMatch = line.match(DATE_PT_RE);
+  // C6 PDF.js concat format: "25fev", "O2mar", "Olmar" (OCR: 0→O, 1→l)
+  const concatMatch = line.match(DATE_C6_CONCAT_RE);
+  if (concatMatch) {
+    const day = normalizeOCRDay(concatMatch[1]);
+    const month = PT_MONTHS[concatMatch[2].toLowerCase()];
+    if (day >= 1 && day <= 31 && month !== undefined) {
+      return { date: new Date(year, month, day), consumed: concatMatch[0].length };
+    }
+  }
+
+  // Classic "04 jan" format (with space)
+  const ptMatch = line.match(DATE_PT_SPACE_RE);
   if (ptMatch) {
     const day = parseInt(ptMatch[1]);
     const month = PT_MONTHS[ptMatch[2].toLowerCase()];
@@ -164,11 +203,14 @@ interface ParsedLine {
 }
 
 function parseLine(line: string, year: number): ParsedLine | null {
+  // Strip checkbox glyph prefix that C6 PDF.js renders before dates
+  const stripped = stripCheckboxPrefix(line);
+
   // Date required
-  const dateResult = extractLeadingDate(line, year);
+  const dateResult = extractLeadingDate(stripped, year);
   if (!dateResult) return null;
 
-  let rest = line.slice(dateResult.consumed).trim();
+  let rest = stripped.slice(dateResult.consumed).trim();
   if (!rest) return null;
 
   // ── Handle international: "... USD X,XX | Cotação USD: R$X,XX   141,17" ──
@@ -379,8 +421,9 @@ export function parseC6Invoice(
         continue;
       }
 
-      // Must start with a date
-      if (!DATE_PT_RE.test(line) && !DATE_SLASH_RE.test(line)) continue;
+      // Must start with a date (check after stripping checkbox prefix)
+      const strippedFb = stripCheckboxPrefix(line);
+      if (!DATE_C6_CONCAT_RE.test(strippedFb) && !DATE_PT_SPACE_RE.test(strippedFb) && !DATE_SLASH_RE.test(strippedFb)) continue;
 
       // Skip hard boilerplate
       if (SKIP_LINES.some(re => re.test(line))) continue;
@@ -422,7 +465,10 @@ export function parseC6Invoice(
     transactions: deduped,
     cards,
     logs,
-    totalLinesProcessed: lineCount || lines.filter(l => DATE_PT_RE.test(l) || DATE_SLASH_RE.test(l)).length,
+    totalLinesProcessed: lineCount || lines.filter(l => {
+      const s = stripCheckboxPrefix(l);
+      return DATE_C6_CONCAT_RE.test(s) || DATE_PT_SPACE_RE.test(s) || DATE_SLASH_RE.test(s);
+    }).length,
     totalSectionsFound: sectionCount,
   };
 }
