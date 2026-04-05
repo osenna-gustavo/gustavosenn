@@ -278,7 +278,8 @@ export function parseC6Invoice(
     .replace(/\r\n/g, '\n')
     .replace(/\r/g, '\n')
     .split('\n')
-    .map(l => l.trim())
+    // Strip leading PDF artifacts: ||, □, ☐, §, ·, |, non-printable chars
+    .map(l => l.replace(/^[\s|□☐§·\u0000-\u001f\u007f]+/, '').trim())
     .filter(l => l.length > 1);
 
   logs.push(`[Parser] Total lines: ${lines.length}`);
@@ -336,9 +337,20 @@ export function parseC6Invoice(
 
     lineCount++;
 
+    // Log first 60 lines inside sections for debugging
+    if (lineCount <= 60) {
+      logs.push(`[Section line ${lineCount}] "${line.slice(0, 100)}"`);
+    }
+
     const parsed = parseLine(line, year);
-    if (!parsed) continue;
-    if (parsed.transactionType === 'pagamento_fatura') continue;
+    if (!parsed) {
+      if (lineCount <= 60) logs.push(`  → no match (date or amount not found)`);
+      continue;
+    }
+    if (parsed.transactionType === 'pagamento_fatura') {
+      logs.push(`  → skipped (pagamento_fatura)`);
+      continue;
+    }
 
     const card = currentCard ?? cards[0] ?? {
       name: 'Cartão C6', lastFour: '????', holder: '', type: 'principal' as CardType,
