@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Upload, FileImage, FileText, Loader2, CheckCircle2, AlertCircle, Trash2, Edit2 } from 'lucide-react';
+import { Upload, FileImage, FileText, Loader2, CheckCircle2, AlertCircle, Trash2, Edit2, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -20,16 +20,68 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdn.jsdelivr.net/npm/pdfjs-dis
 
 type ImportStatus = 'idle' | 'uploading' | 'processing' | 'ready' | 'error';
 
+type StatementType = 'nubank-fatura' | 'c6-fatura' | 'nubank-extrato' | 'c6-extrato';
+
+const STATEMENT_TYPES: {
+  id: StatementType;
+  label: string;
+  subtitle: string;
+  description: string;
+  icon: string;
+  color: string;
+}[] = [
+  {
+    id: 'nubank-fatura',
+    label: 'Fatura Nubank',
+    subtitle: 'Cartão de crédito',
+    description: 'PDF da fatura mensal do cartão Nubank',
+    icon: '💜',
+    color: 'hover:border-purple-500/60 hover:bg-purple-500/5',
+  },
+  {
+    id: 'c6-fatura',
+    label: 'Fatura C6',
+    subtitle: 'Cartão de crédito',
+    description: 'PDF da fatura mensal do cartão C6 Bank',
+    icon: '🖤',
+    color: 'hover:border-zinc-400/60 hover:bg-zinc-400/5',
+  },
+  {
+    id: 'nubank-extrato',
+    label: 'Extrato Nubank',
+    subtitle: 'Conta corrente',
+    description: 'PDF do extrato da conta Nubank',
+    icon: '💜',
+    color: 'hover:border-purple-500/60 hover:bg-purple-500/5',
+  },
+  {
+    id: 'c6-extrato',
+    label: 'Extrato C6',
+    subtitle: 'Conta corrente',
+    description: 'PDF do extrato da conta C6 Bank',
+    icon: '🖤',
+    color: 'hover:border-zinc-400/60 hover:bg-zinc-400/5',
+  },
+];
+
+const STATEMENT_LABELS: Record<StatementType, string> = {
+  'nubank-fatura': 'Fatura Nubank',
+  'c6-fatura': 'Fatura C6',
+  'nubank-extrato': 'Extrato Nubank',
+  'c6-extrato': 'Extrato C6',
+};
+
 export function ImportPage() {
   const { categories, subcategories, addTransaction, selectedMonth, selectedYear } = useApp();
   const { toast } = useToast();
-  
+
+  const [selectedType, setSelectedType] = useState<StatementType | null>(null);
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [progress, setProgress] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [suggestions, setSuggestions] = useState<SuggestedTransaction[]>([]);
   const [editingId, setEditingId] = useState<string | null>(null);
-  
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const processOCR = useCallback(async (imageData: string | ImageData): Promise<string> => {
@@ -40,7 +92,7 @@ export function ImportPage() {
         }
       },
     });
-    
+
     try {
       const { data: { text } } = await worker.recognize(imageData);
       return text;
@@ -52,40 +104,38 @@ export function ImportPage() {
   const extractTextFromPDF = useCallback(async (arrayBuffer: ArrayBuffer): Promise<string> => {
     const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     let fullText = '';
-    
-    const numPages = Math.min(pdf.numPages, 5); // Limit to first 5 pages
-    
+
+    const numPages = Math.min(pdf.numPages, 5);
+
     for (let i = 1; i <= numPages; i++) {
       setProgress(Math.round((i / numPages) * 50));
       const page = await pdf.getPage(i);
-      
-      // Try to extract text content first
+
       const textContent = await page.getTextContent();
       const pageText = textContent.items
         .map((item: any) => item.str)
         .join(' ');
-      
+
       if (pageText.trim().length > 20) {
         fullText += pageText + '\n';
       } else {
-        // If no text, render as image and OCR
         const viewport = page.getViewport({ scale: 2.0 });
         const canvas = document.createElement('canvas');
         const context = canvas.getContext('2d')!;
         canvas.height = viewport.height;
         canvas.width = viewport.width;
-        
+
         await page.render({
           canvasContext: context,
           viewport: viewport,
         }).promise;
-        
+
         const imageData = canvas.toDataURL('image/png');
         const ocrText = await processOCR(imageData);
         fullText += ocrText + '\n';
       }
     }
-    
+
     return fullText;
   }, [processOCR]);
 
@@ -100,12 +150,10 @@ export function ImportPage() {
       let extractedText = '';
 
       if (file.type.startsWith('image/')) {
-        // Process image with OCR
         const imageUrl = URL.createObjectURL(file);
         extractedText = await processOCR(imageUrl);
         URL.revokeObjectURL(imageUrl);
       } else if (file.type === 'application/pdf') {
-        // Process PDF
         const arrayBuffer = await file.arrayBuffer();
         extractedText = await extractTextFromPDF(arrayBuffer);
       } else {
@@ -116,16 +164,15 @@ export function ImportPage() {
         throw new Error('Não foi possível extrair texto do arquivo. Tente com uma imagem mais clara.');
       }
 
-      // Parse extracted text
       const parsed = parseOCRText(extractedText, categories);
-      
+
       if (parsed.length === 0) {
         throw new Error('Nenhum lançamento identificado. Verifique se o arquivo contém valores monetários.');
       }
 
       setSuggestions(parsed);
       setStatus('ready');
-      
+
       toast({
         title: 'Processamento concluído!',
         description: `${parsed.length} lançamento(s) identificado(s) para revisão.`,
@@ -162,7 +209,7 @@ export function ImportPage() {
   }, []);
 
   const updateSuggestion = useCallback((id: string, updates: Partial<SuggestedTransaction>) => {
-    setSuggestions(prev => prev.map(s => 
+    setSuggestions(prev => prev.map(s =>
       s.id === id ? { ...s, ...updates } : s
     ));
   }, []);
@@ -173,7 +220,7 @@ export function ImportPage() {
 
   const handleConfirmAll = useCallback(async () => {
     const confirmedItems = suggestions.filter(s => !s.confirmed);
-    
+
     if (confirmedItems.length === 0) {
       toast({ title: 'Nenhum item para confirmar', variant: 'destructive' });
       return;
@@ -198,9 +245,9 @@ export function ImportPage() {
         description: `${confirmedItems.length} lançamento(s) adicionado(s) com sucesso.`,
       });
 
-      // Reset state
       setSuggestions([]);
       setStatus('idle');
+      setSelectedType(null);
     } catch (error) {
       toast({
         title: 'Erro ao criar lançamentos',
@@ -220,19 +267,73 @@ export function ImportPage() {
     }
   }, []);
 
+  const handleBackToTypeSelection = useCallback(() => {
+    handleReset();
+    setSelectedType(null);
+  }, [handleReset]);
+
   const expenseCategories = categories.filter(c => c.type === 'despesa');
   const incomeCategories = categories.filter(c => c.type === 'receita');
 
+  // Step 1: type selection
+  if (!selectedType) {
+    return (
+      <div className="space-y-8 animate-fade-in">
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
+          <p className="text-muted-foreground">Selecione o tipo de documento para importar</p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {STATEMENT_TYPES.map((type) => (
+            <button
+              key={type.id}
+              onClick={() => setSelectedType(type.id)}
+              className={cn(
+                'glass-card rounded-xl p-6 text-left border border-border transition-all duration-200 cursor-pointer',
+                type.color
+              )}
+            >
+              <div className="flex items-start gap-4">
+                <span className="text-3xl">{type.icon}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-base font-semibold">{type.label}</h3>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
+                      {type.subtitle}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{type.description}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // Step 2: upload + review
   return (
     <div className="space-y-6 animate-fade-in">
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
-        <p className="text-muted-foreground">Importe lançamentos de imagens ou PDFs com OCR</p>
+      <div className="flex items-center gap-3">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleBackToTypeSelection}
+          className="shrink-0"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        <div>
+          <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
+          <p className="text-muted-foreground">{STATEMENT_LABELS[selectedType]}</p>
+        </div>
       </div>
 
       {/* Upload Area */}
       {status === 'idle' && (
-        <div 
+        <div
           className="glass-card rounded-xl p-8 border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
           onDrop={handleDrop}
           onDragOver={handleDragOver}
@@ -274,7 +375,7 @@ export function ImportPage() {
               {status === 'uploading' ? 'Enviando arquivo...' : 'Processando OCR...'}
             </h3>
             <div className="w-full max-w-xs bg-muted rounded-full h-2 mt-4">
-              <div 
+              <div
                 className="bg-primary h-2 rounded-full transition-all duration-300"
                 style={{ width: `${progress}%` }}
               />
@@ -323,8 +424,8 @@ export function ImportPage() {
               );
 
               return (
-                <div 
-                  key={item.id} 
+                <div
+                  key={item.id}
                   className={cn(
                     "glass-card rounded-lg p-4",
                     item.needsReview && "border-l-4 border-l-warning"
@@ -338,8 +439,8 @@ export function ImportPage() {
                           <Input
                             type="date"
                             value={item.date ? new Date(item.date).toISOString().split('T')[0] : ''}
-                            onChange={(e) => updateSuggestion(item.id, { 
-                              date: e.target.value ? new Date(e.target.value) : undefined 
+                            onChange={(e) => updateSuggestion(item.id, {
+                              date: e.target.value ? new Date(e.target.value) : undefined
                             })}
                           />
                         </div>
@@ -347,13 +448,13 @@ export function ImportPage() {
                           <Label className="text-xs">Valor (R$)</Label>
                           <CurrencyInput
                             value={item.amount || 0}
-                            onChange={(val) => updateSuggestion(item.id, { 
-                              amount: parseBRLToNumber(val) 
+                            onChange={(val) => updateSuggestion(item.id, {
+                              amount: parseBRLToNumber(val)
                             })}
                           />
                         </div>
                       </div>
-                      
+
                       <div>
                         <Label className="text-xs">Descrição</Label>
                         <Input
@@ -367,7 +468,7 @@ export function ImportPage() {
                           <Label className="text-xs">Tipo</Label>
                           <Select
                             value={item.type}
-                            onValueChange={(val) => updateSuggestion(item.id, { 
+                            onValueChange={(val) => updateSuggestion(item.id, {
                               type: val as TransactionType,
                               suggestedCategoryId: undefined,
                               suggestedSubcategoryId: undefined,
@@ -386,7 +487,7 @@ export function ImportPage() {
                           <Label className="text-xs">Categoria</Label>
                           <Select
                             value={item.suggestedCategoryId || ''}
-                            onValueChange={(val) => updateSuggestion(item.id, { 
+                            onValueChange={(val) => updateSuggestion(item.id, {
                               suggestedCategoryId: val,
                               suggestedSubcategoryId: undefined,
                             })}
@@ -407,8 +508,8 @@ export function ImportPage() {
                           <Label className="text-xs">Subcategoria</Label>
                           <Select
                             value={item.suggestedSubcategoryId || "__none__"}
-                            onValueChange={(val) => updateSuggestion(item.id, { 
-                              suggestedSubcategoryId: val === "__none__" ? undefined : val 
+                            onValueChange={(val) => updateSuggestion(item.id, {
+                              suggestedSubcategoryId: val === "__none__" ? undefined : val
                             })}
                             disabled={categorySubcategories.length === 0}
                           >
@@ -426,8 +527,8 @@ export function ImportPage() {
                       </div>
 
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          size="sm" 
+                        <Button
+                          size="sm"
                           variant="outline"
                           onClick={() => setEditingId(null)}
                         >
@@ -462,15 +563,15 @@ export function ImportPage() {
                         <span className="font-mono font-bold">
                           {formatCurrency(item.amount || 0)}
                         </span>
-                        <Button 
-                          size="icon" 
+                        <Button
+                          size="icon"
                           variant="ghost"
                           onClick={() => setEditingId(item.id)}
                         >
                           <Edit2 className="h-4 w-4" />
                         </Button>
-                        <Button 
-                          size="icon" 
+                        <Button
+                          size="icon"
                           variant="ghost"
                           onClick={() => removeSuggestion(item.id)}
                         >
@@ -489,8 +590,8 @@ export function ImportPage() {
       {/* Help Text */}
       {status === 'idle' && (
         <div className="glass-card rounded-xl p-6 text-center text-muted-foreground">
-          <p>Envie uma imagem ou PDF de extrato bancário, nota fiscal ou comprovante.</p>
-          <p className="text-sm mt-2">O OCR irá identificar valores e datas automaticamente.</p>
+          <p>Envie o arquivo de <strong className="text-foreground">{STATEMENT_LABELS[selectedType]}</strong>.</p>
+          <p className="text-sm mt-2">O sistema irá identificar os lançamentos automaticamente.</p>
         </div>
       )}
     </div>
