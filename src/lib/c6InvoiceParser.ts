@@ -38,6 +38,12 @@ const TRANSACTION_SECTION_TRIGGERS: RegExp[] = [
   /compras?\s+no\s+(brasil|exterior)/i,
   /lan[cç]amentos?/i,
   /transa[cç][oõ]es?\s+do\s+m[eê]s/i,
+  // C6 variations
+  /compras\s+realizadas/i,
+  /lista\s+de\s+(compras|transa)/i,
+  /suas\s+compras/i,
+  /extrato\s+de\s+compras/i,
+  /movimenta[çc][aã]o/i,
 ];
 
 /** These lines signal the END of a transaction block */
@@ -346,7 +352,72 @@ export function parseC6Invoice(
 
   logs.push(`[Parser] Transactions extracted: ${transactions.length} from ${lineCount} lines in ${sectionCount} sections`);
 
-  // Deduplicate: same date + merchant + amount + installment
+  // ── Fallback: section-agnostic scan ─────────────────────────────────────────
+  // If the section-aware pass found nothing, scan ALL non-boilerplate lines
+  // that look like "DD/MM description amount". This handles C6 PDFs where the
+  // section headers don't match any known trigger.
+  if (transactions.length === 0) {
+    logs.push('[Parser] No sections found — activating fallback (direct date scan)');
+
+    // Build a strong boilerplate set for the fallback
+    const STRONG_BOILERPLATE = [
+      ...BOILERPLATE_PATTERNS,
+      /^\d{5}\.\d{5}/,             // barcode numbers
+      /cart[aã]o\s+(c6|mastercard|visa|elo)/i,
+      /titular/i,
+      /compras?\s+e\s+encargos/i,
+      /vencimento/i,
+      /limite/i,
+      /pagamento/i,
+      /fatura/i,
+      /^c6\s+bank/i,
+    ];
+
+    const fallbackCard = cards[0] ?? {
+      name: 'Cartão C6',
+      lastFour: '????',
+      holder: '',
+      type: 'principal' as CardType,
+    };
+
+    for (const line of lines) {
+      // Must start with a date
+      if (!DATE_LEADING_RE.test(line)) continue;
+
+      // Must not be boilerplate
+      if (STRONG_BOILERPLATE.some(re => re.test(line))) continue;
+
+      const parsed = parseLine(line, year);
+      if (!parsed) continue;
+      if (parsed.transactionType === 'pagamento_fatura') continue;
+
+      // Use current card or default
+      const card = cards.find(c =>
+        line.includes(c.lastFour) || line.toLowerCase().includes(c.cardHolder?.toLowerCase())
+      ) ?? fallbackCard;
+
+      transactions.push({
+        id: uuid(),
+        transactionDate: parsed.date,
+        descriptionOriginal: parsed.descriptionOriginal,
+        merchantNormalized: parsed.merchantNormalized,
+        amount: parsed.amount,
+        currency: 'BRL',
+        transactionType: parsed.transactionType,
+        cardName: (card as any).name ?? fallbackCard.name,
+        cardLastFour: (card as any).lastFour ?? fallbackCard.lastFour,
+        cardHolder: (card as any).holder ?? fallbackCard.holder,
+        cardType: (card as any).type ?? fallbackCard.type,
+        isInstallment: parsed.isInstallment,
+        installmentCurrent: parsed.installmentCurrent,
+        installmentTotal: parsed.installmentTotal,
+        rawLine: parsed.rawLine,
+        parsedAt: new Date(),
+      });
+    }
+
+    logs.push(`[Parser] Fallback extracted: ${transactions.length} transactions`);
+  }
   const seen = new Set<string>();
   const deduplicated = transactions.filter(t => {
     const key = [

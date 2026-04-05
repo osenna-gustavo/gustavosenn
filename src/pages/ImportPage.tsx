@@ -179,6 +179,11 @@ export function ImportPage() {
       logs.push(`[Import] File: ${file.name} (${(file.size / 1024).toFixed(0)} KB)`);
       logs.push(`[Import] Text extracted: ${extractedText.length} chars`);
 
+      // Log first 80 lines for debug (helps understand PDF structure)
+      const rawLines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+      logs.push(`[Import] Raw line count: ${rawLines.length}`);
+      rawLines.slice(0, 80).forEach((l, i) => logs.push(`[RAW ${String(i + 1).padStart(3, '0')}] ${l.slice(0, 120)}`));
+
       setProgress(40);
       setProgressLabel('Identificando transações...');
 
