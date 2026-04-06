@@ -130,14 +130,14 @@ export function findBestMatch(
     }
   }
 
-  if (!bestTx || bestScore < 0.4) {
+  if (!bestTx || bestScore < 0.35) {
     return { confidence: 'none', details: {} };
   }
 
   const confidence: MatchConfidence =
-    bestScore >= 0.92 ? 'exact' :
-    bestScore >= 0.75 ? 'very_likely' :
-    bestScore >= 0.5 ? 'doubtful' : 'none';
+    bestScore >= 0.9 ? 'exact' :
+    bestScore >= 0.72 ? 'very_likely' :
+    bestScore >= 0.45 ? 'doubtful' : 'none';
 
   return {
     matchId: bestTx.id,
@@ -162,25 +162,33 @@ export function matchRecurrence(
   let bestScore = 0;
   let bestRec: Recurrence | undefined;
 
+  const invMerchant = norm(inv.merchantNormalized);
+
   for (const rec of recurrences) {
     if (!rec.isActive) continue;
 
-    // Get the merchant base for comparison
     const recBase = norm((rec as any).merchantNormalizedBase ?? rec.name);
-    const invMerchant = norm(inv.merchantNormalized);
-
-    const nameScore = diceSimilarity(invMerchant, recBase);
-
-    // Also try matching against the recurrence name
     const recName = norm(rec.name);
-    const nameScore2 = diceSimilarity(invMerchant, recName);
 
-    const merchantScore = Math.max(nameScore, nameScore2);
-    if (merchantScore < 0.5) continue;
+    // Dice similarity against both base and display name
+    const sim1 = diceSimilarity(invMerchant, recBase);
+    const sim2 = diceSimilarity(invMerchant, recName);
+    let merchantScore = Math.max(sim1, sim2);
+
+    // Prefix match boost: "SHOPEE GUSTAVO COSTA M" starts with "SHOPEE"
+    const prefixMatch =
+      invMerchant.startsWith(recBase) ||
+      recBase.startsWith(invMerchant) ||
+      invMerchant.startsWith(recName) ||
+      recName.startsWith(invMerchant);
+    if (prefixMatch) merchantScore = Math.max(merchantScore, 0.85);
+
+    // Lower threshold: 0.3 so partial names still qualify
+    if (merchantScore < 0.3) continue;
 
     // Amount check
     const tolerance = (rec as any).valueTolerance ?? 0.1;
-    let valueScore = 0.5; // neutral if no expected value
+    let valueScore = 0.5; // neutral when recurrence has no fixed amount
     if (rec.amount > 0) {
       const relDiff = Math.abs(inv.amount - rec.amount) / rec.amount;
       valueScore = relDiff <= tolerance ? 1.0 : relDiff <= 0.2 ? 0.5 : 0.1;
@@ -194,14 +202,14 @@ export function matchRecurrence(
     }
   }
 
-  if (!bestRec || bestScore < 0.5) {
+  if (!bestRec || bestScore < 0.3) {
     return { confidence: 'none' };
   }
 
   const confidence: MatchConfidence =
     bestScore >= 0.85 ? 'exact' :
     bestScore >= 0.65 ? 'very_likely' :
-    bestScore >= 0.5 ? 'doubtful' : 'none';
+    bestScore >= 0.45 ? 'doubtful' : 'none';
 
   return {
     recurrenceId: bestRec.id,

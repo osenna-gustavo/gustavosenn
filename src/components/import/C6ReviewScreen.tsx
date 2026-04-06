@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import {
   CheckCircle2, XCircle, AlertCircle, RotateCcw, ChevronDown,
-  ChevronRight, Repeat2, Plus, BookOpen, Eye, EyeOff, Edit2
+  ChevronRight, Repeat2, Plus, BookOpen, Eye, EyeOff, Edit2, Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,102 +9,142 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useApp } from '@/contexts/AppContext';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/formatters';
-import { saveCategorizationRule } from '@/lib/invoice-database';
-import { updateInvoiceTransactionStatus } from '@/lib/invoice-database';
+import { saveCategorizationRule, updateInvoiceTransactionStatus } from '@/lib/invoice-database';
 import { cn } from '@/lib/utils';
 import type { InvoiceTransaction, ReviewGroups } from '@/types/invoice';
 
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
-function MatchBadge({ confidence }: { confidence: string }) {
-  if (confidence === 'exact' || confidence === 'very_likely') {
-    return <Badge variant="secondary" className="text-xs bg-red-500/10 text-red-400 border-red-500/20">Já lançado</Badge>;
-  }
-  if (confidence === 'doubtful') {
-    return <Badge variant="secondary" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/20">Dúvida</Badge>;
-  }
-  return null;
-}
-
 function TypeBadge({ type }: { type: string }) {
   const map: Record<string, { label: string; color: string }> = {
-    compra: { label: 'Compra', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
+    compra:  { label: 'Compra',  color: 'bg-blue-500/10 text-blue-400 border-blue-500/20' },
     estorno: { label: 'Estorno', color: 'bg-green-500/10 text-green-400 border-green-500/20' },
-    iof: { label: 'IOF', color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
-    tarifa: { label: 'Tarifa', color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
-    ajuste: { label: 'Ajuste', color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
+    iof:     { label: 'IOF',     color: 'bg-orange-500/10 text-orange-400 border-orange-500/20' },
+    tarifa:  { label: 'Tarifa',  color: 'bg-zinc-500/10 text-zinc-400 border-zinc-500/20' },
+    ajuste:  { label: 'Ajuste',  color: 'bg-purple-500/10 text-purple-400 border-purple-500/20' },
   };
   const info = map[type] ?? { label: type, color: 'bg-muted text-muted-foreground border-border' };
   return <Badge variant="outline" className={cn('text-xs', info.color)}>{info.label}</Badge>;
+}
+
+// ─── Already-launched (duplicate) row ────────────────────────────────────────
+
+interface DuplicateRowProps {
+  tx: InvoiceTransaction;
+  onIgnore: (tx: InvoiceTransaction) => void;
+  onKeep: (tx: InvoiceTransaction) => void;
+}
+
+function DuplicateRow({ tx, onIgnore, onKeep }: DuplicateRowProps) {
+  const dateStr = tx.transactionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const confidence = tx.existingMatchConfidence;
+  const label = confidence === 'exact' || confidence === 'very_likely' ? 'Já lançado' : 'Possível duplicata';
+  const color = confidence === 'exact' || confidence === 'very_likely'
+    ? 'bg-red-500/10 text-red-400 border-red-500/20'
+    : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20';
+
+  return (
+    <div className="glass-card rounded-lg p-3 border-l-2 border-l-red-500/40">
+      <div className="flex items-center gap-3">
+        <span className="text-xs text-muted-foreground font-mono w-10 shrink-0">{dateStr}</span>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <Badge variant="outline" className={cn('text-xs', color)}>{label}</Badge>
+          </div>
+          <p className="text-sm truncate">{tx.descriptionOriginal}</p>
+          <p className="text-xs text-muted-foreground truncate">{tx.merchantNormalized}</p>
+        </div>
+        <span className="font-mono text-sm shrink-0 text-muted-foreground">
+          -{formatCurrency(tx.amount)}
+        </span>
+        <div className="flex gap-1 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            onClick={() => onKeep(tx)}
+            title="Lançar mesmo assim"
+          >
+            Lançar
+          </Button>
+          <Button
+            size="sm"
+            className="h-7 px-2 text-xs gap-1 bg-muted hover:bg-muted/80 text-foreground"
+            onClick={() => onIgnore(tx)}
+          >
+            <XCircle className="h-3 w-3" />
+            Ignorar
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 // ─── Single transaction row ───────────────────────────────────────────────────
 
 interface TransactionRowProps {
   tx: InvoiceTransaction;
-  onConfirm: (tx: InvoiceTransaction, categoryId?: string, subcategoryId?: string) => Promise<void>;
+  onConfirm: (tx: InvoiceTransaction, categoryId?: string, subcategoryId?: string, recurrenceId?: string) => Promise<void>;
   onIgnore: (tx: InvoiceTransaction) => void;
-  onSaveRule: (tx: InvoiceTransaction, categoryId: string) => Promise<void>;
+  onSaveRule: (tx: InvoiceTransaction, categoryId: string, recurrenceId?: string) => Promise<void>;
+  onLinkRecurrence: (tx: InvoiceTransaction, recurrenceId: string) => Promise<void>;
   loading: boolean;
 }
 
-function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: TransactionRowProps) {
-  const { categories, subcategories } = useApp();
+function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence, loading }: TransactionRowProps) {
+  const { categories, subcategories, recurrences } = useApp();
   const [editing, setEditing] = useState(false);
   const [selectedCat, setSelectedCat] = useState(tx.suggestedCategoryId ?? '');
   const [selectedSub, setSelectedSub] = useState(tx.suggestedSubcategoryId ?? '');
+  const [selectedRec, setSelectedRec] = useState(tx.suggestedRecurrenceId ?? '');
 
   const cat = categories.find(c => c.id === (selectedCat || tx.suggestedCategoryId));
   const catSubs = subcategories.filter(s => s.categoryId === selectedCat);
   const expenseCategories = categories.filter(c => c.type === 'despesa');
+  const activeRecurrences = recurrences.filter(r => r.isActive);
 
   const dateStr = tx.transactionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  const linkedRec = recurrences.find(r => r.id === (selectedRec || tx.suggestedRecurrenceId));
 
   const handleConfirm = () => {
-    onConfirm(tx, selectedCat || undefined, selectedSub || undefined);
+    onConfirm(tx, selectedCat || undefined, selectedSub || undefined, selectedRec || undefined);
   };
 
   return (
     <div className={cn(
       'glass-card rounded-lg p-3 transition-all',
       tx.existingMatchConfidence === 'doubtful' && 'border-l-2 border-l-yellow-500',
-      tx.recurrenceMatchConfidence !== 'none' && tx.reviewStatus !== 'duplicate' && 'border-l-2 border-l-primary',
+      (tx.recurrenceMatchConfidence === 'exact' || tx.recurrenceMatchConfidence === 'very_likely') &&
+        tx.reviewStatus !== 'duplicate' && 'border-l-2 border-l-primary',
     )}>
       {!editing ? (
         <div className="flex items-start gap-3">
-          {/* Date */}
           <span className="text-xs text-muted-foreground font-mono pt-0.5 w-10 shrink-0">{dateStr}</span>
 
-          {/* Main info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
               <TypeBadge type={tx.transactionType} />
-              <MatchBadge confidence={tx.existingMatchConfidence} />
-              {tx.recurrenceMatchConfidence !== 'none' && (
+              {(tx.recurrenceMatchConfidence === 'exact' || tx.recurrenceMatchConfidence === 'very_likely' || selectedRec) && (
                 <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
-                  <Repeat2 className="h-3 w-3 mr-1" />Recorrência
+                  <Repeat2 className="h-3 w-3 mr-1" />
+                  {linkedRec ? linkedRec.name : 'Recorrência'}
                 </Badge>
               )}
-              {tx.isInstallment && (
-                <Badge variant="outline" className="text-xs">
-                  {tx.installmentCurrent}/{tx.installmentTotal}
+              {tx.existingMatchConfidence === 'doubtful' && (
+                <Badge variant="outline" className="text-xs bg-yellow-500/10 text-yellow-400 border-yellow-500/20">
+                  Possível duplicata
                 </Badge>
               )}
-              {cat && (
-                <span className="text-xs text-muted-foreground">{cat.icon} {cat.name}</span>
-              )}
+              {cat && <span className="text-xs text-muted-foreground">{cat.icon} {cat.name}</span>}
             </div>
             <p className="text-sm font-medium truncate">{tx.descriptionOriginal}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {tx.merchantNormalized}
-              {tx.cardLastFour && ` • **** ${tx.cardLastFour}`}
-            </p>
+            <p className="text-xs text-muted-foreground truncate">{tx.merchantNormalized}</p>
           </div>
 
-          {/* Amount */}
-          <div className="flex items-center gap-2 shrink-0 ml-2">
+          <div className="flex items-center gap-1 shrink-0 ml-2">
             <span className={cn(
-              'font-mono font-bold text-sm',
+              'font-mono font-bold text-sm mr-1',
               tx.transactionType === 'estorno' ? 'text-success' : 'text-foreground',
             )}>
               {tx.transactionType === 'estorno' ? '+' : '-'}{formatCurrency(tx.amount)}
@@ -113,20 +153,14 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: Transa
               <Edit2 className="h-3.5 w-3.5" />
             </Button>
             <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-success hover:text-success"
-              onClick={handleConfirm}
-              disabled={loading}
+              size="icon" variant="ghost" className="h-7 w-7 text-success hover:text-success"
+              onClick={handleConfirm} disabled={loading}
             >
               <CheckCircle2 className="h-4 w-4" />
             </Button>
             <Button
-              size="icon"
-              variant="ghost"
-              className="h-7 w-7 text-muted-foreground"
-              onClick={() => onIgnore(tx)}
-              disabled={loading}
+              size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground"
+              onClick={() => onIgnore(tx)} disabled={loading}
             >
               <XCircle className="h-3.5 w-3.5" />
             </Button>
@@ -138,29 +172,23 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: Transa
             <p className="text-sm font-medium">{tx.descriptionOriginal}</p>
             <span className="font-mono font-bold">{formatCurrency(tx.amount)}</span>
           </div>
+
+          {/* Category + subcategory */}
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Categoria</p>
               <Select value={selectedCat} onValueChange={(v) => { setSelectedCat(v); setSelectedSub(''); }}>
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
+                <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   {expenseCategories.map(c => (
-                    <SelectItem key={c.id} value={c.id} className="text-xs">
-                      {c.icon} {c.name}
-                    </SelectItem>
+                    <SelectItem key={c.id} value={c.id} className="text-xs">{c.icon} {c.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div>
               <p className="text-xs text-muted-foreground mb-1">Subcategoria</p>
-              <Select
-                value={selectedSub}
-                onValueChange={setSelectedSub}
-                disabled={catSubs.length === 0}
-              >
+              <Select value={selectedSub} onValueChange={setSelectedSub} disabled={catSubs.length === 0}>
                 <SelectTrigger className="h-8 text-xs">
                   <SelectValue placeholder={catSubs.length === 0 ? 'Nenhuma' : 'Opcional'} />
                 </SelectTrigger>
@@ -173,13 +201,43 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: Transa
               </Select>
             </div>
           </div>
-          <div className="flex gap-2 justify-end">
+
+          {/* Recurrence linking */}
+          <div>
+            <p className="text-xs text-muted-foreground mb-1">Vincular à recorrência</p>
+            <Select value={selectedRec} onValueChange={setSelectedRec}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue placeholder="Nenhuma recorrência..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="" className="text-xs">Nenhuma</SelectItem>
+                {activeRecurrences.map(r => (
+                  <SelectItem key={r.id} value={r.id} className="text-xs">
+                    <Repeat2 className="h-3 w-3 inline mr-1" />
+                    {r.name} {r.amount > 0 ? `• ${formatCurrency(r.amount)}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex gap-2 justify-end flex-wrap">
+            {selectedRec && selectedRec !== (tx.suggestedRecurrenceId ?? '') && (
+              <Button
+                size="sm" variant="outline" className="text-xs h-7 gap-1"
+                onClick={async () => {
+                  await onLinkRecurrence(tx, selectedRec);
+                  setEditing(false);
+                }}
+              >
+                <Link2 className="h-3 w-3" />
+                Vincular e lembrar
+              </Button>
+            )}
             {selectedCat && (
               <Button
-                size="sm"
-                variant="outline"
-                className="text-xs h-7 gap-1"
-                onClick={() => onSaveRule(tx, selectedCat)}
+                size="sm" variant="outline" className="text-xs h-7 gap-1"
+                onClick={() => onSaveRule(tx, selectedCat, selectedRec || undefined)}
               >
                 <BookOpen className="h-3 w-3" />
                 Lembrar categoria
@@ -189,8 +247,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: Transa
               Cancelar
             </Button>
             <Button size="sm" className="h-7 text-xs gap-1" onClick={handleConfirm} disabled={loading}>
-              <CheckCircle2 className="h-3 w-3" />
-              Confirmar
+              <CheckCircle2 className="h-3 w-3" />Confirmar
             </Button>
           </div>
         </div>
@@ -207,24 +264,25 @@ interface GroupProps {
   count: number;
   defaultOpen?: boolean;
   accent?: string;
+  headerExtra?: React.ReactNode;
   children: React.ReactNode;
 }
 
-function ReviewGroup({ title, icon, count, defaultOpen = true, accent, children }: GroupProps) {
+function ReviewGroup({ title, icon, count, defaultOpen = true, accent, headerExtra, children }: GroupProps) {
   const [open, setOpen] = useState(defaultOpen);
   if (count === 0) return null;
 
   return (
     <div className="space-y-2">
-      <button
-        className="flex items-center gap-2 w-full text-left"
-        onClick={() => setOpen(o => !o)}
-      >
-        {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
-        {icon}
-        <span className={cn('font-semibold text-sm', accent)}>{title}</span>
-        <Badge variant="secondary" className="ml-1 text-xs">{count}</Badge>
-      </button>
+      <div className="flex items-center gap-2 w-full">
+        <button className="flex items-center gap-2 flex-1 text-left" onClick={() => setOpen(o => !o)}>
+          {open ? <ChevronDown className="h-4 w-4 text-muted-foreground" /> : <ChevronRight className="h-4 w-4 text-muted-foreground" />}
+          {icon}
+          <span className={cn('font-semibold text-sm', accent)}>{title}</span>
+          <Badge variant="secondary" className="ml-1 text-xs">{count}</Badge>
+        </button>
+        {headerExtra}
+      </div>
       {open && <div className="space-y-2 pl-6">{children}</div>}
     </div>
   );
@@ -247,7 +305,7 @@ export function C6ReviewScreen({
   onAllConfirmed,
   onCancel,
 }: C6ReviewScreenProps) {
-  const { addTransaction, categories, recurrences } = useApp();
+  const { addTransaction, recurrences } = useApp();
   const { toast } = useToast();
   const [localGroups, setLocalGroups] = useState(groups);
   const [loading, setLoading] = useState<string | null>(null);
@@ -279,10 +337,13 @@ export function C6ReviewScreen({
     }));
   }, []);
 
+  // ── Confirm (launch) a transaction ─────────────────────────────────────────
+
   const handleConfirm = useCallback(async (
     tx: InvoiceTransaction,
     categoryId?: string,
     subcategoryId?: string,
+    recurrenceId?: string,
   ) => {
     setLoading(tx.id);
     try {
@@ -305,23 +366,22 @@ export function C6ReviewScreen({
         description: tx.descriptionOriginal,
         origin: 'import',
         needsReview: false,
-        recurrenceId: tx.suggestedRecurrenceId,
+        recurrenceId: recurrenceId ?? tx.suggestedRecurrenceId,
       });
 
-      await updateInvoiceTransactionStatus(tx.id, 'confirmed');
+      await updateInvoiceTransactionStatus(tx.id, 'confirmed').catch(() => {});
       removeFromGroups(tx.id);
       setConfirmedCount(n => n + 1);
 
-      toast({
-        title: 'Lançado!',
-        description: tx.descriptionOriginal.slice(0, 50),
-      });
-    } catch (err) {
+      toast({ title: 'Lançado!', description: tx.descriptionOriginal.slice(0, 50) });
+    } catch {
       toast({ title: 'Erro ao lançar', variant: 'destructive' });
     } finally {
       setLoading(null);
     }
   }, [addTransaction, removeFromGroups, toast]);
+
+  // ── Ignore a transaction ────────────────────────────────────────────────────
 
   const handleIgnore = useCallback((tx: InvoiceTransaction) => {
     updateInvoiceTransactionStatus(tx.id, 'ignored').catch(() => {});
@@ -329,71 +389,152 @@ export function C6ReviewScreen({
     addToIgnored(tx);
   }, [removeFromGroups, addToIgnored]);
 
-  const handleSaveRule = useCallback(async (tx: InvoiceTransaction, categoryId: string) => {
+  // ── Move duplicate to newTransactions so user can review & launch ───────────
+
+  const handleKeepDuplicate = useCallback((tx: InvoiceTransaction) => {
+    setLocalGroups(prev => ({
+      ...prev,
+      alreadyLaunched: prev.alreadyLaunched.filter(t => t.id !== tx.id),
+      newTransactions: [...prev.newTransactions, { ...tx, reviewStatus: 'pending', existingMatchConfidence: 'none' }],
+    }));
+  }, []);
+
+  // ── Ignore all duplicates at once ───────────────────────────────────────────
+
+  const handleIgnoreAllDuplicates = useCallback(() => {
+    localGroups.alreadyLaunched.forEach(tx => {
+      updateInvoiceTransactionStatus(tx.id, 'ignored').catch(() => {});
+    });
+    setLocalGroups(prev => ({
+      ...prev,
+      alreadyLaunched: [],
+      ignored: [...prev.ignored, ...prev.alreadyLaunched.map(t => ({ ...t, reviewStatus: 'ignored' as const }))],
+    }));
+    toast({ title: 'Duplicatas ignoradas', description: 'Todos os itens já lançados foram removidos.' });
+  }, [localGroups.alreadyLaunched, toast]);
+
+  // ── Save categorization rule ────────────────────────────────────────────────
+
+  const handleSaveRule = useCallback(async (
+    tx: InvoiceTransaction,
+    categoryId: string,
+    recurrenceId?: string,
+  ) => {
     try {
       await saveCategorizationRule(
         tx.merchantNormalized,
         categoryId,
         tx.suggestedSubcategoryId,
-        tx.suggestedRecurrenceId,
+        recurrenceId ?? tx.suggestedRecurrenceId,
         'manual',
         tx.descriptionOriginal,
       );
       toast({
         title: 'Regra salva!',
-        description: `Próximas compras de "${tx.merchantNormalized}" serão categorizadas automaticamente.`,
+        description: `"${tx.merchantNormalized}" será categorizado automaticamente nas próximas importações.`,
       });
     } catch {
       toast({ title: 'Erro ao salvar regra', variant: 'destructive' });
     }
   }, [toast]);
 
+  // ── Manually link a transaction to a recurrence ─────────────────────────────
+
+  const handleLinkRecurrence = useCallback(async (
+    tx: InvoiceTransaction,
+    recurrenceId: string,
+  ) => {
+    try {
+      // Save rule so future imports auto-match
+      await saveCategorizationRule(
+        tx.merchantNormalized,
+        tx.suggestedCategoryId,
+        tx.suggestedSubcategoryId,
+        recurrenceId,
+        'manual',
+        tx.descriptionOriginal,
+      );
+
+      const rec = recurrences.find(r => r.id === recurrenceId);
+
+      // Move from current group to recurrenceRecognized
+      setLocalGroups(prev => {
+        const updated: InvoiceTransaction = {
+          ...tx,
+          suggestedRecurrenceId: recurrenceId,
+          recurrenceMatchConfidence: 'exact',
+        };
+        return {
+          ...prev,
+          newTransactions: prev.newTransactions.filter(t => t.id !== tx.id),
+          needsReview: prev.needsReview.filter(t => t.id !== tx.id),
+          recurrenceRecognized: prev.recurrenceRecognized.some(t => t.id === tx.id)
+            ? prev.recurrenceRecognized.map(t => t.id === tx.id ? updated : t)
+            : [...prev.recurrenceRecognized, updated],
+        };
+      });
+
+      toast({
+        title: 'Recorrência vinculada!',
+        description: `"${tx.merchantNormalized}" → "${rec?.name ?? recurrenceId}". Próximas importações identificarão automaticamente.`,
+      });
+    } catch {
+      toast({ title: 'Erro ao vincular recorrência', variant: 'destructive' });
+    }
+  }, [recurrences, toast]);
+
+  // ── Confirm all actionable ──────────────────────────────────────────────────
+
   const handleConfirmAll = useCallback(async (txs: InvoiceTransaction[]) => {
     const missing = txs.filter(t => !t.suggestedCategoryId);
     if (missing.length > 0) {
       toast({
         title: `${missing.length} sem categoria`,
-        description: 'Defina a categoria individualmente para os itens sem sugestão.',
+        description: 'Defina a categoria individualmente para esses itens.',
         variant: 'destructive',
       });
       return;
     }
-
     setLoading('all');
     let count = 0;
     for (const tx of txs) {
-      try {
-        await handleConfirm(tx, tx.suggestedCategoryId, tx.suggestedSubcategoryId);
-        count++;
-      } catch {
-        // continue
-      }
+      try { await handleConfirm(tx); count++; } catch { /* continue */ }
     }
     setLoading(null);
-    toast({ title: `${count} lançamentos confirmados!` });
+    if (count > 0) toast({ title: `${count} lançamentos confirmados!` });
   }, [handleConfirm, toast]);
 
   const pendingCount = allActionable.length;
+  const dupCount = localGroups.alreadyLaunched.length;
+
+  const rowProps = (tx: InvoiceTransaction) => ({
+    key: tx.id,
+    tx,
+    onConfirm: handleConfirm,
+    onIgnore: handleIgnore,
+    onSaveRule: handleSaveRule,
+    onLinkRecurrence: handleLinkRecurrence,
+    loading: loading === tx.id || loading === 'all',
+  });
 
   return (
     <div className="space-y-6 animate-fade-in">
+
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-lg font-semibold">Revisão da Fatura C6</h2>
+          <h2 className="text-lg font-semibold">Revisão da Importação</h2>
           <p className="text-sm text-muted-foreground">
             {confirmedCount > 0 && `${confirmedCount} confirmados • `}
-            {pendingCount} pendentes • {localGroups.alreadyLaunched.length} já lançados
+            {pendingCount} para lançar
+            {dupCount > 0 && ` • ${dupCount} duplicatas detectadas`}
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={onCancel}>
-            Cancelar
-          </Button>
+          <Button variant="outline" size="sm" onClick={onCancel}>Cancelar</Button>
           {pendingCount > 0 && (
             <Button
-              size="sm"
-              className="gap-1.5"
+              size="sm" className="gap-1.5"
               disabled={loading === 'all'}
               onClick={() => handleConfirmAll(allActionable)}
             >
@@ -403,8 +544,7 @@ export function C6ReviewScreen({
           )}
           {pendingCount === 0 && confirmedCount > 0 && (
             <Button size="sm" className="gap-1.5" onClick={onAllConfirmed}>
-              <CheckCircle2 className="h-4 w-4" />
-              Concluir
+              <CheckCircle2 className="h-4 w-4" />Concluir
             </Button>
           )}
         </div>
@@ -412,7 +552,37 @@ export function C6ReviewScreen({
 
       {/* Groups */}
       <div className="space-y-5">
-        {/* Recurrence recognized */}
+
+        {/* Already launched (duplicates) — visible by default */}
+        <ReviewGroup
+          title="Já lançados"
+          icon={<AlertCircle className="h-4 w-4 text-red-400" />}
+          count={localGroups.alreadyLaunched.length}
+          accent="text-red-400"
+          defaultOpen
+          headerExtra={
+            localGroups.alreadyLaunched.length > 0 ? (
+              <Button
+                size="sm" variant="ghost"
+                className="h-6 text-xs text-muted-foreground ml-auto"
+                onClick={handleIgnoreAllDuplicates}
+              >
+                Ignorar todos
+              </Button>
+            ) : undefined
+          }
+        >
+          {localGroups.alreadyLaunched.map(tx => (
+            <DuplicateRow
+              key={tx.id}
+              tx={tx}
+              onIgnore={handleIgnore}
+              onKeep={handleKeepDuplicate}
+            />
+          ))}
+        </ReviewGroup>
+
+        {/* Recurrences recognized */}
         <ReviewGroup
           title="Recorrências reconhecidas"
           icon={<Repeat2 className="h-4 w-4 text-primary" />}
@@ -421,14 +591,7 @@ export function C6ReviewScreen({
           defaultOpen
         >
           {localGroups.recurrenceRecognized.map(tx => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onConfirm={handleConfirm}
-              onIgnore={handleIgnore}
-              onSaveRule={handleSaveRule}
-              loading={loading === tx.id || loading === 'all'}
-            />
+            <TransactionRow {...rowProps(tx)} />
           ))}
         </ReviewGroup>
 
@@ -440,14 +603,7 @@ export function C6ReviewScreen({
           defaultOpen
         >
           {localGroups.newTransactions.map(tx => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onConfirm={handleConfirm}
-              onIgnore={handleIgnore}
-              onSaveRule={handleSaveRule}
-              loading={loading === tx.id || loading === 'all'}
-            />
+            <TransactionRow {...rowProps(tx)} />
           ))}
         </ReviewGroup>
 
@@ -460,18 +616,11 @@ export function C6ReviewScreen({
           defaultOpen
         >
           {localGroups.reversals.map(tx => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onConfirm={handleConfirm}
-              onIgnore={handleIgnore}
-              onSaveRule={handleSaveRule}
-              loading={loading === tx.id || loading === 'all'}
-            />
+            <TransactionRow {...rowProps(tx)} />
           ))}
         </ReviewGroup>
 
-        {/* Needs review */}
+        {/* Needs review (doubtful duplicates) */}
         <ReviewGroup
           title="Verificar possível duplicidade"
           icon={<AlertCircle className="h-4 w-4 text-yellow-400" />}
@@ -480,45 +629,7 @@ export function C6ReviewScreen({
           defaultOpen
         >
           {localGroups.needsReview.map(tx => (
-            <TransactionRow
-              key={tx.id}
-              tx={tx}
-              onConfirm={handleConfirm}
-              onIgnore={handleIgnore}
-              onSaveRule={handleSaveRule}
-              loading={loading === tx.id || loading === 'all'}
-            />
-          ))}
-        </ReviewGroup>
-
-        {/* Already launched */}
-        <ReviewGroup
-          title="Já lançados (ocultos)"
-          icon={<Eye className="h-4 w-4 text-muted-foreground" />}
-          count={localGroups.alreadyLaunched.length}
-          defaultOpen={false}
-        >
-          {localGroups.alreadyLaunched.map(tx => (
-            <div key={tx.id} className="glass-card rounded-lg p-3 opacity-50">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-muted-foreground font-mono w-10 shrink-0">
-                  {tx.transactionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm truncate">{tx.descriptionOriginal}</p>
-                </div>
-                <span className="font-mono text-sm shrink-0">{formatCurrency(tx.amount)}</span>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-7 w-7"
-                  onClick={() => handleConfirm(tx)}
-                  title="Lançar mesmo assim"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                </Button>
-              </div>
-            </div>
+            <TransactionRow {...rowProps(tx)} />
           ))}
         </ReviewGroup>
 
@@ -541,6 +652,7 @@ export function C6ReviewScreen({
             </div>
           ))}
         </ReviewGroup>
+
       </div>
 
       {/* Debug logs */}
