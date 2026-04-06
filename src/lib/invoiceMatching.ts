@@ -372,7 +372,8 @@ export function enrichTransactions(
     // 4. Category suggestion (knowledge base → keywords → default)
     let suggestedCategoryId = kwResult.categoryId;
     if (!suggestedCategoryId) {
-      suggestedCategoryId = suggestCategoryFromKeywords(tx.merchantNormalized, categories);
+      const kwSuggestion = suggestCategoryFromKeywords(tx.merchantNormalized, categories);
+      suggestedCategoryId = kwSuggestion.categoryId;
     }
 
     // Determine review status

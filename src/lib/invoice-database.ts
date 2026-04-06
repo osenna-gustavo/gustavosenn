@@ -220,13 +220,13 @@ export async function saveCategorizationRule(
   const userId = await getUserId();
 
   // Check if rule exists for this merchant
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase
     .from('categorization_rules' as any)
     .select('id, usage_count')
     .eq('user_id', userId)
     .eq('merchant_normalized', merchantNormalized)
     .eq('is_active', true)
-    .maybeSingle();
+    .maybeSingle() as any);
 
   if (existing) {
     const { data, error } = await supabase
@@ -271,28 +271,17 @@ export async function saveCategorizationRule(
 }
 
 export async function incrementRuleUsage(ruleId: string): Promise<void> {
-  const { error } = await supabase
+  const { data } = await (supabase
     .from('categorization_rules' as any)
-    .update({
-      usage_count: supabase.rpc('increment' as any, { row_id: ruleId }),
-      last_used_at: new Date().toISOString(),
-    })
-    .eq('id', ruleId);
+    .select('usage_count')
+    .eq('id', ruleId)
+    .single() as any);
 
-  if (error) {
-    // Fallback: manual increment
-    const { data } = await supabase
-      .from('categorization_rules' as any)
-      .select('usage_count')
-      .eq('id', ruleId)
-      .single();
-    if (data) {
-      await supabase
-        .from('categorization_rules' as any)
-        .update({ usage_count: (data.usage_count ?? 0) + 1, last_used_at: new Date().toISOString() })
-        .eq('id', ruleId);
-    }
-  }
+  const newCount = ((data?.usage_count as number) ?? 0) + 1;
+  await (supabase
+    .from('categorization_rules' as any)
+    .update({ usage_count: newCount, last_used_at: new Date().toISOString() } as any)
+    .eq('id', ruleId) as any);
 }
 
 function mapRule(row: any): CategorizationRule {

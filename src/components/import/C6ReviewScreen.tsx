@@ -210,7 +210,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
                 <SelectValue placeholder="Nenhuma recorrência..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="" className="text-xs">Nenhuma</SelectItem>
+                <SelectItem value="__none__" className="text-xs">Nenhuma</SelectItem>
                 {activeRecurrences.map(r => (
                   <SelectItem key={r.id} value={r.id} className="text-xs">
                     <Repeat2 className="h-3 w-3 inline mr-1" />
