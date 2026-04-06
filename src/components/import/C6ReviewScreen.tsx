@@ -433,8 +433,15 @@ export function C6ReviewScreen({
         title: 'Regra salva!',
         description: `"${tx.merchantNormalized}" será categorizado automaticamente nas próximas importações.`,
       });
-    } catch {
-      toast({ title: 'Erro ao salvar regra', variant: 'destructive' });
+    } catch (err: any) {
+      const isTableMissing = err?.message?.includes('relation') || err?.code === '42P01';
+      toast({
+        title: 'Base de conhecimento não configurada',
+        description: isTableMissing
+          ? 'Execute a migration no Supabase Dashboard > SQL Editor (arquivo: 20260405_invoice_import.sql)'
+          : 'Não foi possível salvar a regra.',
+        variant: 'destructive',
+      });
     }
   }, [toast]);
 
@@ -444,8 +451,27 @@ export function C6ReviewScreen({
     tx: InvoiceTransaction,
     recurrenceId: string,
   ) => {
+    const rec = recurrences.find(r => r.id === recurrenceId);
+
+    // Update local state first — this always works, regardless of DB
+    setLocalGroups(prev => {
+      const updated: InvoiceTransaction = {
+        ...tx,
+        suggestedRecurrenceId: recurrenceId,
+        recurrenceMatchConfidence: 'exact',
+      };
+      return {
+        ...prev,
+        newTransactions: prev.newTransactions.filter(t => t.id !== tx.id),
+        needsReview: prev.needsReview.filter(t => t.id !== tx.id),
+        recurrenceRecognized: prev.recurrenceRecognized.some(t => t.id === tx.id)
+          ? prev.recurrenceRecognized.map(t => t.id === tx.id ? updated : t)
+          : [...prev.recurrenceRecognized, updated],
+      };
+    });
+
+    // Try to persist rule for future imports
     try {
-      // Save rule so future imports auto-match
       await saveCategorizationRule(
         tx.merchantNormalized,
         tx.suggestedCategoryId,
@@ -454,32 +480,19 @@ export function C6ReviewScreen({
         'manual',
         tx.descriptionOriginal,
       );
-
-      const rec = recurrences.find(r => r.id === recurrenceId);
-
-      // Move from current group to recurrenceRecognized
-      setLocalGroups(prev => {
-        const updated: InvoiceTransaction = {
-          ...tx,
-          suggestedRecurrenceId: recurrenceId,
-          recurrenceMatchConfidence: 'exact',
-        };
-        return {
-          ...prev,
-          newTransactions: prev.newTransactions.filter(t => t.id !== tx.id),
-          needsReview: prev.needsReview.filter(t => t.id !== tx.id),
-          recurrenceRecognized: prev.recurrenceRecognized.some(t => t.id === tx.id)
-            ? prev.recurrenceRecognized.map(t => t.id === tx.id ? updated : t)
-            : [...prev.recurrenceRecognized, updated],
-        };
-      });
-
       toast({
         title: 'Recorrência vinculada!',
-        description: `"${tx.merchantNormalized}" → "${rec?.name ?? recurrenceId}". Próximas importações identificarão automaticamente.`,
+        description: `"${tx.merchantNormalized}" → "${rec?.name ?? recurrenceId}". Importações futuras identificarão automaticamente.`,
       });
-    } catch {
-      toast({ title: 'Erro ao vincular recorrência', variant: 'destructive' });
+    } catch (err: any) {
+      const isTableMissing = err?.message?.includes('relation') || err?.code === '42P01';
+      toast({
+        title: 'Vinculado nesta sessão',
+        description: isTableMissing
+          ? `Vinculado a "${rec?.name}" agora, mas para que a base de conhecimento lembre nas próximas vezes, execute a migration no Supabase Dashboard.`
+          : `Vinculado a "${rec?.name}". Não foi possível salvar para importações futuras.`,
+        variant: isTableMissing ? 'default' : 'destructive',
+      });
     }
   }, [recurrences, toast]);
 
