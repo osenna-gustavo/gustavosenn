@@ -165,7 +165,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, loading }: Transa
                   <SelectValue placeholder={catSubs.length === 0 ? 'Nenhuma' : 'Opcional'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="" className="text-xs">Nenhuma</SelectItem>
+                  <SelectItem value="__none__" className="text-xs">Nenhuma</SelectItem>
                   {catSubs.map(s => (
                     <SelectItem key={s.id} value={s.id} className="text-xs">{s.name}</SelectItem>
                   ))}
