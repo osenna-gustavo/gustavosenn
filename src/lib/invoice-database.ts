@@ -220,13 +220,13 @@ export async function saveCategorizationRule(
   const userId = await getUserId();
 
   // Check if rule exists for this merchant
-  const { data: existing } = await supabase
+  const { data: existing } = await (supabase
     .from('categorization_rules' as any)
     .select('id, usage_count')
     .eq('user_id', userId)
     .eq('merchant_normalized', merchantNormalized)
     .eq('is_active', true)
-    .maybeSingle();
+    .maybeSingle() as any);
 
   if (existing) {
     const { data, error } = await supabase
