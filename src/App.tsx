@@ -38,6 +38,7 @@ function AppContent() {
       case 'budget': return <BudgetPage />;
       case 'categories': return <CategoriesPage />;
       case 'recurrences': return <RecurrencesPage />;
+      case 'installments': return <InstallmentsPage />;
       case 'import': return <ImportPage />;
       case 'reports': return <ReportsPage />;
       case 'scenarios': return <ScenariosPage />;
