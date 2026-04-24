@@ -151,6 +151,47 @@ export function RecurrencesPage() {
     }
   };
 
+  const toggleBulkMode = () => {
+    setBulkMode(prev => !prev);
+    setSelectedIds(new Set());
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === regularRecurrences.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(regularRecurrences.map(r => r.id)));
+    }
+  };
+
+  const handleBulkPause = async () => {
+    await bulkUpdateRecurrences(Array.from(selectedIds), { isActive: false });
+    toast({ title: `${selectedIds.size} recorrência(s) pausada(s)` });
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkActivate = async () => {
+    await bulkUpdateRecurrences(Array.from(selectedIds), { isActive: true });
+    toast({ title: `${selectedIds.size} recorrência(s) ativada(s)` });
+    setSelectedIds(new Set());
+  };
+
+  const handleBulkDelete = async () => {
+    await bulkDeleteRecurrences(Array.from(selectedIds));
+    toast({ title: `${selectedIds.size} recorrência(s) excluída(s)` });
+    setSelectedIds(new Set());
+    setShowBulkDeleteConfirm(false);
+  };
+
   const frequencyLabels = {
     daily: 'Diária',
     weekly: 'Semanal',
