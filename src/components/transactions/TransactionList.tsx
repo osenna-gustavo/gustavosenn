@@ -51,7 +51,15 @@ interface TransactionListProps {
 }
 
 export function TransactionList({ filteredTransactions: externalFiltered }: TransactionListProps) {
-  const { transactions, categories, subcategories, bulkUpdateTransactions, bulkDeleteTransactions } = useApp();
+  const {
+    transactions,
+    categories,
+    subcategories,
+    recurrences,
+    bulkUpdateTransactions,
+    bulkDeleteTransactions,
+    linkTransactionsToRecurrence,
+  } = useApp();
   const { toast } = useToast();
 
   const [searchQuery, setSearchQuery] = useState('');
