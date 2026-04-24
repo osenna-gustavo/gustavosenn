@@ -362,6 +362,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       addRecurrence,
       updateRecurrence,
       deleteRecurrence,
+      bulkUpdateTransactions,
+      bulkDeleteTransactions,
+      bulkUpdateRecurrences,
+      bulkDeleteRecurrences,
       lastUsedCategoryId,
       setLastUsedCategoryId,
     }}>
