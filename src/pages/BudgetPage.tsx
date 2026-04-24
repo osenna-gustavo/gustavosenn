@@ -94,6 +94,43 @@ export function BudgetPage() {
     return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
   }, [transactions]);
 
+  // Active installment plans for the selected month
+  const activeInstallments = useMemo(() => {
+    return recurrences.filter(r => {
+      if (!r.totalInstallments || !r.isActive) return false;
+      const start = new Date(r.startDate);
+      const currentNum = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+      return currentNum >= 1 && currentNum <= r.totalInstallments;
+    });
+  }, [recurrences, selectedMonth, selectedYear]);
+
+  const handleApplyInstallments = (mode: 'sum' | 'replace') => {
+    const newCatBudgets = { ...categoryBudgets };
+    const newSubBudgets = { ...subcategoryBudgets };
+
+    activeInstallments.forEach(plan => {
+      if (plan.subcategoryId) {
+        const current = parseBRLToNumber(newSubBudgets[plan.subcategoryId] || '0');
+        newSubBudgets[plan.subcategoryId] = formatNumberToBRL(
+          mode === 'sum' ? current + plan.amount : plan.amount
+        );
+      } else {
+        const current = parseBRLToNumber(newCatBudgets[plan.categoryId] || '0');
+        newCatBudgets[plan.categoryId] = formatNumberToBRL(
+          mode === 'sum' ? current + plan.amount : plan.amount
+        );
+      }
+    });
+
+    setCategoryBudgets(newCatBudgets);
+    setSubcategoryBudgets(newSubBudgets);
+
+    toast({
+      title: 'Parcelamentos aplicados!',
+      description: `Valores ${mode === 'sum' ? 'somados ao' : 'substituídos no'} orçamento.`,
+    });
+  };
+
   // Filter only expense categories for budget display - show ALL of them
   const expenseCategories = useMemo(() => {
     return categories.filter(c => c.type === 'despesa').sort((a, b) => a.name.localeCompare(b.name));
