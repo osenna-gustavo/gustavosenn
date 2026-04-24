@@ -37,12 +37,20 @@ import { cn } from '@/lib/utils';
 import { RecurrenceInstances } from '@/components/recurrences/RecurrenceInstances';
 
 export function RecurrencesPage() {
-  const { categories, subcategories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence } = useApp();
+  const { categories, subcategories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence, bulkUpdateRecurrences, bulkDeleteRecurrences } = useApp();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingRecurrence, setEditingRecurrence] = useState<Recurrence | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+
+  // Bulk select state
+  const [bulkMode, setBulkMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+
+  // Only show regular recurrences (not installment plans)
+  const regularRecurrences = recurrences.filter(r => !r.totalInstallments);
 
   const [formData, setFormData] = useState({
     name: '',
