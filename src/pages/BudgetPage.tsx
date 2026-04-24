@@ -5,7 +5,7 @@ import { formatNumberToBRL, parseBRLToNumber } from '@/lib/currencyInput';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Save, Copy, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
+import { Save, Copy, RefreshCw, ChevronDown, ChevronUp, CreditCard } from 'lucide-react';
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
 import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList';
