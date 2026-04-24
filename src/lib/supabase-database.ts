@@ -814,6 +814,86 @@ export async function deleteImportBatch(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ==================== BULK OPERATIONS ====================
+
+export async function bulkUpdateTransactions(
+  ids: string[],
+  updates: { categoryId?: string; subcategoryId?: string | null; description?: string; type?: 'receita' | 'despesa' }
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  const payload: Record<string, unknown> = {};
+  if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+  if (updates.subcategoryId !== undefined) payload.subcategory_id = updates.subcategoryId;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.type !== undefined) payload.type = updates.type;
+
+  const { error } = await supabase
+    .from('transactions')
+    .update(payload)
+    .in('id', ids);
+
+  if (error) throw error;
+}
+
+export async function bulkDeleteTransactions(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  // Reset any linked recurrence instances to pending first
+  const { data: linkedTransactions } = await supabase
+    .from('transactions')
+    .select('id, recurrence_instance_id')
+    .in('id', ids);
+
+  const instanceIds = (linkedTransactions || [])
+    .map(t => t.recurrence_instance_id)
+    .filter(Boolean) as string[];
+
+  if (instanceIds.length > 0) {
+    await supabase
+      .from('recurrence_instances')
+      .update({ status: 'pending', linked_transaction_id: null })
+      .in('id', instanceIds);
+  }
+
+  const { error } = await supabase
+    .from('transactions')
+    .delete()
+    .in('id', ids);
+
+  if (error) throw error;
+}
+
+export async function bulkUpdateRecurrences(
+  ids: string[],
+  updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }
+): Promise<void> {
+  if (ids.length === 0) return;
+
+  const payload: Record<string, unknown> = {};
+  if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+  if (updates.categoryId !== undefined) payload.category_id = updates.categoryId;
+  if (updates.subcategoryId !== undefined) payload.subcategory_id = updates.subcategoryId;
+
+  const { error } = await supabase
+    .from('recurrences')
+    .update(payload)
+    .in('id', ids);
+
+  if (error) throw error;
+}
+
+export async function bulkDeleteRecurrences(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+
+  const { error } = await supabase
+    .from('recurrences')
+    .delete()
+    .in('id', ids);
+
+  if (error) throw error;
+}
+
 // ==================== SETTINGS (using localStorage for non-critical settings) ====================
 
 export async function isAppInitialized(): Promise<boolean> {
