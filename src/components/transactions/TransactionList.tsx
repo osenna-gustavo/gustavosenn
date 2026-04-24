@@ -145,17 +145,31 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
     if (bulkEditData.categoryId) updates.subcategoryId = bulkEditData.subcategoryId || null;
     if (bulkEditData.description.trim()) updates.description = bulkEditData.description.trim();
 
-    if (Object.keys(updates).length === 0) {
+    const hasRecurrenceLink = !!bulkEditData.recurrenceId;
+    const hasOtherUpdates = Object.keys(updates).length > 0;
+
+    if (!hasOtherUpdates && !hasRecurrenceLink) {
       toast({ title: 'Nenhuma alteração selecionada', variant: 'destructive' });
       return;
     }
 
     try {
-      await bulkUpdateTransactions(Array.from(selectedIds), updates);
+      const ids = Array.from(selectedIds);
+
+      // Apply category/description updates first
+      if (hasOtherUpdates) {
+        await bulkUpdateTransactions(ids, updates);
+      }
+
+      // Link to recurrence/installment and mark instance as confirmed
+      if (hasRecurrenceLink) {
+        await linkTransactionsToRecurrence(ids, bulkEditData.recurrenceId);
+      }
+
       toast({ title: `${selectedIds.size} lançamento(s) atualizado(s)!` });
       setSelectedIds(new Set());
       setShowBulkEdit(false);
-      setBulkEditData({ categoryId: '', subcategoryId: '', description: '' });
+      setBulkEditData({ categoryId: '', subcategoryId: '', description: '', recurrenceId: '' });
     } catch {
       toast({ title: 'Erro ao atualizar', variant: 'destructive' });
     }
