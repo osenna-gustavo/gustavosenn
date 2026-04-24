@@ -75,6 +75,7 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
     categoryId: '',
     subcategoryId: '',
     description: '',
+    recurrenceId: '',
   });
 
   const filteredTransactions = useMemo(() => {
