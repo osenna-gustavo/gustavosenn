@@ -51,6 +51,10 @@ interface AppContextType {
   addRecurrence: (recurrence: Omit<Recurrence, 'id' | 'createdAt'>) => Promise<Recurrence>;
   updateRecurrence: (recurrence: Recurrence) => Promise<void>;
   deleteRecurrence: (id: string) => Promise<void>;
+  bulkUpdateTransactions: (ids: string[], updates: { categoryId?: string; subcategoryId?: string | null; description?: string; type?: 'receita' | 'despesa' }) => Promise<void>;
+  bulkDeleteTransactions: (ids: string[]) => Promise<void>;
+  bulkUpdateRecurrences: (ids: string[], updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }) => Promise<void>;
+  bulkDeleteRecurrences: (ids: string[]) => Promise<void>;
   
   // Last used category for quick entry
   lastUsedCategoryId: string | null;
