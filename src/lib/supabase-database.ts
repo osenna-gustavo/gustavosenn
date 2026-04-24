@@ -864,6 +864,74 @@ export async function bulkDeleteTransactions(ids: string[]): Promise<void> {
   if (error) throw error;
 }
 
+export async function linkTransactionsToRecurrence(
+  transactionIds: string[],
+  recurrenceId: string,
+  month: number,
+  year: number,
+  recurrenceAmount: number
+): Promise<void> {
+  if (transactionIds.length === 0) return;
+  const userId = await getUserId();
+
+  // Find existing instance for this recurrence/month/year
+  const { data: existingInstances } = await supabase
+    .from('recurrence_instances')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('recurrence_id', recurrenceId)
+    .eq('month', month)
+    .eq('year', year)
+    .limit(1);
+
+  let instanceId: string;
+  const primaryTransactionId = transactionIds[0];
+
+  if (existingInstances && existingInstances.length > 0) {
+    // Update existing instance to confirmed
+    instanceId = existingInstances[0].id;
+    await supabase
+      .from('recurrence_instances')
+      .update({
+        status: 'confirmed',
+        linked_transaction_id: primaryTransactionId,
+      })
+      .eq('id', instanceId);
+  } else {
+    // Create a new confirmed instance
+    const { data: newInstance, error: instanceError } = await supabase
+      .from('recurrence_instances')
+      .insert({
+        user_id: userId,
+        recurrence_id: recurrenceId,
+        month,
+        year,
+        status: 'confirmed',
+        linked_transaction_id: primaryTransactionId,
+        amount: recurrenceAmount,
+      })
+      .select()
+      .single();
+    if (instanceError) throw instanceError;
+    instanceId = newInstance.id;
+  }
+
+  // Set recurrenceId on all selected transactions
+  // Set recurrenceInstanceId only on the primary transaction
+  await supabase
+    .from('transactions')
+    .update({ recurrence_id: recurrenceId, recurrence_instance_id: instanceId })
+    .eq('id', primaryTransactionId);
+
+  if (transactionIds.length > 1) {
+    const rest = transactionIds.slice(1);
+    await supabase
+      .from('transactions')
+      .update({ recurrence_id: recurrenceId, recurrence_instance_id: null })
+      .in('id', rest);
+  }
+}
+
 export async function bulkUpdateRecurrences(
   ids: string[],
   updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }
