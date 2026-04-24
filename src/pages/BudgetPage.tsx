@@ -36,6 +36,7 @@ export function BudgetPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showApplyRecurrencesModal, setShowApplyRecurrencesModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
+  const [showInstallments, setShowInstallments] = useState(true);
 
   // Initialize from budget AND ensure all categories are represented
   useEffect(() => {
