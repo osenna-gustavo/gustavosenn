@@ -10,6 +10,7 @@ import { TransactionsPage } from '@/pages/TransactionsPage';
 import { BudgetPage } from '@/pages/BudgetPage';
 import { CategoriesPage } from '@/pages/CategoriesPage';
 import { RecurrencesPage } from '@/pages/RecurrencesPage';
+import { InstallmentsPage } from '@/pages/InstallmentsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ScenariosPage } from '@/pages/ScenariosPage';
