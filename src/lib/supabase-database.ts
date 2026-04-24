@@ -537,6 +537,14 @@ export async function addRecurrence(recurrence: Omit<Recurrence, 'id' | 'created
 }
 
 export async function updateRecurrence(recurrence: Recurrence): Promise<void> {
+  // For installment plans, auto-calculate endDate from startDate + totalInstallments
+  let endDate = recurrence.endDate;
+  if (recurrence.totalInstallments && !endDate) {
+    const end = new Date(recurrence.startDate);
+    end.setMonth(end.getMonth() + recurrence.totalInstallments - 1);
+    endDate = end;
+  }
+
   const { error } = await supabase
     .from('recurrences')
     .update({
@@ -547,11 +555,12 @@ export async function updateRecurrence(recurrence: Recurrence): Promise<void> {
       subcategory_id: recurrence.subcategoryId || null,
       frequency: recurrence.frequency,
       start_date: recurrence.startDate.toISOString().split('T')[0],
-      end_date: recurrence.endDate ? recurrence.endDate.toISOString().split('T')[0] : null,
+      end_date: endDate ? endDate.toISOString().split('T')[0] : null,
       is_active: recurrence.isActive,
+      total_installments: recurrence.totalInstallments || null,
     })
     .eq('id', recurrence.id);
-    
+
   if (error) throw error;
 }
 
