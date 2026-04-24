@@ -135,6 +135,15 @@ export function RecurrenceInstances() {
         return;
       }
       
+      // Build description - append installment number for parcelamentos
+      let description = recurrence.name;
+      if (recurrence.totalInstallments) {
+        const start = new Date(recurrence.startDate);
+        const currentNum =
+          (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+        description = `${recurrence.name} (parcela ${currentNum}/${recurrence.totalInstallments})`;
+      }
+
       // Create transaction
       const newTransaction = await addTransaction({
         date: new Date(confirmData.date),
@@ -142,7 +151,7 @@ export function RecurrenceInstances() {
         type: recurrence.type,
         categoryId: confirmData.categoryId,
         subcategoryId: confirmData.subcategoryId || undefined,
-        description: recurrence.name,
+        description,
         origin: 'recurrence',
         needsReview: false,
         recurrenceId: recurrence.id,
