@@ -55,6 +55,7 @@ interface AppContextType {
   bulkDeleteTransactions: (ids: string[]) => Promise<void>;
   bulkUpdateRecurrences: (ids: string[], updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }) => Promise<void>;
   bulkDeleteRecurrences: (ids: string[]) => Promise<void>;
+  linkTransactionsToRecurrence: (transactionIds: string[], recurrenceId: string) => Promise<void>;
   
   // Last used category for quick entry
   lastUsedCategoryId: string | null;
