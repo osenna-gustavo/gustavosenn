@@ -30,6 +30,7 @@ const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = 
   { screen: 'budget', label: 'Orçamento', icon: <Wallet className="h-5 w-5" /> },
   { screen: 'categories', label: 'Categorias', icon: <Tags className="h-5 w-5" /> },
   { screen: 'recurrences', label: 'Recorrências', icon: <RefreshCw className="h-5 w-5" /> },
+  { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-5 w-5" /> },
   { screen: 'import', label: 'Importar', icon: <Upload className="h-5 w-5" /> },
   { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-5 w-5" /> },
   { screen: 'scenarios', label: 'Cenários', icon: <Lightbulb className="h-5 w-5" /> },
