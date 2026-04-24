@@ -312,6 +312,26 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshData();
   }, [refreshData]);
 
+  const bulkUpdateTransactions = useCallback(async (ids: string[], updates: { categoryId?: string; subcategoryId?: string | null; description?: string; type?: 'receita' | 'despesa' }) => {
+    await db.bulkUpdateTransactions(ids, updates);
+    await refreshData();
+  }, [refreshData]);
+
+  const bulkDeleteTransactions = useCallback(async (ids: string[]) => {
+    await db.bulkDeleteTransactions(ids);
+    await refreshData();
+  }, [refreshData]);
+
+  const bulkUpdateRecurrences = useCallback(async (ids: string[], updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }) => {
+    await db.bulkUpdateRecurrences(ids, updates);
+    await refreshData();
+  }, [refreshData]);
+
+  const bulkDeleteRecurrences = useCallback(async (ids: string[]) => {
+    await db.bulkDeleteRecurrences(ids);
+    await refreshData();
+  }, [refreshData]);
+
   return (
     <AppContext.Provider value={{
       currentScreen,
