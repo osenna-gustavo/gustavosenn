@@ -29,8 +29,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, RefreshCw, Pause, Play } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Pause, Play, CheckSquare, Square } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 import type { Recurrence, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
 import { RecurrenceInstances } from '@/components/recurrences/RecurrenceInstances';
