@@ -61,6 +61,7 @@ export interface Recurrence {
   startDate: Date;
   endDate?: Date;
   isActive: boolean;
+  totalInstallments?: number;
   createdAt: Date;
 }
 
