@@ -1,18 +1,19 @@
 import { useApp } from '@/contexts/AppContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { 
-  LayoutDashboard, 
-  Receipt, 
-  Wallet, 
-  Tags, 
-  RefreshCw, 
-  Upload, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Receipt,
+  Wallet,
+  Tags,
+  RefreshCw,
+  Upload,
+  BarChart3,
   Lightbulb,
   Menu,
   X,
   LogOut,
-  Clock
+  Clock,
+  CreditCard
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
 import { useState, useEffect } from 'react';
