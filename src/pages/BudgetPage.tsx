@@ -318,6 +318,72 @@ export function BudgetPage() {
         </div>
       </Collapsible>
 
+      {/* Installments Block */}
+      {activeInstallments.length > 0 && (
+        <Collapsible open={showInstallments} onOpenChange={setShowInstallments}>
+          <div className="glass-card rounded-xl overflow-hidden">
+            <CollapsibleTrigger asChild>
+              <button className="w-full flex items-center justify-between p-4 lg:p-6 hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  <h3 className="text-lg font-semibold">
+                    Parcelamentos do Mês
+                    <span className="ml-2 text-sm font-normal text-muted-foreground">
+                      ({activeInstallments.length} ativo{activeInstallments.length !== 1 ? 's' : ''})
+                    </span>
+                  </h3>
+                </div>
+                {showInstallments ? (
+                  <ChevronUp className="h-5 w-5 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-muted-foreground" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <div className="px-4 pb-4 lg:px-6 lg:pb-6 space-y-3">
+                {activeInstallments.map(plan => {
+                  const category = categories.find(c => c.id === plan.categoryId);
+                  const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
+                  const start = new Date(plan.startDate);
+                  const currentNum = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+                  return (
+                    <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
+                      <div>
+                        <div className="font-medium text-sm">{plan.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {category?.icon} {category?.name}
+                          {subcategory && ` → ${subcategory.name}`}
+                          {' • '}parcela {currentNum}/{plan.totalInstallments}
+                        </div>
+                      </div>
+                      <span className="font-mono text-sm font-medium">
+                        {formatCurrency(plan.amount)}
+                      </span>
+                    </div>
+                  );
+                })}
+                <div className="flex items-center justify-between pt-2 border-t border-border">
+                  <div className="text-sm text-muted-foreground">
+                    Total: <span className="font-mono font-medium text-foreground">
+                      {formatCurrency(activeInstallments.reduce((s, p) => s + p.amount, 0))}
+                    </span>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => handleApplyInstallments('sum')}>
+                      Somar ao orçamento
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => handleApplyInstallments('replace')}>
+                      Substituir
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CollapsibleContent>
+          </div>
+        </Collapsible>
+      )}
+
       {/* Category Budgets */}
       <div className="glass-card rounded-xl p-4 lg:p-6">
         <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria (Despesas)</h3>
