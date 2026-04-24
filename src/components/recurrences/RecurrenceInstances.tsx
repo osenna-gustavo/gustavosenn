@@ -186,13 +186,22 @@ export function RecurrenceInstances() {
         return;
       }
       
+      // Build description - append installment number for parcelamentos
+      let quickDescription = recurrence.name;
+      if (recurrence.totalInstallments) {
+        const start = new Date(recurrence.startDate);
+        const currentNum =
+          (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+        quickDescription = `${recurrence.name} (parcela ${currentNum}/${recurrence.totalInstallments})`;
+      }
+
       const newTransaction = await addTransaction({
         date: new Date(selectedYear, selectedMonth, new Date(recurrence.startDate).getDate() || 1),
         amount: instance.amount,
         type: recurrence.type,
         categoryId: recurrence.categoryId,
         subcategoryId: recurrence.subcategoryId,
-        description: recurrence.name,
+        description: quickDescription,
         origin: 'recurrence',
         needsReview: false,
         recurrenceId: recurrence.id,
