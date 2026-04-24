@@ -484,6 +484,7 @@ export async function getRecurrences(): Promise<Recurrence[]> {
     startDate: new Date(r.start_date),
     endDate: r.end_date ? new Date(r.end_date) : undefined,
     isActive: r.is_active || true,
+    totalInstallments: r.total_installments || undefined,
     createdAt: new Date(r.created_at!),
   }));
 }
