@@ -333,6 +333,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshData();
   }, [refreshData]);
 
+  const linkTransactionsToRecurrence = useCallback(async (transactionIds: string[], recurrenceId: string) => {
+    const rec = recurrences.find(r => r.id === recurrenceId);
+    if (!rec) throw new Error('Recorrência não encontrada');
+    await db.linkTransactionsToRecurrence(transactionIds, recurrenceId, selectedMonth, selectedYear, rec.amount);
+    await refreshData();
+  }, [refreshData, recurrences, selectedMonth, selectedYear]);
+
   return (
     <AppContext.Provider value={{
       currentScreen,
