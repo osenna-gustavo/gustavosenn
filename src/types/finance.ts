@@ -175,12 +175,13 @@ export interface CategorySummary {
   percentage: number;
 }
 
-export type AppScreen = 
-  | 'dashboard' 
-  | 'transactions' 
-  | 'budget' 
-  | 'categories' 
-  | 'recurrences' 
-  | 'import' 
-  | 'reports' 
+export type AppScreen =
+  | 'dashboard'
+  | 'transactions'
+  | 'budget'
+  | 'categories'
+  | 'recurrences'
+  | 'installments'
+  | 'import'
+  | 'reports'
   | 'scenarios';
