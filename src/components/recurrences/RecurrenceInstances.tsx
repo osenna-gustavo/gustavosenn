@@ -285,8 +285,15 @@ export function RecurrenceInstances() {
             const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
             if (!recurrence) return null;
             
+            const installmentLabel = (() => {
+              if (!recurrence.totalInstallments) return null;
+              const start = new Date(recurrence.startDate);
+              const n = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+              return `parcela ${n}/${recurrence.totalInstallments}`;
+            })();
+
             return (
-              <div 
+              <div
                 key={instance.id}
                 className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
               >
@@ -295,7 +302,14 @@ export function RecurrenceInstances() {
                     <RefreshCw className="h-5 w-5 text-warning" />
                   </div>
                   <div>
-                    <div className="font-medium">{recurrence.name}</div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium">{recurrence.name}</span>
+                      {installmentLabel && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                          {installmentLabel}
+                        </span>
+                      )}
+                    </div>
                     <div className="text-sm text-muted-foreground">
                       {category?.icon} {category?.name}
                       {subcategory && ` → ${subcategory.name}`}
