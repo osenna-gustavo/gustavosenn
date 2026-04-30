@@ -30,10 +30,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Recurrence, TransactionType } from '@/types/finance';
+import type { Recurrence, RecurrenceInstance, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
+import * as db from '@/lib/supabase-database';
 
 function getInstallmentNumber(startDate: Date, selectedMonth: number, selectedYear: number): number {
   const start = new Date(startDate);
