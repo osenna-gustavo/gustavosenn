@@ -47,6 +47,7 @@ export function InstallmentsPage() {
     categories,
     subcategories,
     recurrences,
+    recurrenceInstances,
     selectedMonth,
     selectedYear,
     addRecurrence,
@@ -54,6 +55,9 @@ export function InstallmentsPage() {
     deleteRecurrence,
     bulkUpdateRecurrences,
     bulkDeleteRecurrences,
+    addTransaction,
+    deleteTransaction,
+    refreshData,
   } = useApp();
   const { toast } = useToast();
 
