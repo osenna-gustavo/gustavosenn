@@ -89,9 +89,92 @@ export function Sidebar() {
     fetchLastActivity();
   }, [user]);
 
+  useEffect(() => {
+    if (settingsSubScreens.includes(currentScreen as AppScreen) || currentScreen === 'settings') {
+      setIsSettingsOpen(true);
+    }
+  }, [currentScreen]);
+
   const handleNavigation = (screen: AppScreen) => {
     setCurrentScreen(screen);
     setIsMobileMenuOpen(false);
+  };
+
+  const isSettingsActive = currentScreen === 'settings' || settingsSubScreens.includes(currentScreen as AppScreen);
+
+  const renderNavItem = (item: NavItem, variant: 'desktop' | 'mobile') => {
+    const isActive = currentScreen === item.screen;
+    const hasSubItems = !!item.subItems;
+
+    if (hasSubItems) {
+      return (
+        <div key={item.screen}>
+          <button
+            onClick={() => setIsSettingsOpen(prev => !prev)}
+            className={cn(
+              "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+              isSettingsActive
+                ? variant === 'desktop'
+                  ? "bg-sidebar-primary text-sidebar-primary-foreground glow-primary"
+                  : "bg-primary text-primary-foreground"
+                : variant === 'desktop'
+                  ? "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            {item.icon}
+            <span className="flex-1 text-left">{item.label}</span>
+            {isSettingsOpen
+              ? <ChevronDown className="h-4 w-4 shrink-0" />
+              : <ChevronRight className="h-4 w-4 shrink-0" />
+            }
+          </button>
+          {isSettingsOpen && (
+            <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
+              {item.subItems!.map(sub => (
+                <button
+                  key={sub.screen}
+                  onClick={() => handleNavigation(sub.screen)}
+                  className={cn(
+                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
+                    currentScreen === sub.screen
+                      ? variant === 'desktop'
+                        ? "bg-sidebar-primary/80 text-sidebar-primary-foreground"
+                        : "bg-primary/80 text-primary-foreground"
+                      : variant === 'desktop'
+                        ? "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  {sub.icon}
+                  {sub.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <button
+        key={item.screen}
+        onClick={() => handleNavigation(item.screen)}
+        className={cn(
+          "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
+          isActive
+            ? variant === 'desktop'
+              ? "bg-sidebar-primary text-sidebar-primary-foreground glow-primary"
+              : "bg-primary text-primary-foreground"
+            : variant === 'desktop'
+              ? "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground"
+        )}
+      >
+        {item.icon}
+        {item.label}
+      </button>
+    );
   };
 
   const handleLogout = async () => {
