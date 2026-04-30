@@ -217,21 +217,7 @@ export function Sidebar() {
         isMobileMenuOpen ? "translate-x-0" : "translate-x-full"
       )}>
         <div className="flex-1 p-4 space-y-1">
-          {navItems.map((item) => (
-            <button
-              key={item.screen}
-              onClick={() => handleNavigation(item.screen)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                currentScreen === item.screen
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground"
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+          {navItems.map((item) => renderNavItem(item, 'mobile'))}
         </div>
         
         {/* Mobile Footer */}
