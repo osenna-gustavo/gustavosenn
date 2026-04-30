@@ -13,7 +13,8 @@ import {
   X,
   LogOut,
   Clock,
-  CreditCard
+  CreditCard,
+  Settings,
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
 import { useState, useEffect } from 'react';
