@@ -610,9 +610,11 @@ export async function getRecurrenceInstances(month: number, year: number): Promi
 export async function addRecurrenceInstance(instance: Omit<RecurrenceInstance, 'id' | 'createdAt'>): Promise<RecurrenceInstance> {
   const userId = await getUserId();
   
+  // Upsert by (recurrence_id, year, month) to avoid creating duplicates if the
+  // app tries to regenerate instances for an already-existing month.
   const { data, error } = await supabase
     .from('recurrence_instances')
-    .insert({
+    .upsert({
       user_id: userId,
       recurrence_id: instance.recurrenceId,
       month: instance.month,
@@ -620,7 +622,7 @@ export async function addRecurrenceInstance(instance: Omit<RecurrenceInstance, '
       status: instance.status,
       linked_transaction_id: instance.linkedTransactionId || null,
       amount: instance.amount,
-    })
+    }, { onConflict: 'recurrence_id,year,month', ignoreDuplicates: false })
     .select()
     .single();
     
