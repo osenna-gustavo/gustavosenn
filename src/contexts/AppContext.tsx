@@ -416,6 +416,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       bulkUpdateRecurrences,
       bulkDeleteRecurrences,
       linkTransactionsToRecurrence,
+      billingCloseDay,
+      setBillingCloseDay,
+      billingDateRange,
       lastUsedCategoryId,
       setLastUsedCategoryId,
     }}>
