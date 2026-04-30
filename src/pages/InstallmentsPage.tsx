@@ -199,6 +199,104 @@ export function InstallmentsPage() {
     }
   };
 
+  // Map: recurrenceId -> current-month instance (for badges and pay actions)
+  const instancesByRecurrence = useMemo(() => {
+    const map = new Map<string, RecurrenceInstance>();
+    recurrenceInstances.forEach(i => {
+      if (i.month === selectedMonth && i.year === selectedYear) {
+        map.set(i.recurrenceId, i);
+      }
+    });
+    return map;
+  }, [recurrenceInstances, selectedMonth, selectedYear]);
+
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  const handlePayInstallment = async (plan: Recurrence) => {
+    setPayingId(plan.id);
+    try {
+      // Ensure an instance for this month exists
+      let instance = instancesByRecurrence.get(plan.id);
+      if (!instance) {
+        instance = await db.addRecurrenceInstance({
+          recurrenceId: plan.id,
+          month: selectedMonth,
+          year: selectedYear,
+          status: 'pending',
+          amount: plan.amount,
+        });
+      }
+
+      if (instance.status === 'confirmed' && instance.linkedTransactionId) {
+        toast({ title: 'Parcela já está paga' });
+        return;
+      }
+
+      const start = new Date(plan.startDate);
+      const currentNum =
+        (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+      const description = plan.totalInstallments
+        ? `${plan.name} (parcela ${currentNum}/${plan.totalInstallments})`
+        : plan.name;
+
+      const txDate = new Date(selectedYear, selectedMonth, start.getDate() || 1);
+
+      const newTx = await addTransaction({
+        date: txDate,
+        amount: instance.amount,
+        type: plan.type,
+        categoryId: plan.categoryId,
+        subcategoryId: plan.subcategoryId,
+        description,
+        origin: 'recurrence',
+        needsReview: false,
+        recurrenceId: plan.id,
+        recurrenceInstanceId: instance.id,
+      });
+
+      await db.updateRecurrenceInstance({
+        ...instance,
+        status: 'confirmed',
+        linkedTransactionId: newTx.id,
+      });
+
+      await refreshData();
+      toast({ title: 'Parcela paga!', description: 'Lançamento criado em Lançamentos.' });
+    } catch (err) {
+      console.error('[Installments] Erro ao pagar parcela:', err);
+      toast({ title: 'Erro ao marcar como paga', variant: 'destructive' });
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const handleUnpayInstallment = async (plan: Recurrence) => {
+    const instance = instancesByRecurrence.get(plan.id);
+    if (!instance) return;
+    setPayingId(plan.id);
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await deleteTransaction(instance.linkedTransactionId);
+        } catch (e) {
+          console.warn('[Installments] Lançamento vinculado já não existe:', e);
+        }
+      }
+      await db.updateRecurrenceInstance({
+        ...instance,
+        status: 'pending',
+        linkedTransactionId: undefined,
+      });
+      await refreshData();
+      toast({ title: 'Pagamento desfeito' });
+    } catch (err) {
+      console.error('[Installments] Erro ao desfazer pagamento:', err);
+      toast({ title: 'Erro ao desfazer', variant: 'destructive' });
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
