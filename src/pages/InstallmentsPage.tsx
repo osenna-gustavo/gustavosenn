@@ -434,16 +434,21 @@ export function InstallmentsPage() {
                       const startDate = new Date(plan.startDate);
                       const currentNum = getInstallmentNumber(startDate, selectedMonth, selectedYear);
                       const total = plan.totalInstallments!;
-                      const isActive = plan.isActive && currentNum >= 1 && currentNum <= total;
-                      const pct = Math.min(100, (currentNum / total) * 100);
-                      const remaining = total - currentNum + 1;
+                      const isActiveParcel = plan.isActive && currentNum >= 1 && currentNum <= total;
+                      const instance = instancesByRecurrence.get(plan.id);
+                      const isPaid = instance?.status === 'confirmed' && !!instance.linkedTransactionId;
+                      const paidCount = Math.max(0, Math.min(currentNum - 1, total)) + (isPaid && currentNum >= 1 && currentNum <= total ? 1 : 0);
+                      const pct = Math.min(100, (paidCount / total) * 100);
+                      const remaining = Math.max(0, total - paidCount);
+                      const isBusy = payingId === plan.id;
 
                       return (
                         <div
                           key={plan.id}
                           className={cn(
                             'flex items-center gap-3 p-4 transition-colors',
-                            !plan.isActive && 'opacity-50'
+                            !plan.isActive && 'opacity-50',
+                            isPaid && 'bg-success/5'
                           )}
                         >
                           <Checkbox
@@ -451,16 +456,31 @@ export function InstallmentsPage() {
                             onCheckedChange={() => toggleSelect(plan.id)}
                           />
 
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          <div className={cn(
+                            "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+                            isPaid ? "bg-success/15" : "bg-muted"
+                          )}>
+                            {isPaid
+                              ? <Check className="h-5 w-5 text-success" />
+                              : <CreditCard className="h-5 w-5 text-muted-foreground" />}
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium truncate">{plan.name}</span>
-                              {isActive && currentNum >= 1 && currentNum <= total && (
+                              {isActiveParcel && (
                                 <Badge variant="secondary" className="text-xs shrink-0">
                                   parcela {currentNum}/{total}
+                                </Badge>
+                              )}
+                              {isActiveParcel && isPaid && (
+                                <Badge className="text-xs shrink-0 bg-success/15 text-success border border-success/30 hover:bg-success/15">
+                                  Paga
+                                </Badge>
+                              )}
+                              {isActiveParcel && !isPaid && (
+                                <Badge variant="outline" className="text-xs shrink-0 text-warning border-warning/30">
+                                  Pendente
                                 </Badge>
                               )}
                               {!plan.isActive && (
@@ -476,15 +496,15 @@ export function InstallmentsPage() {
                             </div>
                             <div className="text-sm text-muted-foreground mt-0.5">
                               {subcategory ? `→ ${subcategory.name}` : null}
-                              {' • '}
-                              {remaining > 0 && currentNum <= total
+                              {subcategory ? ' • ' : ''}
+                              {remaining > 0
                                 ? `${remaining} parcela(s) restante(s)`
                                 : 'Concluído'}
                             </div>
                             <div className="mt-2 space-y-1">
                               <Progress value={pct} className="h-1.5" />
                               <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>{currentNum > 0 ? Math.min(currentNum - 1, total) : 0} pagas</span>
+                                <span>{paidCount} pagas</span>
                                 <span>{total} total</span>
                               </div>
                             </div>
@@ -493,6 +513,31 @@ export function InstallmentsPage() {
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="font-mono font-medium">{formatCurrency(plan.amount)}/mês</span>
                             <div className="flex gap-1">
+                              {isActiveParcel && (
+                                isPaid ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-warning"
+                                    onClick={() => handleUnpayInstallment(plan)}
+                                    disabled={isBusy}
+                                    title="Desfazer pagamento"
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                                    onClick={() => handlePayInstallment(plan)}
+                                    disabled={isBusy}
+                                    title="Marcar parcela do mês como paga"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
