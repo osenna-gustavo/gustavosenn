@@ -257,21 +257,7 @@ export function Sidebar() {
 
         {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-4 space-y-1 scrollbar-thin">
-          {navItems.map((item) => (
-            <button
-              key={item.screen}
-              onClick={() => handleNavigation(item.screen)}
-              className={cn(
-                "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
-                currentScreen === item.screen
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground glow-primary"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-              )}
-            >
-              {item.icon}
-              {item.label}
-            </button>
-          ))}
+          {navItems.map((item) => renderNavItem(item, 'desktop'))}
         </nav>
 
         {/* Footer with user info and logout */}
