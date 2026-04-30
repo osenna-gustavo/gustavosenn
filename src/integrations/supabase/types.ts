@@ -193,6 +193,76 @@ export type Database = {
         }
         Relationships: []
       }
+      categorization_rules: {
+        Row: {
+          category_id: string | null
+          confidence: number | null
+          created_at: string | null
+          description_example: string | null
+          id: string
+          is_active: boolean | null
+          last_used_at: string | null
+          merchant_normalized: string
+          origin: string | null
+          recurrence_id: string | null
+          subcategory_id: string | null
+          usage_count: number | null
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          description_example?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          merchant_normalized: string
+          origin?: string | null
+          recurrence_id?: string | null
+          subcategory_id?: string | null
+          usage_count?: number | null
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          confidence?: number | null
+          created_at?: string | null
+          description_example?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_used_at?: string | null
+          merchant_normalized?: string
+          origin?: string | null
+          recurrence_id?: string | null
+          subcategory_id?: string | null
+          usage_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "categorization_rules_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_recurrence_id_fkey"
+            columns: ["recurrence_id"]
+            isOneToOne: false
+            referencedRelation: "recurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "categorization_rules_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batches: {
         Row: {
           created_at: string | null
@@ -222,6 +292,247 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      installments: {
+        Row: {
+          category_id: string | null
+          created_at: string
+          description: string | null
+          first_payment_date: string
+          id: string
+          installment_amount: number
+          is_active: boolean
+          name: string
+          subcategory_id: string | null
+          total_amount: number
+          total_installments: number
+          user_id: string
+        }
+        Insert: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          first_payment_date: string
+          id?: string
+          installment_amount: number
+          is_active?: boolean
+          name: string
+          subcategory_id?: string | null
+          total_amount: number
+          total_installments: number
+          user_id: string
+        }
+        Update: {
+          category_id?: string | null
+          created_at?: string
+          description?: string | null
+          first_payment_date?: string
+          id?: string
+          installment_amount?: number
+          is_active?: boolean
+          name?: string
+          subcategory_id?: string | null
+          total_amount?: number
+          total_installments?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "installments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "installments_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_imports: {
+        Row: {
+          competencia: string | null
+          created_at: string | null
+          file_hash: string | null
+          file_name: string | null
+          id: string
+          processing_log: Json | null
+          source: string
+          status: string
+          total_confirmed: number | null
+          total_duplicates: number | null
+          total_extracted: number | null
+          total_new: number | null
+          user_id: string
+        }
+        Insert: {
+          competencia?: string | null
+          created_at?: string | null
+          file_hash?: string | null
+          file_name?: string | null
+          id?: string
+          processing_log?: Json | null
+          source: string
+          status?: string
+          total_confirmed?: number | null
+          total_duplicates?: number | null
+          total_extracted?: number | null
+          total_new?: number | null
+          user_id: string
+        }
+        Update: {
+          competencia?: string | null
+          created_at?: string | null
+          file_hash?: string | null
+          file_name?: string | null
+          id?: string
+          processing_log?: Json | null
+          source?: string
+          status?: string
+          total_confirmed?: number | null
+          total_duplicates?: number | null
+          total_extracted?: number | null
+          total_new?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      invoice_transactions: {
+        Row: {
+          amount: number
+          card_holder: string | null
+          card_last_four: string | null
+          card_name: string | null
+          card_type: string | null
+          created_at: string | null
+          currency: string | null
+          description_original: string
+          existing_match_confidence: string | null
+          existing_match_id: string | null
+          id: string
+          ignore_reason: string | null
+          import_id: string
+          installment_current: number | null
+          installment_total: number | null
+          is_installment: boolean | null
+          knowledge_match_confidence: string | null
+          linked_transaction_id: string | null
+          merchant_normalized: string | null
+          recurrence_match_confidence: string | null
+          review_status: string | null
+          suggested_category_id: string | null
+          suggested_recurrence_id: string | null
+          suggested_subcategory_id: string | null
+          transaction_date: string
+          transaction_type: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          card_holder?: string | null
+          card_last_four?: string | null
+          card_name?: string | null
+          card_type?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description_original: string
+          existing_match_confidence?: string | null
+          existing_match_id?: string | null
+          id?: string
+          ignore_reason?: string | null
+          import_id: string
+          installment_current?: number | null
+          installment_total?: number | null
+          is_installment?: boolean | null
+          knowledge_match_confidence?: string | null
+          linked_transaction_id?: string | null
+          merchant_normalized?: string | null
+          recurrence_match_confidence?: string | null
+          review_status?: string | null
+          suggested_category_id?: string | null
+          suggested_recurrence_id?: string | null
+          suggested_subcategory_id?: string | null
+          transaction_date: string
+          transaction_type?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          card_holder?: string | null
+          card_last_four?: string | null
+          card_name?: string | null
+          card_type?: string | null
+          created_at?: string | null
+          currency?: string | null
+          description_original?: string
+          existing_match_confidence?: string | null
+          existing_match_id?: string | null
+          id?: string
+          ignore_reason?: string | null
+          import_id?: string
+          installment_current?: number | null
+          installment_total?: number | null
+          is_installment?: boolean | null
+          knowledge_match_confidence?: string | null
+          linked_transaction_id?: string | null
+          merchant_normalized?: string | null
+          recurrence_match_confidence?: string | null
+          review_status?: string | null
+          suggested_category_id?: string | null
+          suggested_recurrence_id?: string | null
+          suggested_subcategory_id?: string | null
+          transaction_date?: string
+          transaction_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_transactions_existing_match_id_fkey"
+            columns: ["existing_match_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_transactions_import_id_fkey"
+            columns: ["import_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_imports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_transactions_linked_transaction_id_fkey"
+            columns: ["linked_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_transactions_suggested_category_id_fkey"
+            columns: ["suggested_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_transactions_suggested_recurrence_id_fkey"
+            columns: ["suggested_recurrence_id"]
+            isOneToOne: false
+            referencedRelation: "recurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_transactions_suggested_subcategory_id_fkey"
+            columns: ["suggested_subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recurrence_instances: {
         Row: {
@@ -283,12 +594,15 @@ export type Database = {
           frequency: string
           id: string
           is_active: boolean | null
+          last_match_at: string | null
+          match_count: number | null
+          merchant_normalized_base: string | null
           name: string
           start_date: string
           subcategory_id: string | null
-          total_installments: number | null
           type: string
           user_id: string
+          value_tolerance: number | null
         }
         Insert: {
           amount: number
@@ -298,12 +612,15 @@ export type Database = {
           frequency: string
           id?: string
           is_active?: boolean | null
+          last_match_at?: string | null
+          match_count?: number | null
+          merchant_normalized_base?: string | null
           name: string
           start_date: string
           subcategory_id?: string | null
-          total_installments?: number | null
           type: string
           user_id: string
+          value_tolerance?: number | null
         }
         Update: {
           amount?: number
@@ -313,12 +630,15 @@ export type Database = {
           frequency?: string
           id?: string
           is_active?: boolean | null
+          last_match_at?: string | null
+          match_count?: number | null
+          merchant_normalized_base?: string | null
           name?: string
           start_date?: string
           subcategory_id?: string | null
-          total_installments?: number | null
           type?: string
           user_id?: string
+          value_tolerance?: number | null
         }
         Relationships: [
           {
@@ -444,6 +764,54 @@ export type Database = {
           },
         ]
       }
+      transaction_matches: {
+        Row: {
+          compared_fields: Json | null
+          confidence: number | null
+          created_at: string | null
+          existing_transaction_id: string
+          id: string
+          invoice_transaction_id: string
+          match_type: string
+          user_id: string
+        }
+        Insert: {
+          compared_fields?: Json | null
+          confidence?: number | null
+          created_at?: string | null
+          existing_transaction_id: string
+          id?: string
+          invoice_transaction_id: string
+          match_type: string
+          user_id: string
+        }
+        Update: {
+          compared_fields?: Json | null
+          confidence?: number | null
+          created_at?: string | null
+          existing_transaction_id?: string
+          id?: string
+          invoice_transaction_id?: string
+          match_type?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transaction_matches_existing_transaction_id_fkey"
+            columns: ["existing_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transaction_matches_invoice_transaction_id_fkey"
+            columns: ["invoice_transaction_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       transactions: {
         Row: {
           amount: number
@@ -453,6 +821,7 @@ export type Database = {
           description: string | null
           id: string
           import_batch_id: string | null
+          installment_id: string | null
           needs_review: boolean | null
           origin: string | null
           recurrence_id: string | null
@@ -469,6 +838,7 @@ export type Database = {
           description?: string | null
           id?: string
           import_batch_id?: string | null
+          installment_id?: string | null
           needs_review?: boolean | null
           origin?: string | null
           recurrence_id?: string | null
@@ -485,6 +855,7 @@ export type Database = {
           description?: string | null
           id?: string
           import_batch_id?: string | null
+          installment_id?: string | null
           needs_review?: boolean | null
           origin?: string | null
           recurrence_id?: string | null
@@ -499,6 +870,13 @@ export type Database = {
             columns: ["category_id"]
             isOneToOne: false
             referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_installment_id_fkey"
+            columns: ["installment_id"]
+            isOneToOne: false
+            referencedRelation: "installments"
             referencedColumns: ["id"]
           },
           {
