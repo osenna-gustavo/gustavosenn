@@ -374,8 +374,13 @@ export function C6ReviewScreen({
       setConfirmedCount(n => n + 1);
 
       toast({ title: 'Lançado!', description: tx.descriptionOriginal.slice(0, 50) });
-    } catch {
-      toast({ title: 'Erro ao lançar', variant: 'destructive' });
+    } catch (err: any) {
+      console.error('[C6ReviewScreen] Erro ao lançar transação:', err, { tx, categoryId, subcategoryId, recurrenceId });
+      toast({
+        title: 'Erro ao lançar',
+        description: err?.message || err?.error_description || 'Erro desconhecido',
+        variant: 'destructive',
+      });
     } finally {
       setLoading(null);
     }
