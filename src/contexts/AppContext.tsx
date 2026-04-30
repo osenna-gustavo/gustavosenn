@@ -90,6 +90,33 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [lastUsedCategoryId, setLastUsedCategoryId] = useState<string | null>(null);
 
+  const [billingCloseDay, setBillingCloseDayState] = useState<number | null>(() => {
+    try {
+      const stored = localStorage.getItem(BILLING_CLOSE_DAY_KEY);
+      if (stored === null) return null;
+      const val = Number(stored);
+      return val >= 1 && val <= 28 ? val : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const setBillingCloseDay = useCallback((day: number | null) => {
+    setBillingCloseDayState(day);
+    try {
+      if (day === null) {
+        localStorage.removeItem(BILLING_CLOSE_DAY_KEY);
+      } else {
+        localStorage.setItem(BILLING_CLOSE_DAY_KEY, String(day));
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  const billingDateRange = useMemo(() => {
+    if (!billingCloseDay) return null;
+    return getBillingPeriod(selectedMonth, selectedYear, billingCloseDay);
+  }, [billingCloseDay, selectedMonth, selectedYear]);
+
   const setSelectedMonth = useCallback((month: number, year: number) => {
     setSelectedMonthState(month);
     setSelectedYearState(year);
