@@ -59,6 +59,11 @@ interface AppContextType {
   bulkDeleteRecurrences: (ids: string[]) => Promise<void>;
   linkTransactionsToRecurrence: (transactionIds: string[], recurrenceId: string) => Promise<void>;
   
+  // Billing cycle settings
+  billingCloseDay: number | null;
+  setBillingCloseDay: (day: number | null) => void;
+  billingDateRange: { start: Date; end: Date } | null;
+
   // Last used category for quick entry
   lastUsedCategoryId: string | null;
   setLastUsedCategoryId: (id: string) => void;
