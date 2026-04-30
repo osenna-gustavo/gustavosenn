@@ -485,6 +485,54 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
                 placeholder="Deixe vazio para não alterar"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label>Vincular a recorrência / parcelamento</Label>
+              <Select
+                value={bulkEditData.recurrenceId || '__none__'}
+                onValueChange={val =>
+                  setBulkEditData(prev => ({
+                    ...prev,
+                    recurrenceId: val === '__none__' ? '' : val,
+                  }))
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Não vincular" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Não vincular</SelectItem>
+                  {regularRecurrences.length > 0 && (
+                    <SelectGroup>
+                      <SelectLabel>Recorrências</SelectLabel>
+                      {regularRecurrences.map(rec => (
+                        <SelectItem key={rec.id} value={rec.id}>
+                          {rec.name}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
+                  {installmentRecurrences.length > 0 && (
+                    <>
+                      {regularRecurrences.length > 0 && <SelectSeparator />}
+                      <SelectGroup>
+                        <SelectLabel>Parcelamentos</SelectLabel>
+                        {installmentRecurrences.map(rec => (
+                          <SelectItem key={rec.id} value={rec.id}>
+                            {rec.name}
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              {bulkEditData.recurrenceId && (
+                <p className="text-xs text-muted-foreground">
+                  A recorrência/parcelamento será marcado(a) como confirmado para o mês atual.
+                </p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBulkEdit(false)}>
