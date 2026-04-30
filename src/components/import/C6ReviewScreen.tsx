@@ -117,7 +117,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
   const linkedRec = recurrences.find(r => r.id === (selectedRecId ?? suggestedRecurrenceId));
 
   const handleConfirm = () => {
-    onConfirm(tx, selectedCat || undefined, selectedSub || undefined, selectedRec || undefined);
+    onConfirm(tx, normalizeOptionalId(selectedCat), normalizeOptionalId(selectedSub), selectedRecId);
   };
 
   return (
@@ -246,7 +246,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
             {selectedCat && (
               <Button
                 size="sm" variant="outline" className="text-xs h-7 gap-1"
-                onClick={() => onSaveRule(tx, selectedCat, selectedRec || undefined)}
+                onClick={() => onSaveRule(tx, selectedCat, selectedRecId)}
               >
                 <BookOpen className="h-3 w-3" />
                 Lembrar categoria
