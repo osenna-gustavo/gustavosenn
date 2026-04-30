@@ -1,17 +1,19 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import type { 
-  Category, 
-  Subcategory, 
-  Transaction, 
-  Budget, 
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import type {
+  Category,
+  Subcategory,
+  Transaction,
+  Budget,
   Recurrence,
   RecurrenceInstance,
   MonthSummary,
-  AppScreen 
+  AppScreen
 } from '@/types/finance';
 import * as db from '@/lib/supabase-database';
-import { getCurrentMonthYear } from '@/lib/formatters';
+import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
+
+const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
 interface AppContextType {
   // Navigation
