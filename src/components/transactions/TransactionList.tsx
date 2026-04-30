@@ -142,6 +142,15 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
     s => s.categoryId === bulkEditData.categoryId
   );
 
+  const regularRecurrences = useMemo(
+    () => recurrences.filter(r => !r.totalInstallments),
+    [recurrences]
+  );
+  const installmentRecurrences = useMemo(
+    () => recurrences.filter(r => r.totalInstallments && r.totalInstallments > 0),
+    [recurrences]
+  );
+
   const handleBulkEdit = async () => {
     const updates: { categoryId?: string; subcategoryId?: string | null; description?: string } = {};
     if (bulkEditData.categoryId) updates.categoryId = bulkEditData.categoryId;
