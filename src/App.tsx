@@ -14,6 +14,7 @@ import { InstallmentsPage } from '@/pages/InstallmentsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ScenariosPage } from '@/pages/ScenariosPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { AuthPage } from '@/pages/AuthPage';
 import { TransactionsErrorBoundary } from '@/components/transactions/TransactionsErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
