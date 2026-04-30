@@ -19,6 +19,16 @@ function normalizeOptionalId(value?: string | null) {
   return value && value !== NONE_SELECT_VALUE ? value : undefined;
 }
 
+function getErrorField(error: unknown, field: 'message' | 'error_description' | 'code') {
+  if (!error || typeof error !== 'object' || !(field in error)) return undefined;
+  const value = (error as Record<typeof field, unknown>)[field];
+  return typeof value === 'string' ? value : undefined;
+}
+
+function getErrorMessage(error: unknown) {
+  return getErrorField(error, 'message') ?? getErrorField(error, 'error_description') ?? 'Erro desconhecido';
+}
+
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: string }) {
@@ -383,11 +393,11 @@ export function C6ReviewScreen({
       setConfirmedCount(n => n + 1);
 
       toast({ title: 'Lançado!', description: tx.descriptionOriginal.slice(0, 50) });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[C6ReviewScreen] Erro ao lançar transação:', err, { tx, categoryId, subcategoryId, recurrenceId });
       toast({
         title: 'Erro ao lançar',
-        description: err?.message || err?.error_description || 'Erro desconhecido',
+        description: getErrorMessage(err),
         variant: 'destructive',
       });
     } finally {
@@ -447,8 +457,8 @@ export function C6ReviewScreen({
         title: 'Regra salva!',
         description: `"${tx.merchantNormalized}" será categorizado automaticamente nas próximas importações.`,
       });
-    } catch (err: any) {
-      const isTableMissing = err?.message?.includes('relation') || err?.code === '42P01';
+    } catch (err: unknown) {
+      const isTableMissing = getErrorMessage(err).includes('relation') || getErrorField(err, 'code') === '42P01';
       toast({
         title: 'Base de conhecimento não configurada',
         description: isTableMissing
@@ -498,8 +508,8 @@ export function C6ReviewScreen({
         title: 'Recorrência vinculada!',
         description: `"${tx.merchantNormalized}" → "${rec?.name ?? recurrenceId}". Importações futuras identificarão automaticamente.`,
       });
-    } catch (err: any) {
-      const isTableMissing = err?.message?.includes('relation') || err?.code === '42P01';
+    } catch (err: unknown) {
+      const isTableMissing = getErrorMessage(err).includes('relation') || getErrorField(err, 'code') === '42P01';
       toast({
         title: 'Vinculado nesta sessão',
         description: isTableMissing
