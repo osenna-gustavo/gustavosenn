@@ -13,6 +13,12 @@ import { saveCategorizationRule, updateInvoiceTransactionStatus } from '@/lib/in
 import { cn } from '@/lib/utils';
 import type { InvoiceTransaction, ReviewGroups } from '@/types/invoice';
 
+const NONE_SELECT_VALUE = '__none__';
+
+function normalizeOptionalId(value?: string | null) {
+  return value && value !== NONE_SELECT_VALUE ? value : undefined;
+}
+
 // ─── Badge helpers ────────────────────────────────────────────────────────────
 
 function TypeBadge({ type }: { type: string }) {
@@ -99,13 +105,16 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
   const [selectedSub, setSelectedSub] = useState(tx.suggestedSubcategoryId ?? '');
   const [selectedRec, setSelectedRec] = useState(tx.suggestedRecurrenceId ?? '');
 
+  const selectedRecId = normalizeOptionalId(selectedRec);
+  const suggestedRecurrenceId = normalizeOptionalId(tx.suggestedRecurrenceId);
+
   const cat = categories.find(c => c.id === (selectedCat || tx.suggestedCategoryId));
   const catSubs = subcategories.filter(s => s.categoryId === selectedCat);
   const expenseCategories = categories.filter(c => c.type === 'despesa');
   const activeRecurrences = recurrences.filter(r => r.isActive);
 
   const dateStr = tx.transactionDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-  const linkedRec = recurrences.find(r => r.id === (selectedRec || tx.suggestedRecurrenceId));
+  const linkedRec = recurrences.find(r => r.id === (selectedRecId ?? suggestedRecurrenceId));
 
   const handleConfirm = () => {
     onConfirm(tx, selectedCat || undefined, selectedSub || undefined, selectedRec || undefined);
@@ -125,7 +134,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
               <TypeBadge type={tx.transactionType} />
-              {(tx.recurrenceMatchConfidence === 'exact' || tx.recurrenceMatchConfidence === 'very_likely' || selectedRec) && (
+              {(tx.recurrenceMatchConfidence === 'exact' || tx.recurrenceMatchConfidence === 'very_likely' || selectedRecId) && (
                 <Badge variant="outline" className="text-xs bg-primary/10 text-primary border-primary/20">
                   <Repeat2 className="h-3 w-3 mr-1" />
                   {linkedRec ? linkedRec.name : 'Recorrência'}
@@ -177,7 +186,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
           <div className="grid grid-cols-2 gap-2">
             <div>
               <p className="text-xs text-muted-foreground mb-1">Categoria</p>
-              <Select value={selectedCat} onValueChange={(v) => { setSelectedCat(v); setSelectedSub(''); }}>
+              <Select value={selectedCat} onValueChange={(v) => { setSelectedCat(v); setSelectedSub(NONE_SELECT_VALUE); }}>
                 <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Selecione..." /></SelectTrigger>
                 <SelectContent>
                   {expenseCategories.map(c => (
@@ -193,7 +202,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
                   <SelectValue placeholder={catSubs.length === 0 ? 'Nenhuma' : 'Opcional'} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="__none__" className="text-xs">Nenhuma</SelectItem>
+                  <SelectItem value={NONE_SELECT_VALUE} className="text-xs">Nenhuma</SelectItem>
                   {catSubs.map(s => (
                     <SelectItem key={s.id} value={s.id} className="text-xs">{s.name}</SelectItem>
                   ))}
@@ -210,7 +219,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
                 <SelectValue placeholder="Nenhuma recorrência..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="__none__" className="text-xs">Nenhuma</SelectItem>
+                <SelectItem value={NONE_SELECT_VALUE} className="text-xs">Nenhuma</SelectItem>
                 {activeRecurrences.map(r => (
                   <SelectItem key={r.id} value={r.id} className="text-xs">
                     <Repeat2 className="h-3 w-3 inline mr-1" />
@@ -222,11 +231,11 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
           </div>
 
           <div className="flex gap-2 justify-end flex-wrap">
-            {selectedRec && selectedRec !== (tx.suggestedRecurrenceId ?? '') && (
+            {selectedRecId && selectedRecId !== suggestedRecurrenceId && (
               <Button
                 size="sm" variant="outline" className="text-xs h-7 gap-1"
                 onClick={async () => {
-                  await onLinkRecurrence(tx, selectedRec);
+                  await onLinkRecurrence(tx, selectedRecId);
                   setEditing(false);
                 }}
               >
