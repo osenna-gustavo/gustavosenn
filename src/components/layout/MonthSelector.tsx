@@ -1,5 +1,5 @@
 import { useApp } from '@/contexts/AppContext';
-import { formatMonthYear } from '@/lib/formatters';
+import { formatMonthYear, formatDateShort } from '@/lib/formatters';
 import { ChevronLeft, ChevronRight, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
