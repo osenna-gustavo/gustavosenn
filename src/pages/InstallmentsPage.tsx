@@ -287,6 +287,8 @@ export function InstallmentsPage() {
             </div>
 
             {groupedInstallments.map(({ category, plans }) => {
+              const groupKey = category?.id ?? '__sem_categoria__';
+              const isCollapsed = collapsedGroups.has(groupKey);
               const groupTotal = plans
                 .filter(p => {
                   if (!p.isActive) return false;
@@ -296,10 +298,17 @@ export function InstallmentsPage() {
                 .reduce((sum, p) => sum + p.amount, 0);
 
               return (
-                <div key={category?.id ?? '__sem_categoria__'}>
-                  {/* Category header */}
-                  <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border">
+                <div key={groupKey}>
+                  {/* Category header — clicável para recolher */}
+                  <button
+                    onClick={() => toggleGroup(groupKey)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-muted/50 border-b border-border hover:bg-muted/70 transition-colors"
+                  >
                     <div className="flex items-center gap-2">
+                      {isCollapsed
+                        ? <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                        : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+                      }
                       <span className="text-base">{category?.icon ?? '📦'}</span>
                       <span className="text-sm font-semibold text-foreground">
                         {category?.name ?? 'Sem categoria'}
@@ -313,10 +322,10 @@ export function InstallmentsPage() {
                         {formatCurrency(groupTotal)}/mês
                       </span>
                     )}
-                  </div>
+                  </button>
 
                   {/* Plans in this category */}
-                  <div className="divide-y divide-border/50">
+                  {!isCollapsed && <div className="divide-y divide-border/50">
                     {plans.map(plan => {
                       const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
                       const startDate = new Date(plan.startDate);
