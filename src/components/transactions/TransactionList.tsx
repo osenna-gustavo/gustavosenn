@@ -267,7 +267,7 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
               size="sm"
               variant="outline"
               onClick={() => {
-                setBulkEditData({ categoryId: '', subcategoryId: '', description: '' });
+                setBulkEditData({ categoryId: '', subcategoryId: '', description: '', recurrenceId: '' });
                 setShowBulkEdit(true);
               }}
               className="gap-1"
