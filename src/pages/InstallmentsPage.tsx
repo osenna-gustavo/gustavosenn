@@ -30,10 +30,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight } from 'lucide-react';
+import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { Recurrence, TransactionType } from '@/types/finance';
+import type { Recurrence, RecurrenceInstance, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
+import * as db from '@/lib/supabase-database';
 
 function getInstallmentNumber(startDate: Date, selectedMonth: number, selectedYear: number): number {
   const start = new Date(startDate);
@@ -46,6 +47,7 @@ export function InstallmentsPage() {
     categories,
     subcategories,
     recurrences,
+    recurrenceInstances,
     selectedMonth,
     selectedYear,
     addRecurrence,
@@ -53,6 +55,9 @@ export function InstallmentsPage() {
     deleteRecurrence,
     bulkUpdateRecurrences,
     bulkDeleteRecurrences,
+    addTransaction,
+    deleteTransaction,
+    refreshData,
   } = useApp();
   const { toast } = useToast();
 
@@ -194,6 +199,104 @@ export function InstallmentsPage() {
     }
   };
 
+  // Map: recurrenceId -> current-month instance (for badges and pay actions)
+  const instancesByRecurrence = useMemo(() => {
+    const map = new Map<string, RecurrenceInstance>();
+    recurrenceInstances.forEach(i => {
+      if (i.month === selectedMonth && i.year === selectedYear) {
+        map.set(i.recurrenceId, i);
+      }
+    });
+    return map;
+  }, [recurrenceInstances, selectedMonth, selectedYear]);
+
+  const [payingId, setPayingId] = useState<string | null>(null);
+
+  const handlePayInstallment = async (plan: Recurrence) => {
+    setPayingId(plan.id);
+    try {
+      // Ensure an instance for this month exists
+      let instance = instancesByRecurrence.get(plan.id);
+      if (!instance) {
+        instance = await db.addRecurrenceInstance({
+          recurrenceId: plan.id,
+          month: selectedMonth,
+          year: selectedYear,
+          status: 'pending',
+          amount: plan.amount,
+        });
+      }
+
+      if (instance.status === 'confirmed' && instance.linkedTransactionId) {
+        toast({ title: 'Parcela já está paga' });
+        return;
+      }
+
+      const start = new Date(plan.startDate);
+      const currentNum =
+        (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+      const description = plan.totalInstallments
+        ? `${plan.name} (parcela ${currentNum}/${plan.totalInstallments})`
+        : plan.name;
+
+      const txDate = new Date(selectedYear, selectedMonth, start.getDate() || 1);
+
+      const newTx = await addTransaction({
+        date: txDate,
+        amount: instance.amount,
+        type: plan.type,
+        categoryId: plan.categoryId,
+        subcategoryId: plan.subcategoryId,
+        description,
+        origin: 'recurrence',
+        needsReview: false,
+        recurrenceId: plan.id,
+        recurrenceInstanceId: instance.id,
+      });
+
+      await db.updateRecurrenceInstance({
+        ...instance,
+        status: 'confirmed',
+        linkedTransactionId: newTx.id,
+      });
+
+      await refreshData();
+      toast({ title: 'Parcela paga!', description: 'Lançamento criado em Lançamentos.' });
+    } catch (err) {
+      console.error('[Installments] Erro ao pagar parcela:', err);
+      toast({ title: 'Erro ao marcar como paga', variant: 'destructive' });
+    } finally {
+      setPayingId(null);
+    }
+  };
+
+  const handleUnpayInstallment = async (plan: Recurrence) => {
+    const instance = instancesByRecurrence.get(plan.id);
+    if (!instance) return;
+    setPayingId(plan.id);
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await deleteTransaction(instance.linkedTransactionId);
+        } catch (e) {
+          console.warn('[Installments] Lançamento vinculado já não existe:', e);
+        }
+      }
+      await db.updateRecurrenceInstance({
+        ...instance,
+        status: 'pending',
+        linkedTransactionId: undefined,
+      });
+      await refreshData();
+      toast({ title: 'Pagamento desfeito' });
+    } catch (err) {
+      console.error('[Installments] Erro ao desfazer pagamento:', err);
+      toast({ title: 'Erro ao desfazer', variant: 'destructive' });
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   const toggleSelect = (id: string) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -331,16 +434,21 @@ export function InstallmentsPage() {
                       const startDate = new Date(plan.startDate);
                       const currentNum = getInstallmentNumber(startDate, selectedMonth, selectedYear);
                       const total = plan.totalInstallments!;
-                      const isActive = plan.isActive && currentNum >= 1 && currentNum <= total;
-                      const pct = Math.min(100, (currentNum / total) * 100);
-                      const remaining = total - currentNum + 1;
+                      const isActiveParcel = plan.isActive && currentNum >= 1 && currentNum <= total;
+                      const instance = instancesByRecurrence.get(plan.id);
+                      const isPaid = instance?.status === 'confirmed' && !!instance.linkedTransactionId;
+                      const paidCount = Math.max(0, Math.min(currentNum - 1, total)) + (isPaid && currentNum >= 1 && currentNum <= total ? 1 : 0);
+                      const pct = Math.min(100, (paidCount / total) * 100);
+                      const remaining = Math.max(0, total - paidCount);
+                      const isBusy = payingId === plan.id;
 
                       return (
                         <div
                           key={plan.id}
                           className={cn(
                             'flex items-center gap-3 p-4 transition-colors',
-                            !plan.isActive && 'opacity-50'
+                            !plan.isActive && 'opacity-50',
+                            isPaid && 'bg-success/5'
                           )}
                         >
                           <Checkbox
@@ -348,16 +456,31 @@ export function InstallmentsPage() {
                             onCheckedChange={() => toggleSelect(plan.id)}
                           />
 
-                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                            <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          <div className={cn(
+                            "h-10 w-10 rounded-lg flex items-center justify-center shrink-0",
+                            isPaid ? "bg-success/15" : "bg-muted"
+                          )}>
+                            {isPaid
+                              ? <Check className="h-5 w-5 text-success" />
+                              : <CreditCard className="h-5 w-5 text-muted-foreground" />}
                           </div>
 
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium truncate">{plan.name}</span>
-                              {isActive && currentNum >= 1 && currentNum <= total && (
+                              {isActiveParcel && (
                                 <Badge variant="secondary" className="text-xs shrink-0">
                                   parcela {currentNum}/{total}
+                                </Badge>
+                              )}
+                              {isActiveParcel && isPaid && (
+                                <Badge className="text-xs shrink-0 bg-success/15 text-success border border-success/30 hover:bg-success/15">
+                                  Paga
+                                </Badge>
+                              )}
+                              {isActiveParcel && !isPaid && (
+                                <Badge variant="outline" className="text-xs shrink-0 text-warning border-warning/30">
+                                  Pendente
                                 </Badge>
                               )}
                               {!plan.isActive && (
@@ -373,15 +496,15 @@ export function InstallmentsPage() {
                             </div>
                             <div className="text-sm text-muted-foreground mt-0.5">
                               {subcategory ? `→ ${subcategory.name}` : null}
-                              {' • '}
-                              {remaining > 0 && currentNum <= total
+                              {subcategory ? ' • ' : ''}
+                              {remaining > 0
                                 ? `${remaining} parcela(s) restante(s)`
                                 : 'Concluído'}
                             </div>
                             <div className="mt-2 space-y-1">
                               <Progress value={pct} className="h-1.5" />
                               <div className="flex justify-between text-xs text-muted-foreground">
-                                <span>{currentNum > 0 ? Math.min(currentNum - 1, total) : 0} pagas</span>
+                                <span>{paidCount} pagas</span>
                                 <span>{total} total</span>
                               </div>
                             </div>
@@ -390,6 +513,31 @@ export function InstallmentsPage() {
                           <div className="flex items-center gap-3 shrink-0">
                             <span className="font-mono font-medium">{formatCurrency(plan.amount)}/mês</span>
                             <div className="flex gap-1">
+                              {isActiveParcel && (
+                                isPaid ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-warning"
+                                    onClick={() => handleUnpayInstallment(plan)}
+                                    disabled={isBusy}
+                                    title="Desfazer pagamento"
+                                  >
+                                    <RotateCcw className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-success hover:text-success hover:bg-success/10"
+                                    onClick={() => handlePayInstallment(plan)}
+                                    disabled={isBusy}
+                                    title="Marcar parcela do mês como paga"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                )
+                              )}
                               <Button
                                 variant="ghost"
                                 size="icon"
