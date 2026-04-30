@@ -53,6 +53,9 @@ export function Sidebar() {
   const { user, signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [lastActivity, setLastActivity] = useState<string | null>(null);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(() =>
+    settingsSubScreens.includes(currentScreen as AppScreen) || currentScreen === 'settings'
+  );
 
   useEffect(() => {
     if (!user) return;
