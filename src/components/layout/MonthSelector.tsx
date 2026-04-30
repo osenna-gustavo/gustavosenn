@@ -40,58 +40,55 @@ export function MonthSelector() {
   return (
     <div className="flex flex-col items-center gap-0.5">
       <div className="flex items-center gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handlePrevMonth}
-          className="h-8 w-8"
-        >
+        <Button variant="ghost" size="icon" onClick={handlePrevMonth} className="h-8 w-8">
           <ChevronLeft className="h-4 w-4" />
         </Button>
 
-      <div className="flex items-center gap-1 min-w-[180px]">
-        <Calendar className="h-4 w-4 text-primary" />
-        <Select
-          value={String(selectedMonth)}
-          onValueChange={(value) => setSelectedMonth(Number(value), selectedYear)}
-        >
-          <SelectTrigger className="w-[110px] h-8 border-0 bg-transparent font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {months.map((month, index) => (
-              <SelectItem key={index} value={String(index)}>
-                {month}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-1 min-w-[180px]">
+          <Calendar className="h-4 w-4 text-primary" />
+          <Select
+            value={String(selectedMonth)}
+            onValueChange={(value) => setSelectedMonth(Number(value), selectedYear)}
+          >
+            <SelectTrigger className="w-[110px] h-8 border-0 bg-transparent font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {months.map((month, index) => (
+                <SelectItem key={index} value={String(index)}>
+                  {month}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-        <Select
-          value={String(selectedYear)}
-          onValueChange={(value) => setSelectedMonth(selectedMonth, Number(value))}
-        >
-          <SelectTrigger className="w-[80px] h-8 border-0 bg-transparent font-medium">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {years.map((year) => (
-              <SelectItem key={year} value={String(year)}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          <Select
+            value={String(selectedYear)}
+            onValueChange={(value) => setSelectedMonth(selectedMonth, Number(value))}
+          >
+            <SelectTrigger className="w-[80px] h-8 border-0 bg-transparent font-medium">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {years.map((year) => (
+                <SelectItem key={year} value={String(year)}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        <Button variant="ghost" size="icon" onClick={handleNextMonth} className="h-8 w-8">
+          <ChevronRight className="h-4 w-4" />
+        </Button>
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handleNextMonth}
-        className="h-8 w-8"
-      >
-        <ChevronRight className="h-4 w-4" />
-      </Button>
+      {billingDateRange && (
+        <p className="text-[10px] text-primary/70 font-medium">
+          {formatDateShort(billingDateRange.start)} → {formatDateShort(billingDateRange.end)}
+        </p>
+      )}
     </div>
   );
 }
