@@ -43,6 +43,7 @@ function AppContent() {
       case 'import': return <ImportPage />;
       case 'reports': return <ReportsPage />;
       case 'scenarios': return <ScenariosPage />;
+      case 'settings': return <SettingsPage />;
       default: return <DashboardPage />;
     }
   };
