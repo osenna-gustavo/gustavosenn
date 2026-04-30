@@ -210,16 +210,24 @@ export async function deleteSubcategory(id: string): Promise<void> {
 
 // ==================== TRANSACTIONS ====================
 
-export async function getTransactions(month?: number, year?: number): Promise<Transaction[]> {
+export async function getTransactions(
+  month?: number,
+  year?: number,
+  dateRange?: { start: Date; end: Date }
+): Promise<Transaction[]> {
   const userId = await getUserId();
-  
+
   let query = supabase
     .from('transactions')
     .select('*')
     .eq('user_id', userId)
     .order('date', { ascending: false });
-  
-  if (month !== undefined && year !== undefined) {
+
+  if (dateRange) {
+    query = query
+      .gte('date', dateRange.start.toISOString())
+      .lte('date', dateRange.end.toISOString());
+  } else if (month !== undefined && year !== undefined) {
     const startDate = new Date(year, month, 1).toISOString();
     const endDate = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
     query = query.gte('date', startDate).lte('date', endDate);
