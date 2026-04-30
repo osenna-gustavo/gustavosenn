@@ -79,6 +79,23 @@ export function InstallmentsPage() {
     [recurrences]
   );
 
+  // Group installments by category
+  const groupedInstallments = useMemo(() => {
+    const groups = new Map<string, { category: typeof categories[0] | undefined; plans: typeof installmentPlans }>();
+    installmentPlans.forEach(plan => {
+      const key = plan.categoryId || '__sem_categoria__';
+      if (!groups.has(key)) {
+        groups.set(key, { category: categories.find(c => c.id === plan.categoryId), plans: [] });
+      }
+      groups.get(key)!.plans.push(plan);
+    });
+    return Array.from(groups.values()).sort((a, b) => {
+      if (!a.category) return 1;
+      if (!b.category) return -1;
+      return a.category.name.localeCompare(b.category.name);
+    });
+  }, [installmentPlans, categories]);
+
   const filteredSubcategories = subcategories.filter(s => s.categoryId === formData.categoryId);
 
   const openForm = (plan?: Recurrence) => {
