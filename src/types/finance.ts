@@ -184,4 +184,5 @@ export type AppScreen =
   | 'installments'
   | 'import'
   | 'reports'
-  | 'scenarios';
+  | 'scenarios'
+  | 'settings';
