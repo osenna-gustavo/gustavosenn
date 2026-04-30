@@ -276,97 +276,130 @@ export function InstallmentsPage() {
               <span className="text-xs text-muted-foreground">Selecionar todos</span>
             </div>
 
-            {installmentPlans.map(plan => {
-              const category = categories.find(c => c.id === plan.categoryId);
-              const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
-              const startDate = new Date(plan.startDate);
-              const currentNum = getInstallmentNumber(startDate, selectedMonth, selectedYear);
-              const total = plan.totalInstallments!;
-              const isActive = plan.isActive && currentNum >= 1 && currentNum <= total;
-              const pct = Math.min(100, (currentNum / total) * 100);
-              const remaining = total - currentNum + 1;
+            {groupedInstallments.map(({ category, plans }) => {
+              const groupTotal = plans
+                .filter(p => {
+                  if (!p.isActive) return false;
+                  const n = getInstallmentNumber(new Date(p.startDate), selectedMonth, selectedYear);
+                  return n >= 1 && n <= p.totalInstallments!;
+                })
+                .reduce((sum, p) => sum + p.amount, 0);
 
               return (
-                <div
-                  key={plan.id}
-                  className={cn(
-                    'flex items-center gap-3 p-4 transition-colors',
-                    !plan.isActive && 'opacity-50'
-                  )}
-                >
-                  <Checkbox
-                    checked={selectedIds.has(plan.id)}
-                    onCheckedChange={() => toggleSelect(plan.id)}
-                  />
-
-                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-                    <CreditCard className="h-5 w-5 text-muted-foreground" />
+                <div key={category?.id ?? '__sem_categoria__'}>
+                  {/* Category header */}
+                  <div className="flex items-center justify-between px-4 py-2 bg-muted/50 border-b border-border">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">{category?.icon ?? '📦'}</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {category?.name ?? 'Sem categoria'}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        ({plans.length} parcelamento{plans.length !== 1 ? 's' : ''})
+                      </span>
+                    </div>
+                    {groupTotal > 0 && (
+                      <span className="text-xs font-mono text-muted-foreground">
+                        {formatCurrency(groupTotal)}/mês
+                      </span>
+                    )}
                   </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium truncate">{plan.name}</span>
-                      {isActive && currentNum >= 1 && currentNum <= total && (
-                        <Badge variant="secondary" className="text-xs shrink-0">
-                          parcela {currentNum}/{total}
-                        </Badge>
-                      )}
-                      {!plan.isActive && (
-                        <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">
-                          Pausado
-                        </Badge>
-                      )}
-                      {currentNum > total && (
-                        <Badge variant="outline" className="text-xs text-success border-success/30 shrink-0">
-                          Quitado
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground mt-0.5">
-                      {category?.icon} {category?.name}
-                      {subcategory && ` → ${subcategory.name}`}
-                      {' • '}
-                      {remaining > 0 && currentNum <= total
-                        ? `${remaining} parcela(s) restante(s)`
-                        : 'Concluído'}
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      <Progress value={pct} className="h-1.5" />
-                      <div className="flex justify-between text-xs text-muted-foreground">
-                        <span>{currentNum > 0 ? Math.min(currentNum - 1, total) : 0} pagas</span>
-                        <span>{total} total</span>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Plans in this category */}
+                  <div className="divide-y divide-border/50">
+                    {plans.map(plan => {
+                      const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
+                      const startDate = new Date(plan.startDate);
+                      const currentNum = getInstallmentNumber(startDate, selectedMonth, selectedYear);
+                      const total = plan.totalInstallments!;
+                      const isActive = plan.isActive && currentNum >= 1 && currentNum <= total;
+                      const pct = Math.min(100, (currentNum / total) * 100);
+                      const remaining = total - currentNum + 1;
 
-                  <div className="flex items-center gap-3 shrink-0">
-                    <span className="font-mono font-medium">{formatCurrency(plan.amount)}/mês</span>
-                    <div className="flex gap-1">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => handleToggleActive(plan)}
-                      >
-                        {plan.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8"
-                        onClick={() => openForm(plan)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                        onClick={() => setDeleteId(plan.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                      return (
+                        <div
+                          key={plan.id}
+                          className={cn(
+                            'flex items-center gap-3 p-4 transition-colors',
+                            !plan.isActive && 'opacity-50'
+                          )}
+                        >
+                          <Checkbox
+                            checked={selectedIds.has(plan.id)}
+                            onCheckedChange={() => toggleSelect(plan.id)}
+                          />
+
+                          <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
+                            <CreditCard className="h-5 w-5 text-muted-foreground" />
+                          </div>
+
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-medium truncate">{plan.name}</span>
+                              {isActive && currentNum >= 1 && currentNum <= total && (
+                                <Badge variant="secondary" className="text-xs shrink-0">
+                                  parcela {currentNum}/{total}
+                                </Badge>
+                              )}
+                              {!plan.isActive && (
+                                <Badge variant="outline" className="text-xs text-muted-foreground shrink-0">
+                                  Pausado
+                                </Badge>
+                              )}
+                              {currentNum > total && (
+                                <Badge variant="outline" className="text-xs text-success border-success/30 shrink-0">
+                                  Quitado
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="text-sm text-muted-foreground mt-0.5">
+                              {subcategory ? `→ ${subcategory.name}` : null}
+                              {' • '}
+                              {remaining > 0 && currentNum <= total
+                                ? `${remaining} parcela(s) restante(s)`
+                                : 'Concluído'}
+                            </div>
+                            <div className="mt-2 space-y-1">
+                              <Progress value={pct} className="h-1.5" />
+                              <div className="flex justify-between text-xs text-muted-foreground">
+                                <span>{currentNum > 0 ? Math.min(currentNum - 1, total) : 0} pagas</span>
+                                <span>{total} total</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3 shrink-0">
+                            <span className="font-mono font-medium">{formatCurrency(plan.amount)}/mês</span>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleToggleActive(plan)}
+                              >
+                                {plan.isActive ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => openForm(plan)}
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                onClick={() => setDeleteId(plan.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );
