@@ -1,0 +1,1 @@
+ALTER TABLE public.recurrences ADD COLUMN IF NOT EXISTS total_installments integer;

@@ -600,6 +600,7 @@ export type Database = {
           name: string
           start_date: string
           subcategory_id: string | null
+          total_installments: number | null
           type: string
           user_id: string
           value_tolerance: number | null
@@ -618,6 +619,7 @@ export type Database = {
           name: string
           start_date: string
           subcategory_id?: string | null
+          total_installments?: number | null
           type: string
           user_id: string
           value_tolerance?: number | null
@@ -636,6 +638,7 @@ export type Database = {
           name?: string
           start_date?: string
           subcategory_id?: string | null
+          total_installments?: number | null
           type?: string
           user_id?: string
           value_tolerance?: number | null
