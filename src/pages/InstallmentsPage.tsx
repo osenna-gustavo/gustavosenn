@@ -419,7 +419,7 @@ export function InstallmentsPage() {
                         </div>
                       );
                     })}
-                  </div>
+                  </div>}
                 </div>
               );
             })}
