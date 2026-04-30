@@ -489,7 +489,7 @@ export function C6ReviewScreen({
       await saveCategorizationRule(
         tx.merchantNormalized,
         tx.suggestedCategoryId,
-        tx.suggestedSubcategoryId,
+        normalizeOptionalId(tx.suggestedSubcategoryId),
         recurrenceId,
         'manual',
         tx.descriptionOriginal,
