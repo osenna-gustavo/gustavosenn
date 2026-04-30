@@ -371,11 +371,11 @@ export function C6ReviewScreen({
         amount: tx.amount,
         type: tx.transactionType === 'estorno' ? 'receita' : 'despesa',
         categoryId: finalCategoryId,
-        subcategoryId: subcategoryId ?? tx.suggestedSubcategoryId,
+        subcategoryId: normalizeOptionalId(subcategoryId) ?? normalizeOptionalId(tx.suggestedSubcategoryId),
         description: tx.descriptionOriginal,
         origin: 'import',
         needsReview: false,
-        recurrenceId: recurrenceId ?? tx.suggestedRecurrenceId,
+        recurrenceId: normalizeOptionalId(recurrenceId) ?? normalizeOptionalId(tx.suggestedRecurrenceId),
       });
 
       await updateInvoiceTransactionStatus(tx.id, 'confirmed').catch(() => {});
@@ -438,8 +438,8 @@ export function C6ReviewScreen({
       await saveCategorizationRule(
         tx.merchantNormalized,
         categoryId,
-        tx.suggestedSubcategoryId,
-        recurrenceId ?? tx.suggestedRecurrenceId,
+        normalizeOptionalId(tx.suggestedSubcategoryId),
+        normalizeOptionalId(recurrenceId) ?? normalizeOptionalId(tx.suggestedRecurrenceId),
         'manual',
         tx.descriptionOriginal,
       );
