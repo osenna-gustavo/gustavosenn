@@ -222,33 +222,37 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const refreshData = useCallback(async () => {
     if (!user) return;
-    
+
     setIsLoading(true);
     try {
       const [cats, subs, trans, budg, recs, instances] = await Promise.all([
         db.getCategories(),
         db.getSubcategories(),
-        db.getTransactions(selectedMonth, selectedYear),
+        db.getTransactions(selectedMonth, selectedYear, billingDateRange ?? undefined),
         db.getBudget(selectedMonth, selectedYear),
         db.getRecurrences(),
         db.getRecurrenceInstances(selectedMonth, selectedYear),
       ]);
-      
+
       setCategories(cats);
       setSubcategories(subs);
       setTransactions(trans);
       setBudget(budg ?? null);
       setRecurrences(recs);
       setRecurrenceInstances(instances);
-      
-      const summary = calculateMonthSummary(cats, trans, budg ?? null, recs, instances, selectedMonth, selectedYear);
+
+      const summary = calculateMonthSummary(
+        cats, trans, budg ?? null, recs, instances,
+        selectedMonth, selectedYear,
+        billingDateRange ?? undefined
+      );
       setMonthSummary(summary);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
       setIsLoading(false);
     }
-  }, [user, selectedMonth, selectedYear, calculateMonthSummary]);
+  }, [user, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
 
   // Initialize app when user is authenticated
   useEffect(() => {
