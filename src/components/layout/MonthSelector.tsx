@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 
 export function MonthSelector() {
-  const { selectedMonth, selectedYear, setSelectedMonth } = useApp();
+  const { selectedMonth, selectedYear, setSelectedMonth, billingDateRange } = useApp();
 
   const handlePrevMonth = () => {
     if (selectedMonth === 0) {
