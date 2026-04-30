@@ -129,9 +129,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     recs: Recurrence[],
     instances: RecurrenceInstance[],
     month: number,
-    year: number
+    year: number,
+    dateRange?: { start: Date; end: Date }
   ): MonthSummary => {
-    const monthTransactions = trans.filter(t => {
+    // When billing period is active, transactions are pre-filtered by getTransactions.
+    // Skip the calendar-month filter so cross-month billing periods work correctly.
+    const monthTransactions = dateRange ? trans : trans.filter(t => {
       const date = new Date(t.date);
       return date.getMonth() === month && date.getFullYear() === year;
     });
