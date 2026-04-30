@@ -77,3 +77,23 @@ export function getCurrentMonthYear(): { month: number; year: number } {
 export function getMonthDays(month: number, year: number): number {
   return new Date(year, month + 1, 0).getDate();
 }
+
+export function getBillingPeriod(
+  month: number,
+  year: number,
+  closeDay: number
+): { start: Date; end: Date } {
+  // end: closeDay of selected month, clamped to last day of that month
+  const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+  const endDay = Math.min(closeDay, lastDayOfMonth);
+  const end = new Date(year, month, endDay, 23, 59, 59, 999);
+
+  // start: day after closeDay of previous month
+  // JS Date overflow handles boundaries (e.g. Feb 29 → Mar 1)
+  let prevMonth = month - 1;
+  let prevYear = year;
+  if (prevMonth < 0) { prevMonth = 11; prevYear = year - 1; }
+  const start = new Date(prevYear, prevMonth, closeDay + 1, 0, 0, 0, 0);
+
+  return { start, end };
+}
