@@ -15,6 +15,8 @@ import {
   Clock,
   CreditCard,
   Settings,
+  ChevronDown,
+  ChevronRight,
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
 import { useState, useEffect } from 'react';
@@ -24,18 +26,26 @@ import { ThemeToggle } from './ThemeToggle';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
 
+type NavItem =
+  | { screen: AppScreen; label: string; icon: React.ReactNode; subItems?: never }
+  | { screen: 'settings'; label: string; icon: React.ReactNode; subItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] };
 
-const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
+const settingsSubItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
+  { screen: 'categories', label: 'Categorias', icon: <Tags className="h-4 w-4" /> },
+  { screen: 'recurrences', label: 'Recorrências', icon: <RefreshCw className="h-4 w-4" /> },
+  { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-4 w-4" /> },
+  { screen: 'import', label: 'Importar', icon: <Upload className="h-4 w-4" /> },
+  { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
+  { screen: 'scenarios', label: 'Cenários', icon: <Lightbulb className="h-4 w-4" /> },
+];
+
+const settingsSubScreens = settingsSubItems.map(i => i.screen);
+
+const navItems: NavItem[] = [
   { screen: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
   { screen: 'transactions', label: 'Lançamentos', icon: <Receipt className="h-5 w-5" /> },
   { screen: 'budget', label: 'Orçamento', icon: <Wallet className="h-5 w-5" /> },
-  { screen: 'categories', label: 'Categorias', icon: <Tags className="h-5 w-5" /> },
-  { screen: 'recurrences', label: 'Recorrências', icon: <RefreshCw className="h-5 w-5" /> },
-  { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-5 w-5" /> },
-  { screen: 'import', label: 'Importar', icon: <Upload className="h-5 w-5" /> },
-  { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-5 w-5" /> },
-  { screen: 'scenarios', label: 'Cenários', icon: <Lightbulb className="h-5 w-5" /> },
-  { screen: 'settings', label: 'Configurações', icon: <Settings className="h-5 w-5" /> },
+  { screen: 'settings', label: 'Configurações', icon: <Settings className="h-5 w-5" />, subItems: settingsSubItems },
 ];
 
 export function Sidebar() {
