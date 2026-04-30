@@ -35,6 +35,7 @@ const navItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = 
   { screen: 'import', label: 'Importar', icon: <Upload className="h-5 w-5" /> },
   { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-5 w-5" /> },
   { screen: 'scenarios', label: 'Cenários', icon: <Lightbulb className="h-5 w-5" /> },
+  { screen: 'settings', label: 'Configurações', icon: <Settings className="h-5 w-5" /> },
 ];
 
 export function Sidebar() {
