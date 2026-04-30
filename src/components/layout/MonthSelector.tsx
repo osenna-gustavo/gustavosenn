@@ -38,15 +38,16 @@ export function MonthSelector() {
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={handlePrevMonth}
-        className="h-8 w-8"
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </Button>
+    <div className="flex flex-col items-center gap-0.5">
+      <div className="flex items-center gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handlePrevMonth}
+          className="h-8 w-8"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </Button>
 
       <div className="flex items-center gap-1 min-w-[180px]">
         <Calendar className="h-4 w-4 text-primary" />
