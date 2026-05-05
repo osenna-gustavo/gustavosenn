@@ -31,6 +31,7 @@ type NavItem =
   | { screen: 'settings'; label: string; icon: React.ReactNode; subItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] };
 
 const settingsSubItems: { screen: AppScreen; label: string; icon: React.ReactNode }[] = [
+  { screen: 'settings', label: 'Geral', icon: <Settings className="h-4 w-4" /> },
   { screen: 'categories', label: 'Categorias', icon: <Tags className="h-4 w-4" /> },
   { screen: 'recurrences', label: 'Recorrências', icon: <RefreshCw className="h-4 w-4" /> },
   { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-4 w-4" /> },
