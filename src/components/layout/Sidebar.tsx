@@ -134,7 +134,7 @@ export function Sidebar() {
             <div className="mt-1 ml-3 pl-3 border-l border-border space-y-1">
               {item.subItems!.map(sub => (
                 <button
-                  key={sub.screen}
+                  key={`sub-${sub.screen}-${sub.label}`}
                   onClick={() => handleNavigation(sub.screen)}
                   className={cn(
                     "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200",
