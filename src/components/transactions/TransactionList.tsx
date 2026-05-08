@@ -90,11 +90,25 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
         if (!t || !t.id) return false;
         if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) return false;
         if (searchQuery) {
-          const query = searchQuery.toLowerCase();
+          const query = searchQuery.toLowerCase().trim();
           const category = categories.find(c => c.id === t.categoryId);
+
+          // Numeric search: extract digits from query (supports "29,90", "29.90", "2990", "R$ 29,90")
+          const normalizedNumeric = query.replace(/[^0-9,.\-]/g, '').replace(/\./g, '').replace(',', '.');
+          const queryNumber = normalizedNumeric ? parseFloat(normalizedNumeric) : NaN;
+          const amount = Math.abs(Number(t.amount) || 0);
+          let amountMatch = false;
+          if (!isNaN(queryNumber)) {
+            amountMatch =
+              Math.abs(amount - queryNumber) < 0.005 ||
+              amount.toFixed(2).includes(normalizedNumeric) ||
+              String(Math.round(amount * 100)).includes(normalizedNumeric.replace('.', ''));
+          }
+
           return (
             t.description?.toLowerCase().includes(query) ||
-            category?.name.toLowerCase().includes(query)
+            category?.name.toLowerCase().includes(query) ||
+            amountMatch
           );
         }
         return true;
