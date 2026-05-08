@@ -10,6 +10,7 @@ import type {
   AppScreen
 } from '@/types/finance';
 import * as db from '@/lib/supabase-database';
+import { supabase } from '@/integrations/supabase/client';
 import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 
@@ -101,7 +102,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   });
 
-  const setBillingCloseDay = useCallback((day: number | null) => {
+  const setBillingCloseDay = useCallback(async (day: number | null) => {
     setBillingCloseDayState(day);
     try {
       if (day === null) {
@@ -110,7 +111,69 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         localStorage.setItem(BILLING_CLOSE_DAY_KEY, String(day));
       }
     } catch { /* ignore */ }
-  }, []);
+
+    // Persist to cloud so it stays consistent across devices/sessions
+    if (user) {
+      try {
+        await supabase
+          .from('user_settings')
+          .upsert(
+            { user_id: user.id, billing_close_day: day },
+            { onConflict: 'user_id' }
+          );
+      } catch (err) {
+        console.error('[AppContext] Failed to persist billing_close_day:', err);
+      }
+    }
+  }, [user]);
+
+  // Load billing_close_day from cloud when user logs in (cloud is source of truth)
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('user_settings')
+          .select('billing_close_day')
+          .eq('user_id', user.id)
+          .maybeSingle();
+        if (cancelled) return;
+        if (error) {
+          console.error('[AppContext] Failed to load user_settings:', error);
+          return;
+        }
+        if (data) {
+          const day = data.billing_close_day;
+          setBillingCloseDayState(day);
+          try {
+            if (day === null || day === undefined) {
+              localStorage.removeItem(BILLING_CLOSE_DAY_KEY);
+            } else {
+              localStorage.setItem(BILLING_CLOSE_DAY_KEY, String(day));
+            }
+          } catch { /* ignore */ }
+        } else {
+          // No row yet: if we have a local value, push it up so it's persisted
+          const local = localStorage.getItem(BILLING_CLOSE_DAY_KEY);
+          if (local !== null) {
+            const val = Number(local);
+            if (val >= 1 && val <= 28) {
+              await supabase
+                .from('user_settings')
+                .upsert(
+                  { user_id: user.id, billing_close_day: val },
+                  { onConflict: 'user_id' }
+                );
+            }
+          }
+        }
+      } catch (err) {
+        console.error('[AppContext] Error loading user_settings:', err);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [user]);
 
   const billingDateRange = useMemo(() => {
     if (!billingCloseDay) return null;
