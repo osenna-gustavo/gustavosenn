@@ -437,7 +437,9 @@ export function InstallmentsPage() {
                       const isActiveParcel = plan.isActive && currentNum >= 1 && currentNum <= total;
                       const instance = instancesByRecurrence.get(plan.id);
                       const isPaid = instance?.status === 'confirmed' && !!instance.linkedTransactionId;
-                      const paidCount = Math.max(0, Math.min(currentNum - 1, total)) + (isPaid && currentNum >= 1 && currentNum <= total ? 1 : 0);
+                      const paidCount = recurrenceInstances.filter(
+                        i => i.recurrenceId === plan.id && i.status === 'confirmed' && !!i.linkedTransactionId
+                      ).length;
                       const pct = Math.min(100, (paidCount / total) * 100);
                       const remaining = Math.max(0, total - paidCount);
                       const isBusy = payingId === plan.id;
