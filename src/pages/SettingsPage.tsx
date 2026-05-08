@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatDateShort } from '@/lib/formatters';
 import { Settings, CreditCard, Info, Check } from 'lucide-react';
