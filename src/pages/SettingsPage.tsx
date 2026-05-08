@@ -21,6 +21,11 @@ export function SettingsPage() {
     billingCloseDay !== null ? String(billingCloseDay) : '__none__'
   );
 
+  // Keep dropdown in sync when cloud value loads/changes
+  useEffect(() => {
+    setDraftDay(billingCloseDay !== null ? String(billingCloseDay) : '__none__');
+  }, [billingCloseDay]);
+
   const handleSave = () => {
     if (draftDay === '__none__' || draftDay === '') {
       setBillingCloseDay(null);
