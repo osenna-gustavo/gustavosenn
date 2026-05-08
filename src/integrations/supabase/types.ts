@@ -918,6 +918,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_settings: {
+        Row: {
+          billing_close_day: number | null
+          created_at: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          billing_close_day?: number | null
+          created_at?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          billing_close_day?: number | null
+          created_at?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
