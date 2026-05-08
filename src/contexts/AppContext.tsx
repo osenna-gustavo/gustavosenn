@@ -10,6 +10,7 @@ import type {
   AppScreen
 } from '@/types/finance';
 import * as db from '@/lib/supabase-database';
+import { supabase } from '@/integrations/supabase/client';
 import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 
