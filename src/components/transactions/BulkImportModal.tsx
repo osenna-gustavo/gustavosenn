@@ -655,14 +655,9 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                               ))}
                             </SelectContent>
                           </Select>
-                          {item.matchedRecurrence && !item.matchedInstance && (
-                            <p className="text-xs text-warning mt-1">
-                              ⚠ Sem instância pendente para {selectedMonth}/{selectedYear}.
-                            </p>
-                          )}
-                          {item.matchedRecurrence && item.matchedInstance && (
+                          {item.matchedRecurrence && (
                             <p className="text-xs text-info mt-1">
-                              ✓ A recorrência será marcada como confirmada ao importar.
+                              ✓ A recorrência/parcela será marcada como paga ao importar.
                             </p>
                           )}
                         </div>
