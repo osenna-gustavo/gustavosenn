@@ -188,6 +188,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const calculateMonthSummary = useCallback((
     cats: Category[],
+    subs: Subcategory[],
     trans: Transaction[],
     budg: Budget | null,
     recs: Recurrence[],
