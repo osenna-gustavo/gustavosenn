@@ -218,6 +218,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
   const {
     categories, subcategories, addTransaction, transactions,
     recurrences, recurrenceInstances, selectedMonth, selectedYear,
+    linkTransactionsToRecurrence,
   } = useApp();
   const { toast } = useToast();
 
