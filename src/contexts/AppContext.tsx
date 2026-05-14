@@ -13,6 +13,7 @@ import * as db from '@/lib/supabase-database';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
+import { computeRealized } from '@/lib/category-summary';
 
 const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
