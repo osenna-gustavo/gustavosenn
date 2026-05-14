@@ -135,7 +135,7 @@ function applyLearnedRecurrenceMappings(
   instances: RecurrenceInstance[],
   month: number,
   year: number,
-): { recurrence: Recurrence; instance: RecurrenceInstance } | null {
+): { recurrence: Recurrence; instance?: RecurrenceInstance } | null {
   if (!suggestion.description) return null;
   for (const kw of extractKeywords(suggestion.description)) {
     const recurrenceId = recurrenceMappings[kw];
@@ -145,7 +145,7 @@ function applyLearnedRecurrenceMappings(
         const instance = instances.find(
           i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
         );
-        if (instance) return { recurrence: rec, instance };
+        return { recurrence: rec, instance };
       }
     }
   }
@@ -176,7 +176,7 @@ function matchRecurrence(
   instances: RecurrenceInstance[],
   month: number,
   year: number,
-): { recurrence: Recurrence; instance: RecurrenceInstance } | null {
+): { recurrence: Recurrence; instance?: RecurrenceInstance } | null {
   if (!suggestion.amount || !suggestion.description) return null;
   const descNorm = norm(suggestion.description);
 
@@ -191,7 +191,7 @@ function matchRecurrence(
     const instance = instances.find(
       i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
     );
-    if (instance) return { recurrence: rec, instance };
+    return { recurrence: rec, instance };
   }
   return null;
 }
