@@ -16,7 +16,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { parseBRLToNumber } from '@/lib/currencyInput';
 import { cn } from '@/lib/utils';
 import type { SuggestedTransaction, TransactionType, Transaction, Recurrence, RecurrenceInstance } from '@/types/finance';
-import { updateRecurrenceInstance } from '@/lib/supabase-database';
+
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
