@@ -16,7 +16,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { parseBRLToNumber } from '@/lib/currencyInput';
 import { cn } from '@/lib/utils';
 import type { SuggestedTransaction, TransactionType, Transaction, Recurrence, RecurrenceInstance } from '@/types/finance';
-import { updateRecurrenceInstance } from '@/lib/supabase-database';
+
 import { createWorker } from 'tesseract.js';
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -135,7 +135,7 @@ function applyLearnedRecurrenceMappings(
   instances: RecurrenceInstance[],
   month: number,
   year: number,
-): { recurrence: Recurrence; instance: RecurrenceInstance } | null {
+): { recurrence: Recurrence; instance?: RecurrenceInstance } | null {
   if (!suggestion.description) return null;
   for (const kw of extractKeywords(suggestion.description)) {
     const recurrenceId = recurrenceMappings[kw];
@@ -145,7 +145,7 @@ function applyLearnedRecurrenceMappings(
         const instance = instances.find(
           i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
         );
-        if (instance) return { recurrence: rec, instance };
+        return { recurrence: rec, instance };
       }
     }
   }
@@ -176,7 +176,7 @@ function matchRecurrence(
   instances: RecurrenceInstance[],
   month: number,
   year: number,
-): { recurrence: Recurrence; instance: RecurrenceInstance } | null {
+): { recurrence: Recurrence; instance?: RecurrenceInstance } | null {
   if (!suggestion.amount || !suggestion.description) return null;
   const descNorm = norm(suggestion.description);
 
@@ -191,7 +191,7 @@ function matchRecurrence(
     const instance = instances.find(
       i => i.recurrenceId === rec.id && i.month === month && i.year === year && i.status === 'pending',
     );
-    if (instance) return { recurrence: rec, instance };
+    return { recurrence: rec, instance };
   }
   return null;
 }
@@ -218,6 +218,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
   const {
     categories, subcategories, addTransaction, transactions,
     recurrences, recurrenceInstances, selectedMonth, selectedYear,
+    linkTransactionsToRecurrence,
   } = useApp();
   const { toast } = useToast();
 
@@ -363,6 +364,8 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
     let recMappings = loadRecurrenceMappings();
 
     try {
+      let linkedCount = 0;
+
       for (const item of toImport) {
         const newTx = await addTransaction({
           date: item.date || new Date(),
@@ -375,16 +378,21 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
           needsReview: item.needsReview,
         });
 
-        if (item.matchedInstance) {
+        // If user picked (or auto-match found) a recurrence/installment plan,
+        // link it. linkTransactionsToRecurrence reuses an existing pending
+        // instance for the month or creates a new "confirmed" one if none
+        // exists, AND writes recurrence_id/recurrence_instance_id on the
+        // transaction — so the Recurrences/Installments tab no longer
+        // offers "confirm again" for it.
+        if (item.matchedRecurrence) {
           try {
-            await updateRecurrenceInstance({
-              ...item.matchedInstance,
-              status: 'confirmed',
-              linkedTransactionId: newTx.id,
-            });
-          } catch { /* non-fatal */ }
-          if (item.description) {
-            recMappings = learnRecurrenceMapping(item.description, item.matchedInstance.recurrenceId, recMappings);
+            await linkTransactionsToRecurrence([newTx.id], item.matchedRecurrence.id);
+            linkedCount += 1;
+            if (item.description) {
+              recMappings = learnRecurrenceMapping(item.description, item.matchedRecurrence.id, recMappings);
+            }
+          } catch (err) {
+            console.error('[BulkImport] Falha ao vincular recorrência:', err);
           }
         }
 
@@ -396,12 +404,11 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
       saveMappings(mappings);
       saveRecurrenceMappings(recMappings);
 
-      const linkedCount = toImport.filter(i => i.matchedInstance).length;
       toast({
         title: 'Lançamentos criados!',
         description: [
           `${toImport.length} lançamento(s) adicionado(s).`,
-          linkedCount > 0 ? `${linkedCount} recorrência(s) marcada(s) como confirmada(s).` : '',
+          linkedCount > 0 ? `${linkedCount} recorrência(s)/parcelamento(s) marcado(s) como pago(s).` : '',
         ].filter(Boolean).join(' '),
       });
 
@@ -410,7 +417,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
     } catch {
       toast({ title: 'Erro ao criar lançamentos', description: 'Tente novamente.', variant: 'destructive' });
     }
-  }, [suggestions, addTransaction, onClose, toast]);
+  }, [suggestions, addTransaction, linkTransactionsToRecurrence, onClose, toast]);
 
   const handleReset = useCallback(() => {
     setSuggestions([]);
@@ -648,14 +655,9 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
                               ))}
                             </SelectContent>
                           </Select>
-                          {item.matchedRecurrence && !item.matchedInstance && (
-                            <p className="text-xs text-warning mt-1">
-                              ⚠ Sem instância pendente para {selectedMonth}/{selectedYear}.
-                            </p>
-                          )}
-                          {item.matchedRecurrence && item.matchedInstance && (
+                          {item.matchedRecurrence && (
                             <p className="text-xs text-info mt-1">
-                              ✓ A recorrência será marcada como confirmada ao importar.
+                              ✓ A recorrência/parcela será marcada como paga ao importar.
                             </p>
                           )}
                         </div>

@@ -13,6 +13,7 @@ import * as db from '@/lib/supabase-database';
 import { supabase } from '@/integrations/supabase/client';
 import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
+import { computeRealized } from '@/lib/category-summary';
 
 const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
@@ -187,6 +188,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const calculateMonthSummary = useCallback((
     cats: Category[],
+    subs: Subcategory[],
     trans: Transaction[],
     budg: Budget | null,
     recs: Recurrence[],
@@ -241,14 +243,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const plannedVariable = plannedExpenses - plannedFixed;
 
-    // Category breakdown
+    // Category breakdown — use centralized matching so the dashboard numbers
+    // are always equal to what the drill-down drawer shows for the same
+    // (categoryId, subcategoryId) pair.
     const categoryBreakdown = cats.map(cat => {
       const catBudget = budg?.categoryBudgets.find(cb => cb.categoryId === cat.id);
       const planned = catBudget?.plannedAmount ?? 0;
-      const realized = monthTransactions
-        .filter(t => t.type === 'despesa' && t.categoryId === cat.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      
+      const realized = computeRealized(
+        monthTransactions,
+        { categoryId: cat.id, type: 'despesa' },
+        cats,
+        subs,
+      );
+
       const percentage = planned > 0 ? (realized / planned) * 100 : (realized > 0 ? 100 : 0);
       let status: 'ok' | 'warning' | 'exceeded' = 'ok';
       if (percentage > 100) status = 'exceeded';
@@ -305,7 +312,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRecurrenceInstances(instances);
 
       const summary = calculateMonthSummary(
-        cats, trans, budg ?? null, recs, instances,
+        cats, subs, trans, budg ?? null, recs, instances,
         selectedMonth, selectedYear,
         billingDateRange ?? undefined
       );

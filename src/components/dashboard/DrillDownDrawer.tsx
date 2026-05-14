@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpRight, ArrowDownRight, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { transactionMatchesCategory } from '@/lib/category-summary';
 import type { Transaction, TransactionType } from '@/types/finance';
 
 export interface DrillDownFilter {
@@ -35,7 +36,7 @@ export function DrillDownDrawer({ isOpen, onClose, filter }: DrillDownDrawerProp
     // Filter by type
     if (filter.type === 'expenses' && t.type !== 'despesa') return false;
     if (filter.type === 'income' && t.type !== 'receita') return false;
-    
+
     // Filter by fixed/variable
     if (filter.type === 'fixed') {
       const category = categories.find(c => c.id === t.categoryId);
@@ -45,13 +46,18 @@ export function DrillDownDrawer({ isOpen, onClose, filter }: DrillDownDrawerProp
       const category = categories.find(c => c.id === t.categoryId);
       if (category?.isFixed || t.type !== 'despesa') return false;
     }
-    
-    // Filter by category
-    if (filter.categoryId && t.categoryId !== filter.categoryId) return false;
-    
-    // Filter by subcategory
-    if (filter.subcategoryId && t.subcategoryId !== filter.subcategoryId) return false;
-    
+
+    // Filter by category/subcategory using the same normalization the
+    // dashboard uses, so the drawer always matches the card numbers.
+    if (filter.categoryId || filter.subcategoryId) {
+      if (!transactionMatchesCategory(
+        t,
+        { categoryId: filter.categoryId, subcategoryId: filter.subcategoryId },
+        categories,
+        subcategories,
+      )) return false;
+    }
+
     return true;
   }).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : [];
 

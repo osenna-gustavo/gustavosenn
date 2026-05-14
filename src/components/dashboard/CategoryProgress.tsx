@@ -4,6 +4,7 @@ import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { computeRealized } from '@/lib/category-summary';
 import type { DrillDownFilter } from './DrillDownDrawer';
 
 const INITIAL_LIMIT = 8;
@@ -63,10 +64,13 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
     .map(cat => {
       const catBudgets = budget?.categoryBudgets.filter(cb => cb.categoryId === cat.id) ?? [];
       const planned = catBudgets.reduce((sum, cb) => sum + cb.plannedAmount, 0);
-      const realized = monthTransactions
-        .filter(t => t.type === 'despesa' && t.categoryId === cat.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      
+      const realized = computeRealized(
+        monthTransactions,
+        { categoryId: cat.id, type: 'despesa' },
+        categories,
+        allSubcategories,
+      );
+
       const percentage = planned > 0 ? (realized / planned) * 100 : (realized > 0 ? 100 : 0);
       let status: 'ok' | 'warning' | 'exceeded' = 'ok';
       if (percentage > 100) status = 'exceeded';
@@ -79,10 +83,13 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
           const subPlanned = catBudgets
             .filter(cb => cb.subcategoryId === sub.id)
             .reduce((sum, cb) => sum + cb.plannedAmount, 0);
-          const subRealized = monthTransactions
-            .filter(t => t.type === 'despesa' && t.subcategoryId === sub.id)
-            .reduce((sum, t) => sum + t.amount, 0);
-          
+          const subRealized = computeRealized(
+            monthTransactions,
+            { categoryId: cat.id, subcategoryId: sub.id, type: 'despesa' },
+            categories,
+            allSubcategories,
+          );
+
           const subPercentage = subPlanned > 0 ? (subRealized / subPlanned) * 100 : (subRealized > 0 ? 100 : 0);
           let subStatus: 'ok' | 'warning' | 'exceeded' = 'ok';
           if (subPercentage > 100) subStatus = 'exceeded';
