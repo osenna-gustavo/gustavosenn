@@ -312,7 +312,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRecurrenceInstances(instances);
 
       const summary = calculateMonthSummary(
-        cats, trans, budg ?? null, recs, instances,
+        cats, subs, trans, budg ?? null, recs, instances,
         selectedMonth, selectedYear,
         billingDateRange ?? undefined
       );
