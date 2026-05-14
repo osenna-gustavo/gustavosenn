@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpRight, ArrowDownRight, ExternalLink, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { transactionMatchesCategory } from '@/lib/category-summary';
 import type { Transaction, TransactionType } from '@/types/finance';
 
 export interface DrillDownFilter {
