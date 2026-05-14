@@ -243,14 +243,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const plannedVariable = plannedExpenses - plannedFixed;
 
-    // Category breakdown
+    // Category breakdown — use centralized matching so the dashboard numbers
+    // are always equal to what the drill-down drawer shows for the same
+    // (categoryId, subcategoryId) pair.
     const categoryBreakdown = cats.map(cat => {
       const catBudget = budg?.categoryBudgets.find(cb => cb.categoryId === cat.id);
       const planned = catBudget?.plannedAmount ?? 0;
-      const realized = monthTransactions
-        .filter(t => t.type === 'despesa' && t.categoryId === cat.id)
-        .reduce((sum, t) => sum + t.amount, 0);
-      
+      const realized = computeRealized(
+        monthTransactions,
+        { categoryId: cat.id, type: 'despesa' },
+        cats,
+        subs,
+      );
+
       const percentage = planned > 0 ? (realized / planned) * 100 : (realized > 0 ? 100 : 0);
       let status: 'ok' | 'warning' | 'exceeded' = 'ok';
       if (percentage > 100) status = 'exceeded';
