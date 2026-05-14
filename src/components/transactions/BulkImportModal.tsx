@@ -364,6 +364,8 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
     let recMappings = loadRecurrenceMappings();
 
     try {
+      let linkedCount = 0;
+
       for (const item of toImport) {
         const newTx = await addTransaction({
           date: item.date || new Date(),
@@ -376,16 +378,21 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
           needsReview: item.needsReview,
         });
 
-        if (item.matchedInstance) {
+        // If user picked (or auto-match found) a recurrence/installment plan,
+        // link it. linkTransactionsToRecurrence reuses an existing pending
+        // instance for the month or creates a new "confirmed" one if none
+        // exists, AND writes recurrence_id/recurrence_instance_id on the
+        // transaction — so the Recurrences/Installments tab no longer
+        // offers "confirm again" for it.
+        if (item.matchedRecurrence) {
           try {
-            await updateRecurrenceInstance({
-              ...item.matchedInstance,
-              status: 'confirmed',
-              linkedTransactionId: newTx.id,
-            });
-          } catch { /* non-fatal */ }
-          if (item.description) {
-            recMappings = learnRecurrenceMapping(item.description, item.matchedInstance.recurrenceId, recMappings);
+            await linkTransactionsToRecurrence([newTx.id], item.matchedRecurrence.id);
+            linkedCount += 1;
+            if (item.description) {
+              recMappings = learnRecurrenceMapping(item.description, item.matchedRecurrence.id, recMappings);
+            }
+          } catch (err) {
+            console.error('[BulkImport] Falha ao vincular recorrência:', err);
           }
         }
 
@@ -397,12 +404,11 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
       saveMappings(mappings);
       saveRecurrenceMappings(recMappings);
 
-      const linkedCount = toImport.filter(i => i.matchedInstance).length;
       toast({
         title: 'Lançamentos criados!',
         description: [
           `${toImport.length} lançamento(s) adicionado(s).`,
-          linkedCount > 0 ? `${linkedCount} recorrência(s) marcada(s) como confirmada(s).` : '',
+          linkedCount > 0 ? `${linkedCount} recorrência(s)/parcelamento(s) marcado(s) como pago(s).` : '',
         ].filter(Boolean).join(' '),
       });
 
@@ -411,7 +417,7 @@ export function BulkImportModal({ isOpen, onClose }: BulkImportModalProps) {
     } catch {
       toast({ title: 'Erro ao criar lançamentos', description: 'Tente novamente.', variant: 'destructive' });
     }
-  }, [suggestions, addTransaction, onClose, toast]);
+  }, [suggestions, addTransaction, linkTransactionsToRecurrence, onClose, toast]);
 
   const handleReset = useCallback(() => {
     setSuggestions([]);
