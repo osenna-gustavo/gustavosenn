@@ -211,6 +211,28 @@ export function InstallmentsPage() {
     return map;
   }, [recurrenceInstances, selectedMonth, selectedYear]);
 
+  // Total de parcelas pagas por parcelamento, considerando TODOS os meses
+  // (não apenas o mês selecionado, que é o único carregado em recurrenceInstances).
+  const [paidCountByPlan, setPaidCountByPlan] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('recurrence_instances')
+        .select('recurrence_id')
+        .eq('status', 'confirmed')
+        .not('linked_transaction_id', 'is', null);
+      if (error || cancelled) return;
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((row: { recurrence_id: string }) => {
+        counts[row.recurrence_id] = (counts[row.recurrence_id] ?? 0) + 1;
+      });
+      setPaidCountByPlan(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [recurrenceInstances]);
+
   const [payingId, setPayingId] = useState<string | null>(null);
 
   const handlePayInstallment = async (plan: Recurrence) => {
