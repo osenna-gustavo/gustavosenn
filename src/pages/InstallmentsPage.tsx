@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
