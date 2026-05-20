@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useApp } from '@/contexts/AppContext';
+import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -209,6 +210,28 @@ export function InstallmentsPage() {
     });
     return map;
   }, [recurrenceInstances, selectedMonth, selectedYear]);
+
+  // Total de parcelas pagas por parcelamento, considerando TODOS os meses
+  // (não apenas o mês selecionado, que é o único carregado em recurrenceInstances).
+  const [paidCountByPlan, setPaidCountByPlan] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error } = await supabase
+        .from('recurrence_instances')
+        .select('recurrence_id')
+        .eq('status', 'confirmed')
+        .not('linked_transaction_id', 'is', null);
+      if (error || cancelled) return;
+      const counts: Record<string, number> = {};
+      (data ?? []).forEach((row: { recurrence_id: string }) => {
+        counts[row.recurrence_id] = (counts[row.recurrence_id] ?? 0) + 1;
+      });
+      setPaidCountByPlan(counts);
+    })();
+    return () => { cancelled = true; };
+  }, [recurrenceInstances]);
 
   const [payingId, setPayingId] = useState<string | null>(null);
 
@@ -437,9 +460,7 @@ export function InstallmentsPage() {
                       const isActiveParcel = plan.isActive && currentNum >= 1 && currentNum <= total;
                       const instance = instancesByRecurrence.get(plan.id);
                       const isPaid = instance?.status === 'confirmed' && !!instance.linkedTransactionId;
-                      const paidCount = recurrenceInstances.filter(
-                        i => i.recurrenceId === plan.id && i.status === 'confirmed' && !!i.linkedTransactionId
-                      ).length;
+                      const paidCount = paidCountByPlan[plan.id] ?? 0;
                       const pct = Math.min(100, (paidCount / total) * 100);
                       const remaining = Math.max(0, total - paidCount);
                       const isBusy = payingId === plan.id;
