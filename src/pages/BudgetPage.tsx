@@ -286,7 +286,7 @@ export function BudgetPage() {
           <CurrencyInput
             id="income"
             value={plannedIncome}
-            onChange={setPlannedIncome}
+            onChange={updatePlannedIncome}
             className="mt-2 text-lg border-success/30 focus:border-success"
           />
         </div>
@@ -297,7 +297,7 @@ export function BudgetPage() {
           <CurrencyInput
             id="expenses"
             value={plannedExpenses}
-            onChange={setPlannedExpenses}
+            onChange={updatePlannedExpenses}
             className="mt-2 text-lg border-destructive/30 focus:border-destructive"
           />
           <p className="text-xs text-muted-foreground mt-2">
@@ -420,8 +420,8 @@ export function BudgetPage() {
                 subcategories={subcategories}
                 categoryBudgets={categoryBudgets}
                 subcategoryBudgets={subcategoryBudgets}
-                onCategoryChange={(id, value) => setCategoryBudgets(prev => ({ ...prev, [id]: value }))}
-                onSubcategoryChange={(id, value) => setSubcategoryBudgets(prev => ({ ...prev, [id]: value }))}
+                onCategoryChange={updateCategoryBudget}
+                onSubcategoryChange={updateSubcategoryBudget}
                 realizedByCategory={realizedByCategory}
                 realizedBySubcategory={realizedBySubcategory}
               />
