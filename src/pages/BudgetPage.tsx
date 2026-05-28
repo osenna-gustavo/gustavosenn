@@ -138,6 +138,7 @@ export function BudgetPage() {
       }
     });
 
+    setIsDirty(true);
     setCategoryBudgets(newCatBudgets);
     setSubcategoryBudgets(newSubBudgets);
 
