@@ -33,14 +33,31 @@ export function BudgetPage() {
   const [categoryBudgets, setCategoryBudgets] = useState<Record<string, string>>({});
   const [subcategoryBudgets, setSubcategoryBudgets] = useState<Record<string, string>>({});
   const [isSaving, setIsSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showApplyRecurrencesModal, setShowApplyRecurrencesModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
   const [showInstallments, setShowInstallments] = useState(true);
 
-  // Initialize from budget AND ensure all categories are represented
+  // Wrapped setters that mark form as dirty (user has unsaved edits)
+  const updateCategoryBudget = (id: string, value: string) => {
+    setIsDirty(true);
+    setCategoryBudgets(prev => ({ ...prev, [id]: value }));
+  };
+  const updateSubcategoryBudget = (id: string, value: string) => {
+    setIsDirty(true);
+    setSubcategoryBudgets(prev => ({ ...prev, [id]: value }));
+  };
+  const updatePlannedIncome = (v: string) => { setIsDirty(true); setPlannedIncome(v); };
+  const updatePlannedExpenses = (v: string) => { setIsDirty(true); setPlannedExpenses(v); };
+
+  // Initialize from budget AND ensure all categories are represented.
+  // IMPORTANT: only re-sync from server when the user has no unsaved edits,
+  // otherwise background refreshes (recurrences sync, realtime, etc.) would
+  // wipe out the values the user is typing.
   useEffect(() => {
-    // Set income/expenses from budget
+    if (isDirty) return;
+
     if (budget) {
       setPlannedIncome(budget.plannedIncome > 0 ? formatNumberToBRL(budget.plannedIncome) : '');
       setPlannedExpenses(budget.plannedExpenses > 0 ? formatNumberToBRL(budget.plannedExpenses) : '');
@@ -48,23 +65,17 @@ export function BudgetPage() {
       setPlannedIncome('');
       setPlannedExpenses('');
     }
-    
-    // Initialize ALL expense categories with budget values or empty
+
     const catBudgets: Record<string, string> = {};
     const subBudgets: Record<string, string> = {};
-    
-    // First, initialize all expense categories with empty values
-    const expenseCats = categories.filter(c => c.type === 'despesa');
-    expenseCats.forEach(cat => {
+
+    categories.filter(c => c.type === 'despesa').forEach(cat => {
       catBudgets[cat.id] = '';
     });
-    
-    // Initialize all subcategories with empty values
     subcategories.forEach(sub => {
       subBudgets[sub.id] = '';
     });
-    
-    // Then overlay with budget values if they exist
+
     if (budget) {
       budget.categoryBudgets.forEach(cb => {
         if (cb.subcategoryId) {
@@ -74,10 +85,15 @@ export function BudgetPage() {
         }
       });
     }
-    
+
     setCategoryBudgets(catBudgets);
     setSubcategoryBudgets(subBudgets);
-  }, [budget, categories, subcategories, selectedMonth, selectedYear]);
+  }, [budget, categories, subcategories, isDirty]);
+
+  // Reset dirty flag when user switches month/year (load fresh data from server)
+  useEffect(() => {
+    setIsDirty(false);
+  }, [selectedMonth, selectedYear]);
 
   // Calculate realized amounts
   const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
@@ -122,6 +138,7 @@ export function BudgetPage() {
       }
     });
 
+    setIsDirty(true);
     setCategoryBudgets(newCatBudgets);
     setSubcategoryBudgets(newSubBudgets);
 
@@ -186,6 +203,7 @@ export function BudgetPage() {
         categoryBudgets: categoryBudgetsArray,
       });
 
+      setIsDirty(false);
       toast({
         title: 'Orçamento salvo!',
         description: `Orçamento de ${formatMonthYear(selectedMonth, selectedYear)} atualizado.`,
@@ -219,6 +237,7 @@ export function BudgetPage() {
       }
     });
     
+    setIsDirty(true);
     setCategoryBudgets(newCatBudgets);
     setSubcategoryBudgets(newSubBudgets);
     
@@ -267,7 +286,7 @@ export function BudgetPage() {
           <CurrencyInput
             id="income"
             value={plannedIncome}
-            onChange={setPlannedIncome}
+            onChange={updatePlannedIncome}
             className="mt-2 text-lg border-success/30 focus:border-success"
           />
         </div>
@@ -278,7 +297,7 @@ export function BudgetPage() {
           <CurrencyInput
             id="expenses"
             value={plannedExpenses}
-            onChange={setPlannedExpenses}
+            onChange={updatePlannedExpenses}
             className="mt-2 text-lg border-destructive/30 focus:border-destructive"
           />
           <p className="text-xs text-muted-foreground mt-2">
@@ -401,8 +420,8 @@ export function BudgetPage() {
                 subcategories={subcategories}
                 categoryBudgets={categoryBudgets}
                 subcategoryBudgets={subcategoryBudgets}
-                onCategoryChange={(id, value) => setCategoryBudgets(prev => ({ ...prev, [id]: value }))}
-                onSubcategoryChange={(id, value) => setSubcategoryBudgets(prev => ({ ...prev, [id]: value }))}
+                onCategoryChange={updateCategoryBudget}
+                onSubcategoryChange={updateSubcategoryBudget}
                 realizedByCategory={realizedByCategory}
                 realizedBySubcategory={realizedBySubcategory}
               />
