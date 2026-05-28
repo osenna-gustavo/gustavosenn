@@ -202,6 +202,7 @@ export function BudgetPage() {
         categoryBudgets: categoryBudgetsArray,
       });
 
+      setIsDirty(false);
       toast({
         title: 'Orçamento salvo!',
         description: `Orçamento de ${formatMonthYear(selectedMonth, selectedYear)} atualizado.`,
