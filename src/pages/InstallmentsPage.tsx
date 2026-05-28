@@ -465,6 +465,24 @@ export function InstallmentsPage() {
                       const remaining = Math.max(0, total - paidCount);
                       const isBusy = payingId === plan.id;
 
+                      // Due date of the current month's installment (clamped to month length)
+                      const dueDay = startDate.getDate();
+                      const lastDayCurrent = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+                      const currentDueDate = new Date(
+                        selectedYear,
+                        selectedMonth,
+                        Math.min(dueDay, lastDayCurrent)
+                      );
+                      // End date of the plan (last installment)
+                      const endMonthIdx = startDate.getMonth() + total - 1;
+                      const endYear = startDate.getFullYear() + Math.floor(endMonthIdx / 12);
+                      const endMonth = ((endMonthIdx % 12) + 12) % 12;
+                      const lastDayEnd = new Date(endYear, endMonth + 1, 0).getDate();
+                      const endDate = new Date(endYear, endMonth, Math.min(dueDay, lastDayEnd));
+
+                      const fmtDate = (d: Date) =>
+                        d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
                       return (
                         <div
                           key={plan.id}
@@ -493,7 +511,7 @@ export function InstallmentsPage() {
                               <span className="font-medium truncate">{plan.name}</span>
                               {isActiveParcel && (
                                 <Badge variant="secondary" className="text-xs shrink-0">
-                                  parcela {currentNum}/{total}
+                                  parcela {currentNum}/{total} • venc. {fmtDate(currentDueDate)}
                                 </Badge>
                               )}
                               {isActiveParcel && isPaid && (
@@ -523,6 +541,9 @@ export function InstallmentsPage() {
                               {remaining > 0
                                 ? `${remaining} parcela(s) restante(s)`
                                 : 'Concluído'}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-0.5">
+                              Início: {fmtDate(startDate)} • Término: {fmtDate(endDate)}
                             </div>
                             <div className="mt-2 space-y-1">
                               <Progress value={pct} className="h-1.5" />
