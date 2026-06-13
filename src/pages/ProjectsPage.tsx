@@ -261,13 +261,6 @@ export function ProjectsPage() {
             <Button variant="ghost" size="icon" onClick={() => setActiveProject(null)}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
-    return (
-      <div className="space-y-6 animate-fade-in">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-4 min-w-0">
-            <Button variant="ghost" size="icon" onClick={() => setActiveProject(null)}>
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-2xl lg:text-3xl font-bold truncate">{activeProject.name}</h1>
