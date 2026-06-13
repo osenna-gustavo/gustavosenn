@@ -104,6 +104,7 @@ export interface Project {
   description?: string;
   status: 'planning' | 'in_progress' | 'completed' | 'archived';
   items: ProjectItem[];
+  position: number;
   createdAt: Date;
 }
 

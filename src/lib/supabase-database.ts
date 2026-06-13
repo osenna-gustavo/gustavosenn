@@ -671,6 +671,7 @@ export async function getProjects(): Promise<Project[]> {
     .from('projects')
     .select('*')
     .eq('user_id', userId)
+    .order('position', { ascending: true })
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -681,6 +682,7 @@ export async function getProjects(): Promise<Project[]> {
     description: p.description || undefined,
     status: p.status as Project['status'],
     items: (p.items as any[]) || [],
+    position: p.position ?? 0,
     createdAt: new Date(p.created_at!),
   }));
 }
@@ -696,6 +698,7 @@ export async function addProject(project: Omit<Project, 'id' | 'createdAt'>): Pr
       description: project.description || null,
       status: project.status,
       items: JSON.parse(JSON.stringify(project.items)),
+      position: project.position,
     })
     .select()
     .single();
@@ -708,6 +711,7 @@ export async function addProject(project: Omit<Project, 'id' | 'createdAt'>): Pr
     description: data.description || undefined,
     status: data.status as Project['status'],
     items: (data.items as any[]) || [],
+    position: data.position ?? 0,
     createdAt: new Date(data.created_at!),
   };
 }
@@ -720,6 +724,7 @@ export async function updateProject(project: Project): Promise<void> {
       description: project.description || null,
       status: project.status,
       items: JSON.parse(JSON.stringify(project.items)),
+      position: project.position,
     })
     .eq('id', project.id);
 
@@ -733,6 +738,17 @@ export async function deleteProject(id: string): Promise<void> {
     .eq('id', id);
 
   if (error) throw error;
+}
+
+export async function reorderProjects(updates: { id: string; position: number }[]): Promise<void> {
+  for (const { id, position } of updates) {
+    const { error } = await supabase
+      .from('projects')
+      .update({ position })
+      .eq('id', id);
+
+    if (error) throw error;
+  }
 }
 
 // ==================== IMPORT BATCHES ====================

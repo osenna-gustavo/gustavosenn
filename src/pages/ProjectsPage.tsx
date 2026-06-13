@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type DragEvent } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { FolderKanban, Plus, ArrowLeft, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,6 +40,8 @@ export function ProjectsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
 
   const [showItemForm, setShowItemForm] = useState(false);
+  const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -75,7 +77,8 @@ export function ProjectsPage() {
         if (activeProject?.id === updated.id) setActiveProject(updated);
         toast.success('Projeto atualizado!');
       } else {
-        const newProject = await db.addProject({ ...data, items: [] });
+        const position = projects.length > 0 ? Math.min(...projects.map(p => p.position)) - 1 : 0;
+        const newProject = await db.addProject({ ...data, items: [], position });
         setProjects(prev => [newProject, ...prev]);
         toast.success('Projeto criado!');
       }
@@ -103,6 +106,44 @@ export function ProjectsPage() {
   const openEditModal = (project: Project) => {
     setEditingProject(project);
     setShowFormModal(true);
+  };
+
+  // ===== Drag-and-drop reordering =====
+
+  const handleDragStart = (index: number) => {
+    setDragIndex(index);
+  };
+
+  const handleDragOver = (e: DragEvent, index: number) => {
+    e.preventDefault();
+    if (dragOverIndex !== index) setDragOverIndex(index);
+  };
+
+  const handleDragEnd = () => {
+    setDragIndex(null);
+    setDragOverIndex(null);
+  };
+
+  const handleDrop = async (e: DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (dragIndex === null || dragIndex === dropIndex) {
+      handleDragEnd();
+      return;
+    }
+
+    const reordered = [...projects];
+    const [moved] = reordered.splice(dragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+
+    const withPositions = reordered.map((p, i) => ({ ...p, position: i }));
+    setProjects(withPositions);
+    handleDragEnd();
+
+    try {
+      await db.reorderProjects(withPositions.map(p => ({ id: p.id, position: p.position })));
+    } catch (error) {
+      toast.error('Erro ao salvar a nova ordem dos projetos');
+    }
   };
 
   // ===== Item operations =====
@@ -302,13 +343,20 @@ export function ProjectsPage() {
         </Card>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {projects.map(project => (
+          {projects.map((project, index) => (
             <ProjectCard
               key={project.id}
               project={project}
               onOpen={() => setActiveProject(project)}
               onEdit={() => openEditModal(project)}
               onDelete={() => setDeleteId(project.id)}
+              draggable
+              isDragging={dragIndex === index}
+              isDragOver={dragOverIndex === index && dragIndex !== null && dragIndex !== index}
+              onDragStart={() => handleDragStart(index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
             />
           ))}
           <Card
