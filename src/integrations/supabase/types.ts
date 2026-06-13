@@ -690,44 +690,32 @@ export type Database = {
         }
         Relationships: []
       }
-      scenarios: {
+      projects: {
         Row: {
-          baseline_month: number
-          baseline_type: string
-          baseline_year: number
-          category_adjustments: Json | null
           created_at: string | null
+          description: string | null
           id: string
-          minimum_balance: number | null
-          monthly_commitments: Json | null
+          items: Json | null
           name: string
-          one_time_costs: Json | null
+          status: string
           user_id: string
         }
         Insert: {
-          baseline_month: number
-          baseline_type: string
-          baseline_year: number
-          category_adjustments?: Json | null
           created_at?: string | null
+          description?: string | null
           id?: string
-          minimum_balance?: number | null
-          monthly_commitments?: Json | null
+          items?: Json | null
           name: string
-          one_time_costs?: Json | null
+          status?: string
           user_id: string
         }
         Update: {
-          baseline_month?: number
-          baseline_type?: string
-          baseline_year?: number
-          category_adjustments?: Json | null
           created_at?: string | null
+          description?: string | null
           id?: string
-          minimum_balance?: number | null
-          monthly_commitments?: Json | null
+          items?: Json | null
           name?: string
-          one_time_costs?: Json | null
+          status?: string
           user_id?: string
         }
         Relationships: []

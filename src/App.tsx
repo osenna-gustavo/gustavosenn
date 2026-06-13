@@ -13,7 +13,7 @@ import { RecurrencesPage } from '@/pages/RecurrencesPage';
 import { InstallmentsPage } from '@/pages/InstallmentsPage';
 import { ImportPage } from '@/pages/ImportPage';
 import { ReportsPage } from '@/pages/ReportsPage';
-import { ScenariosPage } from '@/pages/ScenariosPage';
+import { ProjectsPage } from '@/pages/ProjectsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AuthPage } from '@/pages/AuthPage';
 import { TransactionsErrorBoundary } from '@/components/transactions/TransactionsErrorBoundary';
@@ -42,7 +42,7 @@ function AppContent() {
       case 'installments': return <InstallmentsPage />;
       case 'import': return <ImportPage />;
       case 'reports': return <ReportsPage />;
-      case 'scenarios': return <ScenariosPage />;
+      case 'projects': return <ProjectsPage />;
       case 'settings': return <SettingsPage />;
       default: return <DashboardPage />;
     }
@@ -88,7 +88,6 @@ function AuthenticatedApp() {
         const localTransactions = await localDb.getAllTransactions();
         const localBudgets = await localDb.getAllBudgets();
         const localRecurrences = await localDb.getRecurrences();
-        const localScenarios = await localDb.getScenarios();
 
         // Import supabase database functions
         const supabaseDb = await import('@/lib/supabase-database');
@@ -194,36 +193,6 @@ function AuthenticatedApp() {
             } catch (error) {
               console.warn('Error migrating recurrence:', rec.name, error);
             }
-          }
-        }
-
-        // Migrate scenarios
-        for (const scenario of localScenarios) {
-          try {
-            await supabaseDb.addScenario({
-              name: scenario.name,
-              baselineType: scenario.baselineType,
-              baselineMonth: scenario.baselineMonth,
-              baselineYear: scenario.baselineYear,
-              monthlyCommitments: scenario.monthlyCommitments.map(c => ({
-                ...c,
-                categoryId: categoryIdMap[c.categoryId] || c.categoryId,
-                subcategoryId: c.subcategoryId ? subcategoryIdMap[c.subcategoryId] : undefined,
-              })),
-              oneTimeCosts: scenario.oneTimeCosts.map(c => ({
-                ...c,
-                categoryId: categoryIdMap[c.categoryId] || c.categoryId,
-                subcategoryId: c.subcategoryId ? subcategoryIdMap[c.subcategoryId] : undefined,
-              })),
-              categoryAdjustments: scenario.categoryAdjustments.map(a => ({
-                ...a,
-                categoryId: categoryIdMap[a.categoryId] || a.categoryId,
-                subcategoryId: a.subcategoryId ? subcategoryIdMap[a.subcategoryId] : undefined,
-              })),
-              minimumBalance: scenario.minimumBalance,
-            });
-          } catch (error) {
-            console.warn('Error migrating scenario:', scenario.name, error);
           }
         }
 

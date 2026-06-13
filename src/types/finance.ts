@@ -98,54 +98,30 @@ export interface SuggestedTransaction {
   rawText?: string;
 }
 
-export interface Scenario {
+export interface Project {
   id: string;
   name: string;
-  baselineType: 'planned' | 'realized' | 'average';
-  baselineMonth: number;
-  baselineYear: number;
-  monthlyCommitments: ScenarioCommitment[];
-  oneTimeCosts: ScenarioOneTimeCost[];
-  categoryAdjustments: ScenarioCategoryAdjustment[];
-  minimumBalance: number;
+  description?: string;
+  status: 'planning' | 'in_progress' | 'completed' | 'archived';
+  items: ProjectItem[];
   createdAt: Date;
 }
 
-export interface ScenarioCommitment {
+export interface ProjectItem {
   id: string;
   name: string;
-  amount: number;
-  categoryId: string;
-  subcategoryId?: string;
-  isFixed: boolean;
+  notes?: string;
+  options: ProjectSupplierOption[];
+  selectedOptionId?: string;
 }
 
-export interface ScenarioOneTimeCost {
+export interface ProjectSupplierOption {
   id: string;
-  name: string;
-  amount: number;
-  categoryId: string;
-  subcategoryId?: string;
-  impactMonth: number;
-  impactYear: number;
-}
-
-export interface ScenarioCategoryAdjustment {
-  categoryId: string;
-  subcategoryId?: string;
-  adjustedAmount: number;
-}
-
-export interface ScenarioModification {
-  id: string;
-  type: 'monthly_commitment' | 'one_time_cost' | 'budget_adjustment';
-  name: string;
-  amount: number;
-  categoryId: string;
-  subcategoryId?: string;
-  isFixed: boolean;
-  impactMonth?: number;
-  impactYear?: number;
+  supplierName: string;
+  price: number;
+  deliveryTime?: string;
+  link?: string;
+  notes?: string;
 }
 
 export interface MonthSummary {
@@ -184,5 +160,5 @@ export type AppScreen =
   | 'installments'
   | 'import'
   | 'reports'
-  | 'scenarios'
+  | 'projects'
   | 'settings';

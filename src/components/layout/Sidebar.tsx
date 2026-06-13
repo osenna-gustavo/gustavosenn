@@ -8,7 +8,7 @@ import {
   RefreshCw,
   Upload,
   BarChart3,
-  Lightbulb,
+  FolderKanban,
   Menu,
   X,
   LogOut,
@@ -37,7 +37,7 @@ const settingsSubItems: { screen: AppScreen; label: string; icon: React.ReactNod
   { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-4 w-4" /> },
   { screen: 'import', label: 'Importar', icon: <Upload className="h-4 w-4" /> },
   { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
-  { screen: 'scenarios', label: 'Cenários', icon: <Lightbulb className="h-4 w-4" /> },
+  { screen: 'projects', label: 'Projetos', icon: <FolderKanban className="h-4 w-4" /> },
 ];
 
 const settingsSubScreens = settingsSubItems.map(i => i.screen);

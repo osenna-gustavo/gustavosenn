@@ -44,10 +44,6 @@ export function MigrationModal({ isOpen, onClose, onMigrationComplete }: Migrati
       setStatus('Lendo recorrências locais...');
       setProgress(25);
       const localRecurrences = await localDb.getRecurrences();
-      
-      setStatus('Lendo cenários locais...');
-      setProgress(30);
-      const localScenarios = await localDb.getScenarios();
 
       // Maps from old ID to new ID
       const categoryIdMap: Record<string, string> = {};
@@ -161,38 +157,6 @@ export function MigrationModal({ isOpen, onClose, onMigrationComplete }: Migrati
           } catch (error) {
             console.warn('Error migrating recurrence:', rec.name, error);
           }
-        }
-      }
-      setProgress(90);
-
-      // 7. Migrate scenarios
-      setStatus('Migrando cenários...');
-      for (const scenario of localScenarios) {
-        try {
-          await supabaseDb.addScenario({
-            name: scenario.name,
-            baselineType: scenario.baselineType,
-            baselineMonth: scenario.baselineMonth,
-            baselineYear: scenario.baselineYear,
-            monthlyCommitments: scenario.monthlyCommitments.map(c => ({
-              ...c,
-              categoryId: categoryIdMap[c.categoryId] || c.categoryId,
-              subcategoryId: c.subcategoryId ? subcategoryIdMap[c.subcategoryId] : undefined,
-            })),
-            oneTimeCosts: scenario.oneTimeCosts.map(c => ({
-              ...c,
-              categoryId: categoryIdMap[c.categoryId] || c.categoryId,
-              subcategoryId: c.subcategoryId ? subcategoryIdMap[c.subcategoryId] : undefined,
-            })),
-            categoryAdjustments: scenario.categoryAdjustments.map(a => ({
-              ...a,
-              categoryId: categoryIdMap[a.categoryId] || a.categoryId,
-              subcategoryId: a.subcategoryId ? subcategoryIdMap[a.subcategoryId] : undefined,
-            })),
-            minimumBalance: scenario.minimumBalance,
-          });
-        } catch (error) {
-          console.warn('Error migrating scenario:', scenario.name, error);
         }
       }
       setProgress(100);

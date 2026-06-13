@@ -1,14 +1,13 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { v4 as uuidv4 } from 'uuid';
-import type { 
-  Category, 
-  Subcategory, 
-  Transaction, 
-  Budget, 
-  Recurrence, 
+import type {
+  Category,
+  Subcategory,
+  Transaction,
+  Budget,
+  Recurrence,
   RecurrenceInstance,
-  ImportBatch,
-  Scenario 
+  ImportBatch
 } from '@/types/finance';
 
 interface FluxoCaixaDB extends DBSchema {
@@ -48,10 +47,6 @@ interface FluxoCaixaDB extends DBSchema {
   importBatches: {
     key: string;
     value: ImportBatch;
-  };
-  scenarios: {
-    key: string;
-    value: Scenario;
   };
   settings: {
     key: string;
@@ -109,11 +104,6 @@ export async function getDB(): Promise<IDBPDatabase<FluxoCaixaDB>> {
       // Import batches store
       if (!db.objectStoreNames.contains('importBatches')) {
         db.createObjectStore('importBatches', { keyPath: 'id' });
-      }
-
-      // Scenarios store
-      if (!db.objectStoreNames.contains('scenarios')) {
-        db.createObjectStore('scenarios', { keyPath: 'id' });
       }
 
       // Settings store
@@ -346,38 +336,6 @@ export async function updateRecurrenceInstance(instance: RecurrenceInstance): Pr
 export async function deleteRecurrenceInstance(id: string): Promise<void> {
   const db = await getDB();
   await db.delete('recurrenceInstances', id);
-}
-
-// Scenario operations
-export async function getScenarios(): Promise<Scenario[]> {
-  const db = await getDB();
-  return db.getAll('scenarios');
-}
-
-export async function getScenario(id: string): Promise<Scenario | undefined> {
-  const db = await getDB();
-  return db.get('scenarios', id);
-}
-
-export async function addScenario(scenario: Omit<Scenario, 'id' | 'createdAt'>): Promise<Scenario> {
-  const db = await getDB();
-  const newScenario: Scenario = {
-    ...scenario,
-    id: uuidv4(),
-    createdAt: new Date(),
-  };
-  await db.add('scenarios', newScenario);
-  return newScenario;
-}
-
-export async function updateScenario(scenario: Scenario): Promise<void> {
-  const db = await getDB();
-  await db.put('scenarios', scenario);
-}
-
-export async function deleteScenario(id: string): Promise<void> {
-  const db = await getDB();
-  await db.delete('scenarios', id);
 }
 
 // Import batch operations

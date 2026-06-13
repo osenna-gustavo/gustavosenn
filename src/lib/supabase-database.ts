@@ -5,10 +5,10 @@ import type {
   Transaction, 
   Budget, 
   CategoryBudget,
-  Recurrence, 
+  Recurrence,
   RecurrenceInstance,
   ImportBatch,
-  Scenario 
+  Project
 } from '@/types/finance';
 
 // Helper to get current user ID
@@ -662,92 +662,76 @@ export async function deleteRecurrenceInstance(id: string): Promise<void> {
   if (error) throw error;
 }
 
-// ==================== SCENARIOS ====================
+// ==================== PROJECTS ====================
 
-export async function getScenarios(): Promise<Scenario[]> {
+export async function getProjects(): Promise<Project[]> {
   const userId = await getUserId();
-  
+
   const { data, error } = await supabase
-    .from('scenarios')
+    .from('projects')
     .select('*')
     .eq('user_id', userId)
-    .order('name');
-    
+    .order('created_at', { ascending: false });
+
   if (error) throw error;
-  
-  return (data || []).map(s => ({
-    id: s.id,
-    name: s.name,
-    baselineType: s.baseline_type as 'planned' | 'realized' | 'average',
-    baselineMonth: s.baseline_month,
-    baselineYear: s.baseline_year,
-    monthlyCommitments: (s.monthly_commitments as any[]) || [],
-    oneTimeCosts: (s.one_time_costs as any[]) || [],
-    categoryAdjustments: (s.category_adjustments as any[]) || [],
-    minimumBalance: Number(s.minimum_balance),
-    createdAt: new Date(s.created_at!),
+
+  return (data || []).map(p => ({
+    id: p.id,
+    name: p.name,
+    description: p.description || undefined,
+    status: p.status as Project['status'],
+    items: (p.items as any[]) || [],
+    createdAt: new Date(p.created_at!),
   }));
 }
 
-export async function addScenario(scenario: Omit<Scenario, 'id' | 'createdAt'>): Promise<Scenario> {
+export async function addProject(project: Omit<Project, 'id' | 'createdAt'>): Promise<Project> {
   const userId = await getUserId();
-  
+
   const { data, error } = await supabase
-    .from('scenarios')
+    .from('projects')
     .insert({
       user_id: userId,
-      name: scenario.name,
-      baseline_type: scenario.baselineType,
-      baseline_month: scenario.baselineMonth,
-      baseline_year: scenario.baselineYear,
-      monthly_commitments: JSON.parse(JSON.stringify(scenario.monthlyCommitments)),
-      one_time_costs: JSON.parse(JSON.stringify(scenario.oneTimeCosts)),
-      category_adjustments: JSON.parse(JSON.stringify(scenario.categoryAdjustments)),
-      minimum_balance: scenario.minimumBalance,
+      name: project.name,
+      description: project.description || null,
+      status: project.status,
+      items: JSON.parse(JSON.stringify(project.items)),
     })
     .select()
     .single();
-    
+
   if (error) throw error;
-  
+
   return {
     id: data.id,
     name: data.name,
-    baselineType: data.baseline_type as 'planned' | 'realized' | 'average',
-    baselineMonth: data.baseline_month,
-    baselineYear: data.baseline_year,
-    monthlyCommitments: (data.monthly_commitments as any[]) || [],
-    oneTimeCosts: (data.one_time_costs as any[]) || [],
-    categoryAdjustments: (data.category_adjustments as any[]) || [],
-    minimumBalance: Number(data.minimum_balance),
+    description: data.description || undefined,
+    status: data.status as Project['status'],
+    items: (data.items as any[]) || [],
     createdAt: new Date(data.created_at!),
   };
 }
 
-export async function updateScenario(scenario: Scenario): Promise<void> {
+export async function updateProject(project: Project): Promise<void> {
   const { error } = await supabase
-    .from('scenarios')
+    .from('projects')
     .update({
-      name: scenario.name,
-      baseline_type: scenario.baselineType,
-      baseline_month: scenario.baselineMonth,
-      baseline_year: scenario.baselineYear,
-      monthly_commitments: JSON.parse(JSON.stringify(scenario.monthlyCommitments)),
-      one_time_costs: JSON.parse(JSON.stringify(scenario.oneTimeCosts)),
-      category_adjustments: JSON.parse(JSON.stringify(scenario.categoryAdjustments)),
-      minimum_balance: scenario.minimumBalance,
+      name: project.name,
+      description: project.description || null,
+      status: project.status,
+      items: JSON.parse(JSON.stringify(project.items)),
     })
-    .eq('id', scenario.id);
-    
+    .eq('id', project.id);
+
   if (error) throw error;
 }
 
-export async function deleteScenario(id: string): Promise<void> {
+export async function deleteProject(id: string): Promise<void> {
   const { error } = await supabase
-    .from('scenarios')
+    .from('projects')
     .delete()
     .eq('id', id);
-    
+
   if (error) throw error;
 }
 
