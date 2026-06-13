@@ -74,11 +74,28 @@ export function ProjectItemCard({
   };
 
   return (
-    <Card>
+    <Card
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={cn(
+        isDragging && "opacity-50",
+        isDragOver && "border-primary border-dashed"
+      )}
+    >
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
-        <div>
-          <h3 className="font-semibold">{item.name}</h3>
-          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
+        <div className="flex items-start gap-2 min-w-0">
+          {draggable && (
+            <div className="cursor-grab active:cursor-grabbing pt-1 text-muted-foreground shrink-0" title="Arraste para reordenar">
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-semibold">{item.name}</h3>
+            {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
+          </div>
         </div>
         <div className="flex gap-1 shrink-0">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowItemForm(true)}>
