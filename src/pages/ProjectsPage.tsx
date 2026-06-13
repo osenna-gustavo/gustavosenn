@@ -42,6 +42,8 @@ export function ProjectsPage() {
   const [showItemForm, setShowItemForm] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [itemDragIndex, setItemDragIndex] = useState<number | null>(null);
+  const [itemDragOverIndex, setItemDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
