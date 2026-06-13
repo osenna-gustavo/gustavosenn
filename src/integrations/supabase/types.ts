@@ -541,7 +541,6 @@ export type Database = {
           id: string
           items: Json
           name: string
-          position: number
           status: string
           updated_at: string
           user_id: string
@@ -552,7 +551,6 @@ export type Database = {
           id?: string
           items?: Json
           name: string
-          position?: number
           status?: string
           updated_at?: string
           user_id: string
@@ -563,7 +561,6 @@ export type Database = {
           id?: string
           items?: Json
           name?: string
-          position?: number
           status?: string
           updated_at?: string
           user_id?: string
