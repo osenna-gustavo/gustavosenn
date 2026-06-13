@@ -302,7 +302,7 @@ export function ProjectsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {activeProject.items.map(item => (
+            {activeProject.items.map((item, index) => (
               <ProjectItemCard
                 key={item.id}
                 item={item}
@@ -312,6 +312,13 @@ export function ProjectsPage() {
                 onUpdateOption={(optionId, option) => handleUpdateOption(item.id, optionId, option)}
                 onDeleteOption={(optionId) => handleDeleteOption(item.id, optionId)}
                 onSelectOption={(optionId) => handleSelectOption(item.id, optionId)}
+                draggable
+                isDragging={itemDragIndex === index}
+                isDragOver={itemDragOverIndex === index && itemDragIndex !== null && itemDragIndex !== index}
+                onDragStart={() => handleItemDragStart(index)}
+                onDragOver={(e) => handleItemDragOver(e, index)}
+                onDrop={(e) => handleItemDrop(e, index)}
+                onDragEnd={handleItemDragEnd}
               />
             ))}
           </div>
