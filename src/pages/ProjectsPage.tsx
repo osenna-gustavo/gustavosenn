@@ -42,6 +42,8 @@ export function ProjectsPage() {
   const [showItemForm, setShowItemForm] = useState(false);
   const [dragIndex, setDragIndex] = useState<number | null>(null);
   const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [itemDragIndex, setItemDragIndex] = useState<number | null>(null);
+  const [itemDragOverIndex, setItemDragOverIndex] = useState<number | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -225,6 +227,30 @@ export function ProjectsPage() {
     });
   };
 
+  // ===== Item drag-and-drop reordering =====
+
+  const handleItemDragStart = (index: number) => setItemDragIndex(index);
+  const handleItemDragOver = (e: DragEvent, index: number) => {
+    e.preventDefault();
+    if (itemDragOverIndex !== index) setItemDragOverIndex(index);
+  };
+  const handleItemDragEnd = () => {
+    setItemDragIndex(null);
+    setItemDragOverIndex(null);
+  };
+  const handleItemDrop = (e: DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (!activeProject || itemDragIndex === null || itemDragIndex === dropIndex) {
+      handleItemDragEnd();
+      return;
+    }
+    const reordered = [...activeProject.items];
+    const [moved] = reordered.splice(itemDragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+    handleItemDragEnd();
+    persistProject({ ...activeProject, items: reordered });
+  };
+
   // ===== Detail view =====
 
   if (activeProject) {
@@ -276,7 +302,7 @@ export function ProjectsPage() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {activeProject.items.map(item => (
+            {activeProject.items.map((item, index) => (
               <ProjectItemCard
                 key={item.id}
                 item={item}
@@ -286,6 +312,13 @@ export function ProjectsPage() {
                 onUpdateOption={(optionId, option) => handleUpdateOption(item.id, optionId, option)}
                 onDeleteOption={(optionId) => handleDeleteOption(item.id, optionId)}
                 onSelectOption={(optionId) => handleSelectOption(item.id, optionId)}
+                draggable
+                isDragging={itemDragIndex === index}
+                isDragOver={itemDragOverIndex === index && itemDragIndex !== null && itemDragIndex !== index}
+                onDragStart={() => handleItemDragStart(index)}
+                onDragOver={(e) => handleItemDragOver(e, index)}
+                onDrop={(e) => handleItemDrop(e, index)}
+                onDragEnd={handleItemDragEnd}
               />
             ))}
           </div>

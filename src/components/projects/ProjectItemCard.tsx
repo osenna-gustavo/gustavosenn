@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type DragEvent } from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +12,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Pencil, Trash2, Plus, CheckCircle2, Circle, ExternalLink } from 'lucide-react';
+import { Pencil, Trash2, Plus, CheckCircle2, Circle, ExternalLink, GripVertical } from 'lucide-react';
 import { formatCurrency } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import type { ProjectItem, ProjectSupplierOption } from '@/types/finance';
@@ -27,6 +27,13 @@ interface ProjectItemCardProps {
   onUpdateOption: (optionId: string, option: Omit<ProjectSupplierOption, 'id'>) => void;
   onDeleteOption: (optionId: string) => void;
   onSelectOption: (optionId: string | null) => void;
+  draggable?: boolean;
+  isDragging?: boolean;
+  isDragOver?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: DragEvent) => void;
+  onDrop?: (e: DragEvent) => void;
+  onDragEnd?: () => void;
 }
 
 export function ProjectItemCard({
@@ -37,6 +44,13 @@ export function ProjectItemCard({
   onUpdateOption,
   onDeleteOption,
   onSelectOption,
+  draggable,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: ProjectItemCardProps) {
   const [showItemForm, setShowItemForm] = useState(false);
   const [showOptionForm, setShowOptionForm] = useState(false);
@@ -60,11 +74,28 @@ export function ProjectItemCard({
   };
 
   return (
-    <Card>
+    <Card
+      draggable={draggable}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+      onDragEnd={onDragEnd}
+      className={cn(
+        isDragging && "opacity-50",
+        isDragOver && "border-primary border-dashed"
+      )}
+    >
       <CardHeader className="flex flex-row items-start justify-between gap-2 pb-3">
-        <div>
-          <h3 className="font-semibold">{item.name}</h3>
-          {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
+        <div className="flex items-start gap-2 min-w-0">
+          {draggable && (
+            <div className="cursor-grab active:cursor-grabbing pt-1 text-muted-foreground shrink-0" title="Arraste para reordenar">
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h3 className="font-semibold">{item.name}</h3>
+            {item.notes && <p className="text-sm text-muted-foreground mt-1">{item.notes}</p>}
+          </div>
         </div>
         <div className="flex gap-1 shrink-0">
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setShowItemForm(true)}>
