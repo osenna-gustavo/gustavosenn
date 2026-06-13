@@ -8,9 +8,6 @@
  *    categoryId is taken from `subcategory.categoryId` (fixes data where a
  *    transaction was moved between parents but the subcategory pointer
  *    stayed the same).
- *  - A category may itself have a parentId. When matching/aggregating by a
- *    parent category, transactions credited to its child categories also
- *    count for the parent.
  */
 import type { Category, Subcategory, Transaction } from '@/types/finance';
 
@@ -34,8 +31,7 @@ export function normalizeTransactionRef(
 
 /**
  * True if a transaction belongs to the given (categoryId, subcategoryId)
- * filter, after normalization. When only categoryId is provided, child
- * categories of that parent (via Category.parentId) also match.
+ * filter, after normalization.
  */
 export function transactionMatchesCategory(
   t: Pick<Transaction, 'categoryId' | 'subcategoryId'>,
@@ -50,10 +46,7 @@ export function transactionMatchesCategory(
   }
 
   if (filter.categoryId) {
-    if (norm.categoryId === filter.categoryId) return true;
-    const cat = categories.find(c => c.id === norm.categoryId);
-    if (cat?.parentId === filter.categoryId) return true;
-    return false;
+    return norm.categoryId === filter.categoryId;
   }
 
   return true;
