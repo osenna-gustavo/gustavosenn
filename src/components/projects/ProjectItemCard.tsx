@@ -27,6 +27,13 @@ interface ProjectItemCardProps {
   onUpdateOption: (optionId: string, option: Omit<ProjectSupplierOption, 'id'>) => void;
   onDeleteOption: (optionId: string) => void;
   onSelectOption: (optionId: string | null) => void;
+  draggable?: boolean;
+  isDragging?: boolean;
+  isDragOver?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: DragEvent) => void;
+  onDrop?: (e: DragEvent) => void;
+  onDragEnd?: () => void;
 }
 
 export function ProjectItemCard({
@@ -37,6 +44,13 @@ export function ProjectItemCard({
   onUpdateOption,
   onDeleteOption,
   onSelectOption,
+  draggable,
+  isDragging,
+  isDragOver,
+  onDragStart,
+  onDragOver,
+  onDrop,
+  onDragEnd,
 }: ProjectItemCardProps) {
   const [showItemForm, setShowItemForm] = useState(false);
   const [showOptionForm, setShowOptionForm] = useState(false);
