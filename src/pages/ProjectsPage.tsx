@@ -227,9 +227,40 @@ export function ProjectsPage() {
     });
   };
 
+  // ===== Item drag-and-drop reordering =====
+
+  const handleItemDragStart = (index: number) => setItemDragIndex(index);
+  const handleItemDragOver = (e: DragEvent, index: number) => {
+    e.preventDefault();
+    if (itemDragOverIndex !== index) setItemDragOverIndex(index);
+  };
+  const handleItemDragEnd = () => {
+    setItemDragIndex(null);
+    setItemDragOverIndex(null);
+  };
+  const handleItemDrop = (e: DragEvent, dropIndex: number) => {
+    e.preventDefault();
+    if (!activeProject || itemDragIndex === null || itemDragIndex === dropIndex) {
+      handleItemDragEnd();
+      return;
+    }
+    const reordered = [...activeProject.items];
+    const [moved] = reordered.splice(itemDragIndex, 1);
+    reordered.splice(dropIndex, 0, moved);
+    handleItemDragEnd();
+    persistProject({ ...activeProject, items: reordered });
+  };
+
   // ===== Detail view =====
 
   if (activeProject) {
+    return (
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-4 min-w-0">
+            <Button variant="ghost" size="icon" onClick={() => setActiveProject(null)}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
     return (
       <div className="space-y-6 animate-fade-in">
         <div className="flex items-center justify-between gap-3">
