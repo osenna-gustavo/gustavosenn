@@ -38,17 +38,33 @@ export function ProjectFormModal({ open, onClose, onSave, project }: ProjectForm
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState<Project['status']>('planning');
 
+  const draftKey = project ? `draft:project:${project.id}` : 'draft:project:new';
+  const { load: loadDraft, clear: clearDraft } = useDraft(
+    draftKey,
+    { name, description, status },
+    open,
+  );
+
   useEffect(() => {
     if (open) {
-      setName(project?.name || '');
-      setDescription(project?.description || '');
-      setStatus(project?.status || 'planning');
+      const draft = loadDraft();
+      if (draft && (draft.name || draft.description)) {
+        setName(draft.name || project?.name || '');
+        setDescription(draft.description || project?.description || '');
+        setStatus(draft.status || project?.status || 'planning');
+      } else {
+        setName(project?.name || '');
+        setDescription(project?.description || '');
+        setStatus(project?.status || 'planning');
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, project]);
 
   const handleSave = () => {
     if (!name.trim()) return;
     onSave({ name: name.trim(), description: description.trim() || undefined, status });
+    clearDraft();
   };
 
   return (
