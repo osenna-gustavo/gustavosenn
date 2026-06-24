@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Recurrence, RecurrenceInstance, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
