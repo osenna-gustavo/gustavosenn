@@ -92,14 +92,10 @@ export function InstallmentsPage() {
   });
 
   // Filter only installment plans (recurrences with totalInstallments set)
-  const installmentPlans = useMemo(() => {
-    const plans = recurrences.filter(r => r.totalInstallments && r.totalInstallments > 0);
-    if (!hidePaid) return plans;
-    return plans.filter(plan => {
-      const paid = paidCountByPlan[plan.id] ?? 0;
-      return paid < (plan.totalInstallments ?? 0);
-    });
-  }, [recurrences, hidePaid, paidCountByPlan]);
+  const installmentPlans = useMemo(
+    () => recurrences.filter(r => r.totalInstallments && r.totalInstallments > 0),
+    [recurrences]
+  );
 
   // Group installments by category
   const groupedInstallments = useMemo(() => {
