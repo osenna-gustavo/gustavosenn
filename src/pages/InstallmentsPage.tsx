@@ -432,11 +432,11 @@ export function InstallmentsPage() {
 
       {/* List */}
       <div className="glass-card rounded-xl overflow-hidden">
-        {installmentPlans.length === 0 ? (
+        {visiblePlans.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhum parcelamento cadastrado.</p>
-            <p className="text-sm mt-1">Crie um para acompanhar pagamentos parcelados.</p>
+            <p>{hidePaid ? 'Nenhum parcelamento ativo.' : 'Nenhum parcelamento cadastrado.'}</p>
+            <p className="text-sm mt-1">{hidePaid ? 'Todos os parcelamentos estão quitados.' : 'Crie um para acompanhar pagamentos parcelados.'}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
