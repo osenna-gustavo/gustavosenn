@@ -449,7 +449,7 @@ export function InstallmentsPage() {
               <span className="text-xs text-muted-foreground">Selecionar todos</span>
             </div>
 
-            {groupedInstallments.map(({ category, plans }) => {
+            {visibleGrouped.map(({ category, plans }) => {
               const groupKey = category?.id ?? '__sem_categoria__';
               const isCollapsed = collapsedGroups.has(groupKey);
               const groupTotal = plans
