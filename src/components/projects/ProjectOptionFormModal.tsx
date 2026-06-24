@@ -12,29 +12,50 @@ import { Textarea } from '@/components/ui/textarea';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { parseBRLToNumber, formatNumberToBRL } from '@/lib/currencyInput';
 import type { ProjectSupplierOption } from '@/types/finance';
+import { useDraft } from '@/hooks/useDraft';
 
 interface ProjectOptionFormModalProps {
   open: boolean;
   onClose: () => void;
   onSave: (data: Omit<ProjectSupplierOption, 'id'>) => void;
   option?: ProjectSupplierOption | null;
+  draftScope?: string;
 }
 
-export function ProjectOptionFormModal({ open, onClose, onSave, option }: ProjectOptionFormModalProps) {
+export function ProjectOptionFormModal({ open, onClose, onSave, option, draftScope }: ProjectOptionFormModalProps) {
   const [supplierName, setSupplierName] = useState('');
   const [price, setPrice] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
   const [link, setLink] = useState('');
   const [notes, setNotes] = useState('');
 
+  const draftKey = option
+    ? `draft:project-option:${option.id}`
+    : `draft:project-option:new:${draftScope || 'global'}`;
+  const { load: loadDraft, clear: clearDraft } = useDraft(
+    draftKey,
+    { supplierName, price, deliveryTime, link, notes },
+    open,
+  );
+
   useEffect(() => {
     if (open) {
-      setSupplierName(option?.supplierName || '');
-      setPrice(option ? formatNumberToBRL(option.price) : '');
-      setDeliveryTime(option?.deliveryTime || '');
-      setLink(option?.link || '');
-      setNotes(option?.notes || '');
+      const draft = loadDraft();
+      if (draft && (draft.supplierName || draft.price || draft.deliveryTime || draft.link || draft.notes)) {
+        setSupplierName(draft.supplierName || option?.supplierName || '');
+        setPrice(draft.price || (option ? formatNumberToBRL(option.price) : ''));
+        setDeliveryTime(draft.deliveryTime || option?.deliveryTime || '');
+        setLink(draft.link || option?.link || '');
+        setNotes(draft.notes || option?.notes || '');
+      } else {
+        setSupplierName(option?.supplierName || '');
+        setPrice(option ? formatNumberToBRL(option.price) : '');
+        setDeliveryTime(option?.deliveryTime || '');
+        setLink(option?.link || '');
+        setNotes(option?.notes || '');
+      }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, option]);
 
   const handleSave = () => {
@@ -46,6 +67,7 @@ export function ProjectOptionFormModal({ open, onClose, onSave, option }: Projec
       link: link.trim() || undefined,
       notes: notes.trim() || undefined,
     });
+    clearDraft();
   };
 
   return (

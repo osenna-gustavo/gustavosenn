@@ -22,8 +22,8 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
 
   if (!monthSummary) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[...Array(3)].map((_, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+        {[...Array(5)].map((_, i) => (
           <div key={i} className="stat-card animate-pulse">
             <div className="h-4 bg-muted rounded w-24 mb-2" />
             <div className="h-8 bg-muted rounded w-32" />
@@ -34,6 +34,22 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
   }
 
   const kpis = [
+    {
+      label: 'Receitas',
+      value: monthSummary.realizedIncome,
+      icon: TrendingUp,
+      trend: 'positive' as const,
+      description: 'Entradas do mês',
+      drillDownFilter: { type: 'income' as const, title: 'Receitas do Mês' },
+    },
+    {
+      label: 'Despesas',
+      value: monthSummary.realizedExpenses,
+      icon: TrendingDown,
+      trend: 'negative' as const,
+      description: 'Saídas do mês',
+      drillDownFilter: { type: 'expenses' as const, title: 'Despesas do Mês' },
+    },
     {
       label: 'Saldo do Mês',
       value: monthSummary.balance,
@@ -70,7 +86,7 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
   };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
