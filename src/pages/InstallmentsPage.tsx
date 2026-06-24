@@ -443,7 +443,7 @@ export function InstallmentsPage() {
             {/* Select All row */}
             <div className="flex items-center gap-3 px-4 py-2 bg-muted/30">
               <Checkbox
-                checked={selectedIds.size === installmentPlans.length && installmentPlans.length > 0}
+                checked={selectedIds.size === visiblePlans.length && visiblePlans.length > 0}
                 onCheckedChange={toggleSelectAll}
               />
               <span className="text-xs text-muted-foreground">Selecionar todos</span>
