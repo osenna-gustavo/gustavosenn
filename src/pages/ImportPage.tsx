@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback } from 'react';
 import {
-  Upload, FileText, Loader2, AlertCircle, ChevronLeft, ClipboardPaste,
+  Upload, Loader2, AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -16,64 +16,13 @@ import {
   getCategorizationRules,
 } from '@/lib/invoice-database';
 import { C6ReviewScreen } from '@/components/import/C6ReviewScreen';
-import { cn } from '@/lib/utils';
 import type { ReviewGroups } from '@/types/invoice';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ImportStatus = 'idle' | 'processing' | 'review' | 'error';
-type InputMode = 'csv' | 'paste';
 
-type StatementType = 'nubank-fatura' | 'c6-fatura' | 'nubank-extrato' | 'c6-extrato';
-
-const STATEMENT_TYPES: {
-  id: StatementType;
-  label: string;
-  subtitle: string;
-  description: string;
-  icon: string;
-  color: string;
-}[] = [
-  {
-    id: 'nubank-fatura',
-    label: 'Fatura Nubank',
-    subtitle: 'Cartão de crédito',
-    description: 'Importe via CSV exportado do app ou cole as transações',
-    icon: '💜',
-    color: 'hover:border-purple-500/60 hover:bg-purple-500/5',
-  },
-  {
-    id: 'c6-fatura',
-    label: 'Fatura C6',
-    subtitle: 'Cartão de crédito',
-    description: 'Importe via CSV exportado do app ou cole as transações',
-    icon: '🖤',
-    color: 'hover:border-zinc-400/60 hover:bg-zinc-400/5',
-  },
-  {
-    id: 'nubank-extrato',
-    label: 'Extrato Nubank',
-    subtitle: 'Conta corrente',
-    description: 'Importe via CSV exportado do app ou cole as transações',
-    icon: '💜',
-    color: 'hover:border-purple-500/60 hover:bg-purple-500/5',
-  },
-  {
-    id: 'c6-extrato',
-    label: 'Extrato C6',
-    subtitle: 'Conta corrente',
-    description: 'Importe via CSV exportado do app ou cole as transações',
-    icon: '🖤',
-    color: 'hover:border-zinc-400/60 hover:bg-zinc-400/5',
-  },
-];
-
-const STATEMENT_LABELS: Record<StatementType, string> = {
-  'nubank-fatura': 'Fatura Nubank',
-  'c6-fatura': 'Fatura C6',
-  'nubank-extrato': 'Extrato Nubank',
-  'c6-extrato': 'Extrato C6',
-};
+const IMPORT_SOURCE = 'Importação';
 
 // ─── Paste format instructions ────────────────────────────────────────────────
 
@@ -91,8 +40,6 @@ export function ImportPage() {
   } = useApp();
   const { toast } = useToast();
 
-  const [selectedType, setSelectedType] = useState<StatementType | null>(null);
-  const [inputMode, setInputMode] = useState<InputMode>('csv');
   const [status, setStatus] = useState<ImportStatus>('idle');
   const [progressLabel, setProgressLabel] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -112,7 +59,7 @@ export function ImportPage() {
     const logs: string[] = [];
 
     try {
-      const sourceName = STATEMENT_LABELS[selectedType!];
+      const sourceName = IMPORT_SOURCE;
       const parseResult = parseImportText(text, sourceName, selectedYear);
       logs.push(...parseResult.logs);
 
@@ -144,7 +91,7 @@ export function ImportPage() {
       let sessionId = `local-${Date.now()}`;
       try {
         const importRecord = await createInvoiceImport({
-          source: selectedType!,
+          source: IMPORT_SOURCE,
           competencia,
           fileName,
           fileHash: `text-${Date.now()}`,
@@ -213,7 +160,7 @@ export function ImportPage() {
         variant: 'destructive',
       });
     }
-  }, [selectedType, selectedYear, selectedMonth, transactions, recurrences, categories, toast]);
+  }, [selectedYear, selectedMonth, transactions, recurrences, categories, toast]);
 
   // ── CSV file upload ─────────────────────────────────────────────────────────
 
@@ -223,8 +170,8 @@ export function ImportPage() {
     setErrorMessage('');
     setReviewGroups(null);
 
-    if (!file.name.toLowerCase().endsWith('.csv') && file.type !== 'text/csv' && file.type !== 'text/plain') {
-      toast({ title: 'Formato inválido', description: 'Selecione um arquivo .csv ou .txt', variant: 'destructive' });
+    if (!file.name.toLowerCase().endsWith('.txt') && file.type !== 'text/plain') {
+      toast({ title: 'Formato inválido', description: 'Selecione um arquivo .txt', variant: 'destructive' });
       return;
     }
 
@@ -265,162 +212,81 @@ export function ImportPage() {
     if (fileInputRef.current) fileInputRef.current.value = '';
   }, []);
 
-  const handleBackToTypeSelection = useCallback(() => {
-    handleReset();
-    setSelectedType(null);
-  }, [handleReset]);
-
-  // ── STEP 1: Type selection ──────────────────────────────────────────────────
-
-  if (!selectedType) {
-    return (
-      <div className="space-y-8 animate-fade-in">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
-          <p className="text-muted-foreground">Selecione o tipo de documento para importar</p>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {STATEMENT_TYPES.map((type) => (
-            <button
-              key={type.id}
-              onClick={() => { setSelectedType(type.id); setInputMode('csv'); }}
-              className={cn(
-                'glass-card rounded-xl p-6 text-left border border-border transition-all duration-200 cursor-pointer',
-                type.color,
-              )}
-            >
-              <div className="flex items-start gap-4">
-                <span className="text-3xl">{type.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-base font-semibold">{type.label}</h3>
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-muted text-muted-foreground">
-                      {type.subtitle}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{type.description}</p>
-                </div>
-              </div>
-            </button>
-          ))}
-        </div>
-      </div>
-    );
-  }
-
-  // ── STEP 2+: Import ─────────────────────────────────────────────────────────
+  // ── Import ───────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6 animate-fade-in">
 
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" onClick={handleBackToTypeSelection} className="shrink-0">
-          <ChevronLeft className="h-5 w-5" />
-        </Button>
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
-          <p className="text-muted-foreground">{STATEMENT_LABELS[selectedType]}</p>
-        </div>
+      <div>
+        <h1 className="text-2xl lg:text-3xl font-bold">Importar</h1>
+        <p className="text-muted-foreground">Cole ou envie o extrato/fatura em formato de texto (.txt)</p>
       </div>
 
-      {/* Input area */}
+      {/* Input area: single drop zone — arraste um .txt ou cole o texto */}
       {status === 'idle' && (
-        <div className="space-y-4">
+        <div
+          className="glass-card rounded-xl p-6 border-2 border-dashed border-border hover:border-primary/50 transition-colors space-y-4"
+          onDrop={handleDrop}
+          onDragOver={(e) => e.preventDefault()}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt,text/plain"
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-          {/* Mode tabs */}
-          <div className="flex gap-2 p-1 bg-muted rounded-lg w-fit">
-            <button
-              className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-all',
-                inputMode === 'csv'
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              onClick={() => setInputMode('csv')}
-            >
-              <FileText className="h-4 w-4 inline mr-2" />Upload CSV
-            </button>
-            <button
-              className={cn(
-                'px-4 py-2 rounded-md text-sm font-medium transition-all',
-                inputMode === 'paste'
-                  ? 'bg-background shadow text-foreground'
-                  : 'text-muted-foreground hover:text-foreground',
-              )}
-              onClick={() => setInputMode('paste')}
-            >
-              <ClipboardPaste className="h-4 w-4 inline mr-2" />Colar texto
-            </button>
+          <div className="flex flex-col items-center text-center">
+            <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center mb-3">
+              <Upload className="h-7 w-7 text-primary" />
+            </div>
+            <h3 className="text-base font-semibold mb-1">Arraste um arquivo .txt aqui</h3>
+            <p className="text-sm text-muted-foreground">
+              ou{' '}
+              <button
+                type="button"
+                className="text-primary underline underline-offset-2"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                selecione um arquivo
+              </button>
+              {' '}— ou cole o texto abaixo
+            </p>
           </div>
 
-          {/* CSV upload */}
-          {inputMode === 'csv' && (
-            <div
-              className="glass-card rounded-xl p-8 border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer"
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.txt,text/csv,text/plain"
-                onChange={handleFileChange}
-                className="hidden"
-              />
-              <div className="flex flex-col items-center text-center">
-                <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center mb-4">
-                  <Upload className="h-8 w-8 text-primary" />
-                </div>
-                <h3 className="text-lg font-semibold mb-2">Arraste o arquivo CSV aqui</h3>
-                <p className="text-muted-foreground mb-2">ou clique para selecionar</p>
-                <p className="text-xs text-muted-foreground">Aceita .csv ou .txt</p>
-              </div>
-            </div>
-          )}
-
-          {/* Paste text */}
-          {inputMode === 'paste' && (
-            <div className="space-y-3">
-              <div className="glass-card rounded-xl p-5 space-y-4">
-                <div>
-                  <h3 className="text-sm font-semibold mb-1">Formato esperado</h3>
-                  <p className="text-xs text-muted-foreground mb-2">
-                    Uma transação por linha, separada por <code className="bg-muted px-1 rounded">;</code> ou TAB:
-                  </p>
-                  <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-muted-foreground">
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">
+              Uma transação por linha, separada por <code className="bg-muted px-1 rounded">;</code> ou TAB:
+            </p>
+            <pre className="text-xs bg-muted rounded-lg p-3 overflow-x-auto text-muted-foreground">
 {`DD/MM/AAAA; Descrição; Valor
 ${PASTE_EXAMPLE}
 
 → Valor positivo = despesa
 → Valor negativo = estorno (ex: -56,01)
 → Data pode ser DD/MM ou DD/MM/AAAA`}
-                  </pre>
-                </div>
+            </pre>
+          </div>
 
-                <div>
-                  <label className="text-sm font-medium mb-2 block">Cole suas transações aqui</label>
-                  <Textarea
-                    value={pasteText}
-                    onChange={(e) => setPasteText(e.target.value)}
-                    placeholder={PASTE_EXAMPLE}
-                    className="font-mono text-sm min-h-[200px] resize-y"
-                    autoFocus
-                  />
-                </div>
+          <div>
+            <Textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder={PASTE_EXAMPLE}
+              className="font-mono text-sm min-h-[200px] resize-y"
+            />
+          </div>
 
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setPasteText('')} disabled={!pasteText}>
-                    Limpar
-                  </Button>
-                  <Button onClick={handlePasteSubmit} disabled={!pasteText.trim()}>
-                    Processar transações
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPasteText('')} disabled={!pasteText}>
+              Limpar
+            </Button>
+            <Button onClick={handlePasteSubmit} disabled={!pasteText.trim()}>
+              Processar transações
+            </Button>
+          </div>
         </div>
       )}
 
@@ -465,10 +331,7 @@ ${PASTE_EXAMPLE}
           groups={reviewGroups}
           importId={importId ?? ''}
           logs={importLogs}
-          onAllConfirmed={() => {
-            handleReset();
-            setSelectedType(null);
-          }}
+          onAllConfirmed={handleReset}
           onCancel={handleReset}
         />
       )}
