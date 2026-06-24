@@ -36,7 +36,7 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
   const kpis = [
     {
       label: 'Receitas',
-      value: monthSummary.realizedIncome ?? monthSummary.totalIncome ?? 0,
+      value: monthSummary.realizedIncome,
       icon: TrendingUp,
       trend: 'positive' as const,
       description: 'Entradas do mês',
