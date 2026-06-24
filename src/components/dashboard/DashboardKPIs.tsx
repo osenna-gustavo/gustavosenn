@@ -35,6 +35,22 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
 
   const kpis = [
     {
+      label: 'Receitas',
+      value: monthSummary.realizedIncome ?? monthSummary.totalIncome ?? 0,
+      icon: TrendingUp,
+      trend: 'positive' as const,
+      description: 'Entradas do mês',
+      drillDownFilter: { type: 'income' as const, title: 'Receitas do Mês' },
+    },
+    {
+      label: 'Despesas',
+      value: monthSummary.realizedExpenses,
+      icon: TrendingDown,
+      trend: 'negative' as const,
+      description: 'Saídas do mês',
+      drillDownFilter: { type: 'expenses' as const, title: 'Despesas do Mês' },
+    },
+    {
       label: 'Saldo do Mês',
       value: monthSummary.balance,
       icon: Wallet,
