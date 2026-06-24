@@ -2,10 +2,11 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MonthSelector } from './MonthSelector';
 import { useApp } from '@/contexts/AppContext';
-import { Loader2, Calculator, StickyNote, Plus } from 'lucide-react';
+import { Loader2, Calculator, StickyNote, Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { FloatingCalculator } from '@/components/tools/FloatingCalculator';
 import { FloatingNotepad } from '@/components/tools/FloatingNotepad';
+import { FloatingAIAssistant } from '@/components/tools/FloatingAIAssistant';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 
@@ -17,6 +18,7 @@ export function MainLayout({ children }: MainLayoutProps) {
   const { isLoading, isInitialized } = useApp();
   const [calcOpen, setCalcOpen] = useState(false);
   const [notepadOpen, setNotepadOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   if (!isInitialized) {
@@ -71,6 +73,19 @@ export function MainLayout({ children }: MainLayoutProps) {
                   <TooltipTrigger asChild>
                     <Button
                       size="icon"
+                      variant="outline"
+                      className="h-9 w-9 rounded-full bg-background"
+                      onClick={() => setAiOpen(true)}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom">Assistente Financeiro</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="icon"
                       className="h-9 w-9 rounded-full"
                       onClick={() => setCalcOpen(true)}
                     >
@@ -104,6 +119,7 @@ export function MainLayout({ children }: MainLayoutProps) {
 
       <FloatingCalculator open={calcOpen} onClose={() => setCalcOpen(false)} />
       <FloatingNotepad open={notepadOpen} onClose={() => setNotepadOpen(false)} />
+      <FloatingAIAssistant open={aiOpen} onClose={() => setAiOpen(false)} />
       <TransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
     </div>
   );
