@@ -69,6 +69,7 @@ export function InstallmentsPage() {
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [hidePaid, setHidePaid] = useState(false);
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups(prev => {
