@@ -657,14 +657,14 @@ export function InstallmentsPage() {
       </div>
 
       {/* Summary card */}
-      {installmentPlans.length > 0 && (
+      {visiblePlans.length > 0 && (
         <div className="glass-card rounded-xl p-4">
           <p className="text-sm text-muted-foreground mb-1">
             Total comprometido em {formatMonthYear(selectedMonth, selectedYear)}
           </p>
           <p className="text-2xl font-mono font-bold">
             {formatCurrency(
-              installmentPlans
+              visiblePlans
                 .filter(p => {
                   if (!p.isActive) return false;
                   const n = getInstallmentNumber(new Date(p.startDate), selectedMonth, selectedYear);
