@@ -75,6 +75,10 @@ const AppContext = createContext<AppContextType | null>(null);
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  // Supabase recria o objeto `user` a cada evento de auth (ex.: refresh de token,
+  // revalidação ao focar a aba) mesmo quando o usuário logado não muda. Usar o id
+  // como dependência evita refetch/loading em loop nesses casos.
+  const userId = user?.id;
   const [currentScreen, setCurrentScreen] = useState<AppScreen>('dashboard');
   const { month: currentMonth, year: currentYear } = getCurrentMonthYear();
   const [selectedMonth, setSelectedMonthState] = useState(currentMonth);
@@ -126,7 +130,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         console.error('[AppContext] Failed to persist billing_close_day:', err);
       }
     }
-  }, [user]);
+  }, [userId]);
 
   // Load billing_close_day from cloud when user logs in (cloud is source of truth)
   useEffect(() => {
@@ -174,7 +178,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     })();
     return () => { cancelled = true; };
-  }, [user]);
+  }, [userId]);
 
   const billingDateRange = useMemo(() => {
     if (!billingCloseDay) return null;
@@ -322,7 +326,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [user, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
+  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
 
   // Initialize app when user is authenticated
   useEffect(() => {
@@ -339,14 +343,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       }
     };
     init();
-  }, [user]);
+  }, [userId]);
 
   // Refresh when month changes
   useEffect(() => {
     if (isInitialized && user) {
       refreshData();
     }
-  }, [selectedMonth, selectedYear, isInitialized, user, refreshData]);
+  }, [selectedMonth, selectedYear, isInitialized, userId, refreshData]);
 
   // Transaction actions
   const addTransaction = useCallback(async (transaction: Omit<Transaction, 'id' | 'createdAt'>) => {
