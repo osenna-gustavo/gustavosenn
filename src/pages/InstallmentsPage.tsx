@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -31,7 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw } from 'lucide-react';
+import { Plus, Pencil, Trash2, CreditCard, Pause, Play, ChevronDown, ChevronRight, Check, RotateCcw, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { Recurrence, RecurrenceInstance, TransactionType } from '@/types/finance';
 import { cn } from '@/lib/utils';
@@ -68,6 +69,7 @@ export function InstallmentsPage() {
   const [showBulkDelete, setShowBulkDelete] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [hidePaid, setHidePaid] = useState(false);
 
   const toggleGroup = (key: string) => {
     setCollapsedGroups(prev => {
@@ -233,6 +235,30 @@ export function InstallmentsPage() {
     return () => { cancelled = true; };
   }, [recurrenceInstances]);
 
+  const visiblePlans = useMemo(() => {
+    if (!hidePaid) return installmentPlans;
+    return installmentPlans.filter(plan => {
+      const paid = paidCountByPlan[plan.id] ?? 0;
+      return paid < (plan.totalInstallments ?? 0);
+    });
+  }, [installmentPlans, hidePaid, paidCountByPlan]);
+
+  const visibleGrouped = useMemo(() => {
+    const groups = new Map<string, { category: typeof categories[0] | undefined; plans: typeof installmentPlans }>();
+    visiblePlans.forEach(plan => {
+      const key = plan.categoryId || '__sem_categoria__';
+      if (!groups.has(key)) {
+        groups.set(key, { category: categories.find(c => c.id === plan.categoryId), plans: [] });
+      }
+      groups.get(key)!.plans.push(plan);
+    });
+    return Array.from(groups.values()).sort((a, b) => {
+      if (!a.category) return 1;
+      if (!b.category) return -1;
+      return a.category.name.localeCompare(b.category.name);
+    });
+  }, [visiblePlans, categories]);
+
   const [payingId, setPayingId] = useState<string | null>(null);
 
   const handlePayInstallment = async (plan: Recurrence) => {
@@ -364,10 +390,21 @@ export function InstallmentsPage() {
           <h1 className="text-2xl lg:text-3xl font-bold">Parcelamentos</h1>
           <p className="text-muted-foreground">Gerencie seus planos de parcelamento</p>
         </div>
-        <Button onClick={() => openForm()} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Parcelamento
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+            {hidePaid ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+            <span className="text-sm text-muted-foreground">Ocultar quitados</span>
+            <Switch
+              checked={hidePaid}
+              onCheckedChange={setHidePaid}
+              aria-label="Ocultar parcelamentos quitados"
+            />
+          </div>
+          <Button onClick={() => openForm()} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Parcelamento
+          </Button>
+        </div>
       </div>
 
       {/* Bulk action bar */}
@@ -395,24 +432,24 @@ export function InstallmentsPage() {
 
       {/* List */}
       <div className="glass-card rounded-xl overflow-hidden">
-        {installmentPlans.length === 0 ? (
+        {visiblePlans.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <CreditCard className="h-10 w-10 mx-auto mb-3 opacity-30" />
-            <p>Nenhum parcelamento cadastrado.</p>
-            <p className="text-sm mt-1">Crie um para acompanhar pagamentos parcelados.</p>
+            <p>{hidePaid ? 'Nenhum parcelamento ativo.' : 'Nenhum parcelamento cadastrado.'}</p>
+            <p className="text-sm mt-1">{hidePaid ? 'Todos os parcelamentos estão quitados.' : 'Crie um para acompanhar pagamentos parcelados.'}</p>
           </div>
         ) : (
           <div className="divide-y divide-border">
             {/* Select All row */}
             <div className="flex items-center gap-3 px-4 py-2 bg-muted/30">
               <Checkbox
-                checked={selectedIds.size === installmentPlans.length && installmentPlans.length > 0}
+                checked={selectedIds.size === visiblePlans.length && visiblePlans.length > 0}
                 onCheckedChange={toggleSelectAll}
               />
               <span className="text-xs text-muted-foreground">Selecionar todos</span>
             </div>
 
-            {groupedInstallments.map(({ category, plans }) => {
+            {visibleGrouped.map(({ category, plans }) => {
               const groupKey = category?.id ?? '__sem_categoria__';
               const isCollapsed = collapsedGroups.has(groupKey);
               const groupTotal = plans
@@ -620,14 +657,14 @@ export function InstallmentsPage() {
       </div>
 
       {/* Summary card */}
-      {installmentPlans.length > 0 && (
+      {visiblePlans.length > 0 && (
         <div className="glass-card rounded-xl p-4">
           <p className="text-sm text-muted-foreground mb-1">
             Total comprometido em {formatMonthYear(selectedMonth, selectedYear)}
           </p>
           <p className="text-2xl font-mono font-bold">
             {formatCurrency(
-              installmentPlans
+              visiblePlans
                 .filter(p => {
                   if (!p.isActive) return false;
                   const n = getInstallmentNumber(new Date(p.startDate), selectedMonth, selectedYear);
