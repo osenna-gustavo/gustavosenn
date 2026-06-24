@@ -390,10 +390,21 @@ export function InstallmentsPage() {
           <h1 className="text-2xl lg:text-3xl font-bold">Parcelamentos</h1>
           <p className="text-muted-foreground">Gerencie seus planos de parcelamento</p>
         </div>
-        <Button onClick={() => openForm()} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Novo Parcelamento
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-muted/50 rounded-lg px-3 py-2">
+            {hidePaid ? <EyeOff className="h-4 w-4 text-muted-foreground" /> : <Eye className="h-4 w-4 text-muted-foreground" />}
+            <span className="text-sm text-muted-foreground">Ocultar quitados</span>
+            <Switch
+              checked={hidePaid}
+              onCheckedChange={setHidePaid}
+              aria-label="Ocultar parcelamentos quitados"
+            />
+          </div>
+          <Button onClick={() => openForm()} className="gap-2">
+            <Plus className="h-4 w-4" />
+            Novo Parcelamento
+          </Button>
+        </div>
       </div>
 
       {/* Bulk action bar */}
