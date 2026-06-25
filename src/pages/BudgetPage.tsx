@@ -219,10 +219,15 @@ export function BudgetPage() {
     }
   };
 
-  const handleApplyRecurrences = (mode: 'sum' | 'replace', amounts: Record<string, number>) => {
+  const handleApplyRecurrences = (
+    mode: 'sum' | 'replace',
+    amounts: Record<string, number>,
+    incomeTotal: number,
+    includeIncome: boolean,
+  ) => {
     const newCatBudgets = { ...categoryBudgets };
     const newSubBudgets = { ...subcategoryBudgets };
-    
+
     Object.entries(amounts).forEach(([key, amount]) => {
       if (key.startsWith('cat_')) {
         const catId = key.replace('cat_', '');
@@ -236,13 +241,19 @@ export function BudgetPage() {
         newSubBudgets[subId] = formatNumberToBRL(newValue);
       }
     });
-    
+
     setIsDirty(true);
     setCategoryBudgets(newCatBudgets);
     setSubcategoryBudgets(newSubBudgets);
-    
+
+    if (includeIncome && incomeTotal > 0) {
+      const currentIncome = parseBRLToNumber(plannedIncome || '0');
+      const newIncome = mode === 'sum' ? currentIncome + incomeTotal : incomeTotal;
+      setPlannedIncome(formatNumberToBRL(newIncome));
+    }
+
     toast({
-      title: 'Recorrências aplicadas!',
+      title: 'Orçamento atualizado!',
       description: `Valores ${mode === 'sum' ? 'somados ao' : 'substituídos no'} orçamento.`,
     });
   };
@@ -258,13 +269,13 @@ export function BudgetPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button 
-            variant="outline" 
-            onClick={() => setShowApplyRecurrencesModal(true)} 
+          <Button
+            variant="outline"
+            onClick={() => setShowApplyRecurrencesModal(true)}
             className="gap-2"
           >
             <RefreshCw className="h-4 w-4" />
-            Aplicar Recorrências
+            Montar Automático
           </Button>
           <Button variant="outline" onClick={() => setShowDuplicateModal(true)} className="gap-2">
             <Copy className="h-4 w-4" />
