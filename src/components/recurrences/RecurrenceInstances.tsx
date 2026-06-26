@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
+import { Check, X, RefreshCw, Edit2, Undo2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
@@ -263,6 +263,62 @@ export function RecurrenceInstances() {
     }
   };
 
+  // Revert a confirmed instance back to pending: delete linked transaction and clear link
+  const handleRevertConfirmed = async (instance: RecurrenceInstance) => {
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await db.deleteTransaction(instance.linkedTransactionId);
+        } catch (err) {
+          console.error('Failed to delete linked transaction:', err);
+        }
+      }
+      const updatedInstance: RecurrenceInstance = {
+        ...instance,
+        status: 'pending',
+        linkedTransactionId: undefined,
+      };
+      await db.updateRecurrenceInstance(updatedInstance);
+      setInstances(prev => prev.map(i => i.id === instance.id ? updatedInstance : i));
+      await refreshData();
+      toast({ title: 'Confirmação desfeita', description: 'Voltou para pendente e o lançamento foi removido.' });
+    } catch (error) {
+      toast({ title: 'Erro ao reverter', variant: 'destructive' });
+    }
+  };
+
+  // Edit a confirmed instance: revert it and open the confirm modal pre-filled
+  const handleEditConfirmed = async (instance: RecurrenceInstance) => {
+    await handleRevertConfirmed(instance);
+    const reverted: RecurrenceInstance = { ...instance, status: 'pending', linkedTransactionId: undefined };
+    openConfirmModal(reverted);
+  };
+
+  // Delete a confirmed instance's transaction and mark instance as ignored
+  const handleDeleteConfirmed = async (instance: RecurrenceInstance) => {
+    if (!window.confirm('Apagar o lançamento desta recorrência neste mês?')) return;
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await db.deleteTransaction(instance.linkedTransactionId);
+        } catch (err) {
+          console.error('Failed to delete linked transaction:', err);
+        }
+      }
+      const updatedInstance: RecurrenceInstance = {
+        ...instance,
+        status: 'ignored',
+        linkedTransactionId: undefined,
+      };
+      await db.updateRecurrenceInstance(updatedInstance);
+      setInstances(prev => prev.map(i => i.id === instance.id ? updatedInstance : i));
+      await refreshData();
+      toast({ title: 'Lançamento apagado' });
+    } catch (error) {
+      toast({ title: 'Erro ao apagar', variant: 'destructive' });
+    }
+  };
+
   const groupByCategory = (items: RecurrenceInstance[]) => {
     const groups = new Map<string, { category: Category | undefined; instances: RecurrenceInstance[] }>();
     for (const instance of items) {
@@ -451,6 +507,35 @@ export function RecurrenceInstances() {
                         )}>
                           {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
                         </span>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            onClick={() => handleEditConfirmed(instance)}
+                            title="Editar"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-warning hover:bg-warning/10"
+                            onClick={() => handleRevertConfirmed(instance)}
+                            title="Desfazer confirmação"
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteConfirmed(instance)}
+                            title="Apagar lançamento"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
