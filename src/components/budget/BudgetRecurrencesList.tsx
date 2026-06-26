@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Check, X, TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CollapsibleCategoryGroup } from '@/components/recurrences/CollapsibleCategoryGroup';
 import type { Recurrence, RecurrenceInstance, Category, Subcategory } from '@/types/finance';
 
 interface BudgetRecurrencesListProps {
