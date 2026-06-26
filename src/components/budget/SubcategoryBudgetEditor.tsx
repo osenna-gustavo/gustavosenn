@@ -123,11 +123,6 @@ export function SubcategoryBudgetEditor({
               className="w-28"
               placeholder={hasSubcategories ? 'extra' : '0,00'}
             />
-            {autoCategory > 0 && (
-              <span className="text-[10px] text-muted-foreground mt-0.5">
-                + auto {formatCurrency(autoCategory)}
-              </span>
-            )}
           </div>
         </div>
       </div>
