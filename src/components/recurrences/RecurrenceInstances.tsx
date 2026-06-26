@@ -263,6 +263,62 @@ export function RecurrenceInstances() {
     }
   };
 
+  // Revert a confirmed instance back to pending: delete linked transaction and clear link
+  const handleRevertConfirmed = async (instance: RecurrenceInstance) => {
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await db.deleteTransaction(instance.linkedTransactionId);
+        } catch (err) {
+          console.error('Failed to delete linked transaction:', err);
+        }
+      }
+      const updatedInstance: RecurrenceInstance = {
+        ...instance,
+        status: 'pending',
+        linkedTransactionId: undefined,
+      };
+      await db.updateRecurrenceInstance(updatedInstance);
+      setInstances(prev => prev.map(i => i.id === instance.id ? updatedInstance : i));
+      await refreshData();
+      toast({ title: 'Confirmação desfeita', description: 'Voltou para pendente e o lançamento foi removido.' });
+    } catch (error) {
+      toast({ title: 'Erro ao reverter', variant: 'destructive' });
+    }
+  };
+
+  // Edit a confirmed instance: revert it and open the confirm modal pre-filled
+  const handleEditConfirmed = async (instance: RecurrenceInstance) => {
+    await handleRevertConfirmed(instance);
+    const reverted: RecurrenceInstance = { ...instance, status: 'pending', linkedTransactionId: undefined };
+    openConfirmModal(reverted);
+  };
+
+  // Delete a confirmed instance's transaction and mark instance as ignored
+  const handleDeleteConfirmed = async (instance: RecurrenceInstance) => {
+    if (!window.confirm('Apagar o lançamento desta recorrência neste mês?')) return;
+    try {
+      if (instance.linkedTransactionId) {
+        try {
+          await db.deleteTransaction(instance.linkedTransactionId);
+        } catch (err) {
+          console.error('Failed to delete linked transaction:', err);
+        }
+      }
+      const updatedInstance: RecurrenceInstance = {
+        ...instance,
+        status: 'ignored',
+        linkedTransactionId: undefined,
+      };
+      await db.updateRecurrenceInstance(updatedInstance);
+      setInstances(prev => prev.map(i => i.id === instance.id ? updatedInstance : i));
+      await refreshData();
+      toast({ title: 'Lançamento apagado' });
+    } catch (error) {
+      toast({ title: 'Erro ao apagar', variant: 'destructive' });
+    }
+  };
+
   const groupByCategory = (items: RecurrenceInstance[]) => {
     const groups = new Map<string, { category: Category | undefined; instances: RecurrenceInstance[] }>();
     for (const instance of items) {
