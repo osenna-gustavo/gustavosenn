@@ -85,6 +85,8 @@ export function BudgetPage() {
   const [showApplyRecurrencesModal, setShowApplyRecurrencesModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
   const [showInstallments, setShowInstallments] = useState(true);
+  const autoSyncRef = useRef(false);
+
 
   // Wrapped setters that mark form as dirty (user has unsaved edits)
   const updateCategoryBudget = (id: string, value: string) => {
