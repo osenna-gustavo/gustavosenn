@@ -9,7 +9,7 @@ import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
-import type { RecurrenceInstance, Recurrence, Subcategory } from '@/types/finance';
+import type { RecurrenceInstance, Recurrence, Subcategory, Category } from '@/types/finance';
 import {
   Dialog,
   DialogContent,
@@ -251,6 +251,22 @@ export function RecurrenceInstances() {
     }
   };
 
+  const groupByCategory = (items: RecurrenceInstance[]) => {
+    const groups = new Map<string, { category: Category | undefined; instances: RecurrenceInstance[] }>();
+    for (const instance of items) {
+      const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+      const category = categories.find(c => c.id === recurrence?.categoryId);
+      const key = category?.id || '__none__';
+      if (!groups.has(key)) {
+        groups.set(key, { category, instances: [] });
+      }
+      groups.get(key)!.instances.push(instance);
+    }
+    return Array.from(groups.values()).sort((a, b) =>
+      (a.category?.name || '').localeCompare(b.category?.name || '')
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="p-8 text-center text-muted-foreground">
@@ -279,84 +295,96 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Pendentes ({pendingInstances.length})
           </h4>
-          {pendingInstances.map(instance => {
-            const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
-            const category = categories.find(c => c.id === recurrence?.categoryId);
-            const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
-            if (!recurrence) return null;
-            
-            const installmentLabel = (() => {
-              if (!recurrence.totalInstallments) return null;
-              const start = new Date(recurrence.startDate);
-              const n = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
-              return `parcela ${n}/${recurrence.totalInstallments}`;
-            })();
-
-            return (
-              <div
-                key={instance.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
-                    <RefreshCw className="h-5 w-5 text-warning" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{recurrence.name}</span>
-                      {installmentLabel && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                          {installmentLabel}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-muted-foreground">
-                      {category?.icon} {category?.name}
-                      {subcategory && ` → ${subcategory.name}`}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "font-mono font-medium",
-                    recurrence.type === 'receita' ? "text-success" : "text-foreground"
-                  )}>
-                    {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
-                  </span>
-                  <div className="flex gap-1">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
-                      onClick={() => openConfirmModal(instance)}
-                      title="Confirmar com detalhes"
-                    >
-                      <Edit2 className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-success hover:text-success hover:bg-success/10"
-                      onClick={() => handleQuickConfirm(instance)}
-                      title="Confirmar rápido"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                      onClick={() => handleIgnore(instance)}
-                      title="Ignorar"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+          {groupByCategory(pendingInstances).map(group => (
+            <div key={(group.category?.id || '__none__') + '-pending'} className="space-y-1">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {group.instances.length} item(ns)
+                </span>
               </div>
-            );
-          })}
+              <div className="space-y-1">
+                {group.instances.map(instance => {
+                  const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+                  const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
+                  if (!recurrence) return null;
+                  
+                  const installmentLabel = (() => {
+                    if (!recurrence.totalInstallments) return null;
+                    const start = new Date(recurrence.startDate);
+                    const n = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+                    return `parcela ${n}/${recurrence.totalInstallments}`;
+                  })();
+
+                  return (
+                    <div
+                      key={instance.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border bg-card"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-warning/10 flex items-center justify-center">
+                          <RefreshCw className="h-5 w-5 text-warning" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{recurrence.name}</span>
+                            {installmentLabel && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                                {installmentLabel}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-sm text-muted-foreground">
+                            {subcategory && `${subcategory.name}`}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <span className={cn(
+                          "font-mono font-medium",
+                          recurrence.type === 'receita' ? "text-success" : "text-foreground"
+                        )}>
+                          {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
+                        </span>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            onClick={() => openConfirmModal(instance)}
+                            title="Confirmar com detalhes"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-success hover:text-success hover:bg-success/10"
+                            onClick={() => handleQuickConfirm(instance)}
+                            title="Confirmar rápido"
+                          >
+                            <Check className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleIgnore(instance)}
+                            title="Ignorar"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -366,44 +394,56 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Confirmados ({confirmedInstances.length})
           </h4>
-          {confirmedInstances.map(instance => {
-            const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
-            const category = categories.find(c => c.id === recurrence?.categoryId);
-            const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
-            if (!recurrence) return null;
-            
-            return (
-              <div 
-                key={instance.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-success/30 bg-success/5"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
-                    <Check className="h-5 w-5 text-success" />
-                  </div>
-                  <div>
-                    <div className="font-medium">{recurrence.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {category?.icon} {category?.name}
-                      {subcategory && ` → ${subcategory.name}`}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <Badge variant="outline" className="text-success border-success/30">
-                    Confirmado
-                  </Badge>
-                  <span className={cn(
-                    "font-mono font-medium",
-                    recurrence.type === 'receita' ? "text-success" : "text-foreground"
-                  )}>
-                    {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
-                  </span>
-                </div>
+          {groupByCategory(confirmedInstances).map(group => (
+            <div key={(group.category?.id || '__none__') + '-confirmed'} className="space-y-1">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {group.instances.length} item(ns)
+                </span>
               </div>
-            );
-          })}
+              <div className="space-y-1">
+                {group.instances.map(instance => {
+                  const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+                  const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
+                  if (!recurrence) return null;
+                  
+                  return (
+                    <div 
+                      key={instance.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-success/30 bg-success/5"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-success/10 flex items-center justify-center">
+                          <Check className="h-5 w-5 text-success" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{recurrence.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {subcategory && `${subcategory.name}`}
+                          </div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <Badge variant="outline" className="text-success border-success/30">
+                          Confirmado
+                        </Badge>
+                        <span className={cn(
+                          "font-mono font-medium",
+                          recurrence.type === 'receita' ? "text-success" : "text-foreground"
+                        )}>
+                          {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -413,43 +453,53 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Ignorados ({ignoredInstances.length})
           </h4>
-          {ignoredInstances.map(instance => {
-            const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
-            const category = categories.find(c => c.id === recurrence?.categoryId);
-            if (!recurrence) return null;
-            
-            return (
-              <div 
-                key={instance.id}
-                className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30 opacity-60"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
-                    <X className="h-5 w-5 text-muted-foreground" />
-                  </div>
-                  <div>
-                    <div className="font-medium">{recurrence.name}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {category?.icon} {category?.name}
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-muted-foreground">
-                    {formatCurrency(instance.amount)}
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => handleReopen(instance)}
-                  >
-                    Reabrir
-                  </Button>
-                </div>
+          {groupByCategory(ignoredInstances).map(group => (
+            <div key={(group.category?.id || '__none__') + '-ignored'} className="space-y-1">
+              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
+                <span className="text-xs font-medium text-muted-foreground">
+                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  {group.instances.length} item(ns)
+                </span>
               </div>
-            );
-          })}
+              <div className="space-y-1">
+                {group.instances.map(instance => {
+                  const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+                  if (!recurrence) return null;
+                  
+                  return (
+                    <div 
+                      key={instance.id}
+                      className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/30 opacity-60"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-lg bg-muted flex items-center justify-center">
+                          <X className="h-5 w-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="font-medium">{recurrence.name}</div>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-muted-foreground">
+                          {formatCurrency(instance.amount)}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleReopen(instance)}
+                        >
+                          Reabrir
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
