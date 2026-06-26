@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { formatNumberToBRL, parseBRLToNumber } from '@/lib/currencyInput';
@@ -12,6 +12,53 @@ import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList
 import { ApplyRecurrencesModal } from '@/components/budget/ApplyRecurrencesModal';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import type { Recurrence, RecurrenceInstance } from '@/types/finance';
+
+type RecSnapshotEntry = { key: string; amount: number; type: 'receita' | 'despesa' };
+type RecSnapshot = Record<string, RecSnapshotEntry>;
+
+const snapKey = (y: number, m: number) => `budget_rec_snapshot_${y}_${m}`;
+
+function readSnapshot(y: number, m: number): RecSnapshot | null {
+  try {
+    const raw = localStorage.getItem(snapKey(y, m));
+    return raw ? JSON.parse(raw) as RecSnapshot : null;
+  } catch { return null; }
+}
+
+function writeSnapshot(y: number, m: number, snap: RecSnapshot) {
+  try { localStorage.setItem(snapKey(y, m), JSON.stringify(snap)); } catch { /* ignore */ }
+}
+
+// Compute the recurrence/installment contributions that apply to a given month.
+function computeRecurrenceContributions(
+  recurrences: Recurrence[],
+  instances: RecurrenceInstance[],
+  month: number,
+  year: number,
+): RecSnapshot {
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+  const out: RecSnapshot = {};
+  for (const rec of recurrences) {
+    if (!rec.isActive) continue;
+    const startDate = new Date(rec.startDate);
+    const endDate = rec.endDate ? new Date(rec.endDate) : null;
+    if (startDate > monthEnd) continue;
+    if (endDate && endDate < monthStart) continue;
+    if (rec.totalInstallments) {
+      const currentNum = (year - startDate.getFullYear()) * 12 + (month - startDate.getMonth()) + 1;
+      if (currentNum < 1 || currentNum > rec.totalInstallments) continue;
+    }
+    const instance = instances.find(i => i.recurrenceId === rec.id);
+    const amount = instance?.amount ?? rec.amount;
+    const key = rec.type === 'receita'
+      ? 'income'
+      : (rec.subcategoryId ? `sub_${rec.subcategoryId}` : `cat_${rec.categoryId}`);
+    out[rec.id] = { key, amount, type: rec.type };
+  }
+  return out;
+}
 
 export function BudgetPage() {
   const { 
