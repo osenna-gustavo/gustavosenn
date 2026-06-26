@@ -86,6 +86,14 @@ export function BudgetPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
   const [showInstallments, setShowInstallments] = useState(true);
+  const [collapsedInstallmentGroups, setCollapsedInstallmentGroups] = useState<Set<string>>(new Set());
+  const toggleInstallmentGroup = (key: string) => {
+    setCollapsedInstallmentGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // Wrapped setters that mark form as dirty (user has unsaved edits)
   const updateCategoryBudget = (id: string, value: string) => {
