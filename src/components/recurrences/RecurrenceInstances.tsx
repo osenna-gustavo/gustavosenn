@@ -9,7 +9,7 @@ import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
-import type { RecurrenceInstance, Recurrence, Subcategory } from '@/types/finance';
+import type { RecurrenceInstance, Recurrence, Subcategory, Category } from '@/types/finance';
 import {
   Dialog,
   DialogContent,
