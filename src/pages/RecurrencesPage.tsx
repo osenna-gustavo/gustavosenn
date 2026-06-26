@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, RefreshCw, Pause, Play, CheckSquare, Square } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Pause, Play, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Recurrence, TransactionType } from '@/types/finance';
@@ -48,6 +48,16 @@ export function RecurrencesPage() {
   const [bulkMode, setBulkMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState(false);
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // Only show regular recurrences (not installment plans)
   const regularRecurrences = recurrences.filter(r => !r.totalInstallments);
@@ -286,103 +296,117 @@ export function RecurrencesPage() {
                     (a.category?.name || '').localeCompare(b.category?.name || '')
                   );
                   
-                  return sorted.map(group => (
-                    <div key={group.category?.id || '__none__'} className="space-y-1">
-                      <div className="flex items-center justify-between px-4 py-2 bg-muted/50 rounded-lg">
-                        <div className="flex items-center gap-2 text-sm font-medium">
-                          <span>{group.category?.icon}</span>
-                          <span>{group.category?.name || 'Sem categoria'}</span>
-                        </div>
-                        <span className="text-xs text-muted-foreground">
-                          {group.items.length} recorrência(s)
-                        </span>
-                      </div>
-                      <div className="divide-y divide-border">
-                        {group.items.map((recurrence) => {
-                          const isIncome = recurrence.type === 'receita';
+                  return sorted.map(group => {
+                    const key = group.category?.id || '__none__';
+                    const isCollapsed = collapsedGroups.has(key);
+                    return (
+                      <div key={key} className="space-y-1">
+                        <button
+                          onClick={() => toggleGroup(key)}
+                          className="w-full flex items-center justify-between px-4 py-2 bg-muted/50 rounded-lg cursor-pointer hover:bg-muted transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-medium">
+                            {isCollapsed ? (
+                              <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                            )}
+                            <span>{group.category?.icon}</span>
+                            <span>{group.category?.name || 'Sem categoria'}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {group.items.length} recorrência(s)
+                          </span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className="divide-y divide-border">
+                            {group.items.map((recurrence) => {
+                              const isIncome = recurrence.type === 'receita';
 
-                          return (
-                            <div
-                              key={recurrence.id}
-                              className={cn(
-                                "flex items-center justify-between p-4 transition-colors",
-                                !recurrence.isActive && "opacity-50",
-                                bulkMode && selectedIds.has(recurrence.id) && "bg-primary/5"
-                              )}
-                            >
-                              <div className="flex items-center gap-3">
-                                {bulkMode && (
-                                  <Checkbox
-                                    checked={selectedIds.has(recurrence.id)}
-                                    onCheckedChange={() => toggleSelect(recurrence.id)}
-                                  />
-                                )}
-                                <div className={cn(
-                                  "h-10 w-10 rounded-lg flex items-center justify-center",
-                                  isIncome ? "bg-success/10" : "bg-muted"
-                                )}>
-                                  <RefreshCw className={cn(
-                                    "h-5 w-5",
-                                    isIncome ? "text-success" : "text-muted-foreground"
-                                  )} />
-                                </div>
-                                <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium">{recurrence.name}</span>
-                                    <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
-                                      {frequencyLabels[recurrence.frequency]}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-muted-foreground">
-                                    Início: {formatDate(recurrence.startDate)}
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex items-center gap-3">
-                                <span className={cn(
-                                  "font-mono font-medium",
-                                  isIncome ? "text-success" : "text-foreground"
-                                )}>
-                                  {isIncome ? '+' : '-'}{formatCurrency(recurrence.amount)}
-                                </span>
-                                <div className="flex items-center gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => handleToggleActive(recurrence)}
-                                  >
-                                    {recurrence.isActive ? (
-                                      <Pause className="h-4 w-4" />
-                                    ) : (
-                                      <Play className="h-4 w-4" />
+                              return (
+                                <div
+                                  key={recurrence.id}
+                                  className={cn(
+                                    "flex items-center justify-between p-4 transition-colors",
+                                    !recurrence.isActive && "opacity-50",
+                                    bulkMode && selectedIds.has(recurrence.id) && "bg-primary/5"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    {bulkMode && (
+                                      <Checkbox
+                                        checked={selectedIds.has(recurrence.id)}
+                                        onCheckedChange={() => toggleSelect(recurrence.id)}
+                                      />
                                     )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8"
-                                    onClick={() => openForm(recurrence)}
-                                  >
-                                    <Pencil className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() => setDeleteId(recurrence.id)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                    <div className={cn(
+                                      "h-10 w-10 rounded-lg flex items-center justify-center",
+                                      isIncome ? "bg-success/10" : "bg-muted"
+                                    )}>
+                                      <RefreshCw className={cn(
+                                        "h-5 w-5",
+                                        isIncome ? "text-success" : "text-muted-foreground"
+                                      )} />
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium">{recurrence.name}</span>
+                                        <span className="text-xs px-2 py-0.5 rounded bg-muted text-muted-foreground">
+                                          {frequencyLabels[recurrence.frequency]}
+                                        </span>
+                                      </div>
+                                      <div className="text-sm text-muted-foreground">
+                                        Início: {formatDate(recurrence.startDate)}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center gap-3">
+                                    <span className={cn(
+                                      "font-mono font-medium",
+                                      isIncome ? "text-success" : "text-foreground"
+                                    )}>
+                                      {isIncome ? '+' : '-'}{formatCurrency(recurrence.amount)}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => handleToggleActive(recurrence)}
+                                      >
+                                        {recurrence.isActive ? (
+                                          <Pause className="h-4 w-4" />
+                                        ) : (
+                                          <Play className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8"
+                                        onClick={() => openForm(recurrence)}
+                                      >
+                                        <Pencil className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                        onClick={() => setDeleteId(recurrence.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
-                              </div>
-                            </div>
-                          );
-                        })}
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
-                    </div>
-                  ));
+                    );
+                  });
                 })()}
               </>
             )}
