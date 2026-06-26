@@ -507,6 +507,35 @@ export function RecurrenceInstances() {
                         )}>
                           {recurrence.type === 'receita' ? '+' : '-'}{formatCurrency(instance.amount)}
                         </span>
+                        <div className="flex gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-primary hover:bg-primary/10"
+                            onClick={() => handleEditConfirmed(instance)}
+                            title="Editar"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-warning hover:bg-warning/10"
+                            onClick={() => handleRevertConfirmed(instance)}
+                            title="Desfazer confirmação"
+                          >
+                            <Undo2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => handleDeleteConfirmed(instance)}
+                            title="Apagar lançamento"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   );
