@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { formatCurrency } from '@/lib/formatters';
 import { Badge } from '@/components/ui/badge';
 import { RefreshCw, Check, X, TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CollapsibleCategoryGroup } from '@/components/recurrences/CollapsibleCategoryGroup';
 import type { Recurrence, RecurrenceInstance, Category, Subcategory } from '@/types/finance';
 
 interface BudgetRecurrencesListProps {
@@ -22,6 +23,15 @@ export function BudgetRecurrencesList({
   selectedMonth,
   selectedYear,
 }: BudgetRecurrencesListProps) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   // Generate preview of recurrences for the month
   const monthRecurrences = useMemo(() => {
     const result: Array<{
@@ -140,7 +150,7 @@ export function BudgetRecurrencesList({
 
       {/* Income Recurrences */}
       {incomeGrouped.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h4 className="text-sm font-medium text-muted-foreground">
             Receitas ({incomeRecurrences.length})
           </h4>
@@ -148,17 +158,17 @@ export function BudgetRecurrencesList({
             const category = categories.find(c => c.id === catId);
             const groupTotal = items.reduce((s, i) => s + (i.instance?.amount ?? i.recurrence.amount), 0);
             return (
-              <div key={catId} className="border border-border/60 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border/40">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <span>{category?.icon}</span>
-                    <span>{category?.name || 'Sem categoria'}</span>
-                  </div>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {formatCurrency(groupTotal)}
-                  </span>
-                </div>
-                <div className="divide-y divide-border/30">
+              <CollapsibleCategoryGroup
+                key={`inc-${catId}`}
+                groupKey={`inc-${catId}`}
+                icon={category?.icon}
+                name={category?.name}
+                count={items.length}
+                collapsedGroups={collapsedGroups}
+                onToggle={toggleGroup}
+                variant="md"
+              >
+                <div className="border border-border/60 rounded-lg overflow-hidden divide-y divide-border/30">
                   {items.map(({ recurrence, instance, subcategory }) => (
                     <RecurrenceItem
                       key={recurrence.id}
@@ -168,8 +178,11 @@ export function BudgetRecurrencesList({
                       subcategory={subcategory}
                     />
                   ))}
+                  <div className="px-3 py-2 bg-muted/30 text-right text-xs text-muted-foreground">
+                    Subtotal: <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotal)}</span>
+                  </div>
                 </div>
-              </div>
+              </CollapsibleCategoryGroup>
             );
           })}
         </div>
@@ -177,7 +190,7 @@ export function BudgetRecurrencesList({
 
       {/* Expense Recurrences */}
       {expenseGrouped.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <h4 className="text-sm font-medium text-muted-foreground">
             Despesas ({expenseRecurrences.length})
           </h4>
@@ -185,17 +198,17 @@ export function BudgetRecurrencesList({
             const category = categories.find(c => c.id === catId);
             const groupTotal = items.reduce((s, i) => s + (i.instance?.amount ?? i.recurrence.amount), 0);
             return (
-              <div key={catId} className="border border-border/60 rounded-lg overflow-hidden">
-                <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border/40">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <span>{category?.icon}</span>
-                    <span>{category?.name || 'Sem categoria'}</span>
-                  </div>
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {formatCurrency(groupTotal)}
-                  </span>
-                </div>
-                <div className="divide-y divide-border/30">
+              <CollapsibleCategoryGroup
+                key={`exp-${catId}`}
+                groupKey={`exp-${catId}`}
+                icon={category?.icon}
+                name={category?.name}
+                count={items.length}
+                collapsedGroups={collapsedGroups}
+                onToggle={toggleGroup}
+                variant="md"
+              >
+                <div className="border border-border/60 rounded-lg overflow-hidden divide-y divide-border/30">
                   {items.map(({ recurrence, instance, subcategory }) => (
                     <RecurrenceItem
                       key={recurrence.id}
@@ -205,8 +218,11 @@ export function BudgetRecurrencesList({
                       subcategory={subcategory}
                     />
                   ))}
+                  <div className="px-3 py-2 bg-muted/30 text-right text-xs text-muted-foreground">
+                    Subtotal: <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotal)}</span>
+                  </div>
                 </div>
-              </div>
+              </CollapsibleCategoryGroup>
             );
           })}
         </div>

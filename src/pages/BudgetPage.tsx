@@ -9,6 +9,7 @@ import { Save, Copy, RefreshCw, ChevronDown, ChevronUp, CreditCard } from 'lucid
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
 import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList';
+import { CollapsibleCategoryGroup } from '@/components/recurrences/CollapsibleCategoryGroup';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Recurrence, RecurrenceInstance } from '@/types/finance';
@@ -85,6 +86,14 @@ export function BudgetPage() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
   const [showInstallments, setShowInstallments] = useState(true);
+  const [collapsedInstallmentGroups, setCollapsedInstallmentGroups] = useState<Set<string>>(new Set());
+  const toggleInstallmentGroup = (key: string) => {
+    setCollapsedInstallmentGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
 
   // Wrapped setters that mark form as dirty (user has unsaved edits)
   const updateCategoryBudget = (id: string, value: string) => {
@@ -343,27 +352,60 @@ export function BudgetPage() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <div className="px-4 pb-4 lg:px-6 lg:pb-6 space-y-3">
-                {activeInstallments.map(plan => {
-                  const category = categories.find(c => c.id === plan.categoryId);
-                  const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
-                  const start = new Date(plan.startDate);
-                  const currentNum = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
-                  return (
-                    <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
-                      <div>
-                        <div className="font-medium text-sm">{plan.name}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {category?.icon} {category?.name}
-                          {subcategory && ` → ${subcategory.name}`}
-                          {' • '}parcela {currentNum}/{plan.totalInstallments}
+                {(() => {
+                  const grouped = new Map<string, typeof activeInstallments>();
+                  for (const plan of activeInstallments) {
+                    const key = plan.categoryId || '__none__';
+                    const arr = grouped.get(key) || [];
+                    arr.push(plan);
+                    grouped.set(key, arr);
+                  }
+                  const entries = Array.from(grouped.entries()).sort((a, b) => {
+                    const nA = categories.find(c => c.id === a[0])?.name || '';
+                    const nB = categories.find(c => c.id === b[0])?.name || '';
+                    return nA.localeCompare(nB);
+                  });
+                  return entries.map(([catId, plans]) => {
+                    const category = categories.find(c => c.id === catId);
+                    const groupTotal = plans.reduce((s, p) => s + p.amount, 0);
+                    return (
+                      <CollapsibleCategoryGroup
+                        key={catId}
+                        groupKey={`inst-${catId}`}
+                        icon={category?.icon}
+                        name={category?.name}
+                        count={plans.length}
+                        collapsedGroups={collapsedInstallmentGroups}
+                        onToggle={toggleInstallmentGroup}
+                        variant="md"
+                      >
+                        <div className="space-y-2 pl-2">
+                          {plans.map(plan => {
+                            const subcategory = subcategories.find(s => s.id === plan.subcategoryId);
+                            const start = new Date(plan.startDate);
+                            const currentNum = (selectedYear - start.getFullYear()) * 12 + (selectedMonth - start.getMonth()) + 1;
+                            return (
+                              <div key={plan.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/40">
+                                <div>
+                                  <div className="font-medium text-sm">{plan.name}</div>
+                                  <div className="text-xs text-muted-foreground">
+                                    {subcategory && `${subcategory.name} • `}parcela {currentNum}/{plan.totalInstallments}
+                                  </div>
+                                </div>
+                                <span className="font-mono text-sm font-medium">
+                                  {formatCurrency(plan.amount)}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          <div className="text-right text-xs text-muted-foreground pr-1">
+                            Subtotal: <span className="font-mono font-medium text-foreground">{formatCurrency(groupTotal)}</span>
+                          </div>
                         </div>
-                      </div>
-                      <span className="font-mono text-sm font-medium">
-                        {formatCurrency(plan.amount)}
-                      </span>
-                    </div>
-                  );
-                })}
+                      </CollapsibleCategoryGroup>
+                    );
+                  });
+                })()}
                 <div className="pt-2 border-t border-border text-sm text-muted-foreground">
                   Total: <span className="font-mono font-medium text-foreground">
                     {formatCurrency(activeInstallments.reduce((s, p) => s + p.amount, 0))}
