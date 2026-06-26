@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
+import { Check, X, RefreshCw, Edit2, Undo2, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
