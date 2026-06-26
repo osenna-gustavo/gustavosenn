@@ -33,22 +33,22 @@ export function BudgetRecurrencesList({
 
     for (const rec of recurrences) {
       if (!rec.isActive) continue;
-      
+
       const startDate = new Date(rec.startDate);
       const endDate = rec.endDate ? new Date(rec.endDate) : null;
-      
+
       const monthStart = new Date(selectedYear, selectedMonth, 1);
       const monthEnd = new Date(selectedYear, selectedMonth + 1, 0);
-      
+
       if (startDate > monthEnd) continue;
       if (endDate && endDate < monthStart) continue;
-      
+
       const instance = instances.find(i => i.recurrenceId === rec.id);
       const category = categories.find(c => c.id === rec.categoryId);
-      const subcategory = rec.subcategoryId 
-        ? subcategories.find(s => s.id === rec.subcategoryId) 
+      const subcategory = rec.subcategoryId
+        ? subcategories.find(s => s.id === rec.subcategoryId)
         : undefined;
-      
+
       result.push({ recurrence: rec, instance, category, subcategory });
     }
 
@@ -86,6 +86,25 @@ export function BudgetRecurrencesList({
   const incomeRecurrences = monthRecurrences.filter(r => r.recurrence.type === 'receita');
   const expenseRecurrences = monthRecurrences.filter(r => r.recurrence.type === 'despesa');
 
+  const groupByCategory = (items: typeof incomeRecurrences) => {
+    const grouped = new Map<string, typeof items>();
+    for (const item of items) {
+      const catId = item.category?.id || '__none__';
+      const existing = grouped.get(catId) || [];
+      existing.push(item);
+      grouped.set(catId, existing);
+    }
+    // Sort categories by name
+    return Array.from(grouped.entries()).sort((a, b) => {
+      const nameA = categories.find(c => c.id === a[0])?.name || '';
+      const nameB = categories.find(c => c.id === b[0])?.name || '';
+      return nameA.localeCompare(nameB);
+    });
+  };
+
+  const incomeGrouped = groupByCategory(incomeRecurrences);
+  const expenseGrouped = groupByCategory(expenseRecurrences);
+
   return (
     <div className="space-y-4">
       {/* Summary Cards */}
@@ -120,37 +139,76 @@ export function BudgetRecurrencesList({
       </div>
 
       {/* Income Recurrences */}
-      {incomeRecurrences.length > 0 && (
-        <div className="space-y-2">
+      {incomeGrouped.length > 0 && (
+        <div className="space-y-4">
           <h4 className="text-sm font-medium text-muted-foreground">
             Receitas ({incomeRecurrences.length})
           </h4>
-          {incomeRecurrences.map(({ recurrence, instance, category }) => (
-            <RecurrenceItem
-              key={recurrence.id}
-              recurrence={recurrence}
-              instance={instance}
-              category={category}
-            />
-          ))}
+          {incomeGrouped.map(([catId, items]) => {
+            const category = categories.find(c => c.id === catId);
+            const groupTotal = items.reduce((s, i) => s + (i.instance?.amount ?? i.recurrence.amount), 0);
+            return (
+              <div key={catId} className="border border-border/60 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border/40">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span>{category?.icon}</span>
+                    <span>{category?.name || 'Sem categoria'}</span>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {formatCurrency(groupTotal)}
+                  </span>
+                </div>
+                <div className="divide-y divide-border/30">
+                  {items.map(({ recurrence, instance, subcategory }) => (
+                    <RecurrenceItem
+                      key={recurrence.id}
+                      recurrence={recurrence}
+                      instance={instance}
+                      category={category}
+                      subcategory={subcategory}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* Expense Recurrences */}
-      {expenseRecurrences.length > 0 && (
-        <div className="space-y-2">
+      {expenseGrouped.length > 0 && (
+        <div className="space-y-4">
           <h4 className="text-sm font-medium text-muted-foreground">
             Despesas ({expenseRecurrences.length})
           </h4>
-          {expenseRecurrences.map(({ recurrence, instance, category, subcategory }) => (
-            <RecurrenceItem
-              key={recurrence.id}
-              recurrence={recurrence}
-              instance={instance}
-              category={category}
-              subcategory={subcategory}
-            />
-          ))}
+          {expenseGrouped.map(([catId, items]) => {
+            const category = categories.find(c => c.id === catId);
+            const groupTotal = items.reduce((s, i) => s + (i.instance?.amount ?? i.recurrence.amount), 0);
+            return (
+              <div key={catId} className="border border-border/60 rounded-lg overflow-hidden">
+                <div className="flex items-center justify-between px-3 py-2 bg-muted/40 border-b border-border/40">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <span>{category?.icon}</span>
+                    <span>{category?.name || 'Sem categoria'}</span>
+                  </div>
+                  <span className="text-xs font-mono text-muted-foreground">
+                    {formatCurrency(groupTotal)}
+                  </span>
+                </div>
+                <div className="divide-y divide-border/30">
+                  {items.map(({ recurrence, instance, subcategory }) => (
+                    <RecurrenceItem
+                      key={recurrence.id}
+                      recurrence={recurrence}
+                      instance={instance}
+                      category={category}
+                      subcategory={subcategory}
+                    />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
@@ -182,9 +240,9 @@ function RecurrenceItem({
 
   return (
     <div className={cn(
-      "flex items-center justify-between p-3 rounded-lg border",
+      "flex items-center justify-between p-3",
       status === 'ignored' ? 'opacity-50' : '',
-      status === 'confirmed' ? 'border-success/30 bg-success/5' : 'border-border bg-card'
+      status === 'confirmed' ? 'bg-success/5' : 'bg-card'
     )}>
       <div className="flex items-center gap-3">
         <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", config.bg)}>
@@ -193,12 +251,11 @@ function RecurrenceItem({
         <div>
           <div className="font-medium text-sm">{recurrence.name}</div>
           <div className="text-xs text-muted-foreground flex items-center gap-2">
-            <span>{category?.icon} {category?.name}</span>
-            {subcategory && <span>• {subcategory.name}</span>}
+            {subcategory && <span>{subcategory.name}</span>}
           </div>
         </div>
       </div>
-      
+
       <div className="flex items-center gap-2">
         {category?.isFixed && (
           <Badge variant="outline" className="text-xs border-primary/30 text-primary">
