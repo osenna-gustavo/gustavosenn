@@ -251,6 +251,22 @@ export function RecurrenceInstances() {
     }
   };
 
+  const groupByCategory = (items: RecurrenceInstance[]) => {
+    const groups = new Map<string, { category: Category | undefined; instances: RecurrenceInstance[] }>();
+    for (const instance of items) {
+      const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
+      const category = categories.find(c => c.id === recurrence?.categoryId);
+      const key = category?.id || '__none__';
+      if (!groups.has(key)) {
+        groups.set(key, { category, instances: [] });
+      }
+      groups.get(key)!.instances.push(instance);
+    }
+    return Array.from(groups.values()).sort((a, b) =>
+      (a.category?.name || '').localeCompare(b.category?.name || '')
+    );
+  };
+
   if (isLoading) {
     return (
       <div className="p-8 text-center text-muted-foreground">
