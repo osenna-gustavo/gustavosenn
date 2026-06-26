@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Check, X, RefreshCw, Edit2, ChevronDown, ChevronRight } from 'lucide-react';
+import { Check, X, RefreshCw, Edit2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import * as db from '@/lib/supabase-database';
@@ -24,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CollapsibleCategoryGroup } from './CollapsibleCategoryGroup';
 
 export function RecurrenceInstances() {
   const { 
@@ -306,17 +307,18 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Pendentes ({pendingInstances.length})
           </h4>
-          {groupByCategory(pendingInstances).map(group => (
-            <div key={(group.category?.id || '__none__') + '-pending'} className="space-y-1">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {group.instances.length} item(ns)
-                </span>
-              </div>
-              <div className="space-y-1">
+          {groupByCategory(pendingInstances).map(group => {
+            const key = (group.category?.id || '__none__') + '-pending';
+            return (
+              <CollapsibleCategoryGroup
+                key={key}
+                groupKey={key}
+                icon={group.category?.icon}
+                name={group.category?.name}
+                count={group.instances.length}
+                collapsedGroups={collapsedGroups}
+                onToggle={toggleGroup}
+              >
                 {group.instances.map(instance => {
                   const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
                   const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
@@ -393,9 +395,9 @@ export function RecurrenceInstances() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          ))}
+              </CollapsibleCategoryGroup>
+            );
+          })}
         </div>
       )}
 
@@ -405,17 +407,18 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Confirmados ({confirmedInstances.length})
           </h4>
-          {groupByCategory(confirmedInstances).map(group => (
-            <div key={(group.category?.id || '__none__') + '-confirmed'} className="space-y-1">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {group.instances.length} item(ns)
-                </span>
-              </div>
-              <div className="space-y-1">
+          {groupByCategory(confirmedInstances).map(group => {
+            const key = (group.category?.id || '__none__') + '-confirmed';
+            return (
+              <CollapsibleCategoryGroup
+                key={key}
+                groupKey={key}
+                icon={group.category?.icon}
+                name={group.category?.name}
+                count={group.instances.length}
+                collapsedGroups={collapsedGroups}
+                onToggle={toggleGroup}
+              >
                 {group.instances.map(instance => {
                   const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
                   const subcategory = subcategories.find(s => s.id === recurrence?.subcategoryId);
@@ -452,9 +455,9 @@ export function RecurrenceInstances() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          ))}
+              </CollapsibleCategoryGroup>
+            );
+          })}
         </div>
       )}
 
@@ -464,17 +467,18 @@ export function RecurrenceInstances() {
           <h4 className="text-sm font-medium text-muted-foreground px-1">
             Ignorados ({ignoredInstances.length})
           </h4>
-          {groupByCategory(ignoredInstances).map(group => (
-            <div key={(group.category?.id || '__none__') + '-ignored'} className="space-y-1">
-              <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 rounded-md">
-                <span className="text-xs font-medium text-muted-foreground">
-                  {group.category?.icon} {group.category?.name || 'Sem categoria'}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {group.instances.length} item(ns)
-                </span>
-              </div>
-              <div className="space-y-1">
+          {groupByCategory(ignoredInstances).map(group => {
+            const key = (group.category?.id || '__none__') + '-ignored';
+            return (
+              <CollapsibleCategoryGroup
+                key={key}
+                groupKey={key}
+                icon={group.category?.icon}
+                name={group.category?.name}
+                count={group.instances.length}
+                collapsedGroups={collapsedGroups}
+                onToggle={toggleGroup}
+              >
                 {group.instances.map(instance => {
                   const recurrence = recurrences.find(r => r.id === instance.recurrenceId);
                   if (!recurrence) return null;
@@ -508,9 +512,9 @@ export function RecurrenceInstances() {
                     </div>
                   );
                 })}
-              </div>
-            </div>
-          ))}
+              </CollapsibleCategoryGroup>
+            );
+          })}
         </div>
       )}
 
