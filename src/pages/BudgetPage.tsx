@@ -9,6 +9,7 @@ import { Save, Copy, RefreshCw, ChevronDown, ChevronUp, CreditCard } from 'lucid
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
 import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList';
+import { CollapsibleCategoryGroup } from '@/components/recurrences/CollapsibleCategoryGroup';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Recurrence, RecurrenceInstance } from '@/types/finance';
