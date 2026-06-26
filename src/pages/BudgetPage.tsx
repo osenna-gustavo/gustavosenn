@@ -144,6 +144,96 @@ export function BudgetPage() {
     setIsDirty(false);
   }, [selectedMonth, selectedYear]);
 
+  // Auto-sync recurrence/installment changes into the saved budget:
+  // applies only the DELTA vs the last snapshot, so manual edits stay intact.
+  useEffect(() => {
+    if (isDirty || !budget || autoSyncRef.current) return;
+
+    const current = computeRecurrenceContributions(
+      recurrences, recurrenceInstances, selectedMonth, selectedYear,
+    );
+    const snap = readSnapshot(selectedYear, selectedMonth);
+
+    // First time on this month: just record the baseline, don't change budget.
+    if (!snap) {
+      writeSnapshot(selectedYear, selectedMonth, current);
+      return;
+    }
+
+    // Compute per-key deltas
+    const deltas: Record<string, number> = {};
+    const ids = new Set<string>([...Object.keys(current), ...Object.keys(snap)]);
+    let changed = false;
+    for (const id of ids) {
+      const cur = current[id];
+      const old = snap[id];
+      if (cur && !old) {
+        deltas[cur.key] = (deltas[cur.key] || 0) + cur.amount;
+        changed = true;
+      } else if (!cur && old) {
+        deltas[old.key] = (deltas[old.key] || 0) - old.amount;
+        changed = true;
+      } else if (cur && old) {
+        if (cur.key !== old.key) {
+          deltas[old.key] = (deltas[old.key] || 0) - old.amount;
+          deltas[cur.key] = (deltas[cur.key] || 0) + cur.amount;
+          changed = true;
+        } else if (Math.abs(cur.amount - old.amount) > 0.001) {
+          deltas[cur.key] = (deltas[cur.key] || 0) + (cur.amount - old.amount);
+          changed = true;
+        }
+      }
+    }
+
+    if (!changed) return;
+
+    // Build updated budget from current saved budget + deltas
+    autoSyncRef.current = true;
+    const byKey = new Map<string, { categoryId: string; subcategoryId?: string; plannedAmount: number }>();
+    budget.categoryBudgets.forEach(cb => {
+      const k = cb.subcategoryId ? `sub_${cb.subcategoryId}` : `cat_${cb.categoryId}`;
+      byKey.set(k, { ...cb });
+    });
+
+    let newIncome = budget.plannedIncome;
+    Object.entries(deltas).forEach(([key, delta]) => {
+      if (key === 'income') { newIncome = Math.max(0, newIncome + delta); return; }
+      if (key.startsWith('sub_')) {
+        const subId = key.slice(4);
+        const sub = subcategories.find(s => s.id === subId);
+        const existing = byKey.get(key);
+        const next = Math.max(0, (existing?.plannedAmount || 0) + delta);
+        byKey.set(key, { categoryId: sub?.categoryId || existing?.categoryId || '', subcategoryId: subId, plannedAmount: next });
+      } else if (key.startsWith('cat_')) {
+        const catId = key.slice(4);
+        const existing = byKey.get(key);
+        const next = Math.max(0, (existing?.plannedAmount || 0) + delta);
+        byKey.set(key, { categoryId: catId, plannedAmount: next });
+      }
+    });
+
+    const newCategoryBudgets = Array.from(byKey.values()).filter(cb => cb.plannedAmount > 0);
+
+    saveBudget({
+      month: selectedMonth,
+      year: selectedYear,
+      plannedIncome: newIncome,
+      plannedExpenses: budget.plannedExpenses,
+      categoryBudgets: newCategoryBudgets,
+    }).then(() => {
+      writeSnapshot(selectedYear, selectedMonth, current);
+      toast({
+        title: 'Orçamento atualizado',
+        description: 'As recorrências mudaram e o orçamento foi ajustado automaticamente.',
+      });
+    }).catch(() => {
+      // ignore
+    }).finally(() => {
+      autoSyncRef.current = false;
+    });
+  }, [budget, recurrences, recurrenceInstances, selectedMonth, selectedYear, isDirty, subcategories, saveBudget, toast]);
+
+
   // Calculate realized amounts
   const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
     const byCategory: Record<string, number> = {};
