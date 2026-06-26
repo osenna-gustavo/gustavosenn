@@ -342,6 +342,13 @@ export function BudgetPage() {
         categoryBudgets: categoryBudgetsArray,
       });
 
+      // Refresh recurrence snapshot baseline after a manual save so future
+      // recurrence changes only apply the delta vs this saved state.
+      const baseline = computeRecurrenceContributions(
+        recurrences, recurrenceInstances, selectedMonth, selectedYear,
+      );
+      writeSnapshot(selectedYear, selectedMonth, baseline);
+
       setIsDirty(false);
       toast({
         title: 'Orçamento salvo!',
