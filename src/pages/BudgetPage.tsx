@@ -336,7 +336,7 @@ export function BudgetPage() {
           <CollapsibleContent>
             <div className="px-4 pb-4 lg:px-6 lg:pb-6">
               <BudgetRecurrencesList
-                recurrences={recurrences}
+                recurrences={recurrences.filter(r => !r.totalInstallments)}
                 instances={recurrenceInstances}
                 categories={categories}
                 subcategories={subcategories}
