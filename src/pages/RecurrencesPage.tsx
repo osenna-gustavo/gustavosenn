@@ -29,7 +29,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Pencil, Trash2, RefreshCw, Pause, Play, CheckSquare, Square } from 'lucide-react';
+import { Plus, Pencil, Trash2, RefreshCw, Pause, Play, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Checkbox } from '@/components/ui/checkbox';
 import type { Recurrence, TransactionType } from '@/types/finance';
