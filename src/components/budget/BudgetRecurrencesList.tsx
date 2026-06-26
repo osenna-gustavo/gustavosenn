@@ -23,6 +23,15 @@ export function BudgetRecurrencesList({
   selectedMonth,
   selectedYear,
 }: BudgetRecurrencesListProps) {
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
   // Generate preview of recurrences for the month
   const monthRecurrences = useMemo(() => {
     const result: Array<{
