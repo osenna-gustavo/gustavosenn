@@ -48,6 +48,17 @@ export function RecurrenceInstances() {
     date: '',
   });
 
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+
+  const toggleGroup = (key: string) => {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+
   // Get subcategories for selected category
   const filteredSubcategories = subcategories.filter(
     s => s.categoryId === confirmData.categoryId
