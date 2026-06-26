@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatMonthYear } from '@/lib/formatters';
 import { formatNumberToBRL, parseBRLToNumber } from '@/lib/currencyInput';
@@ -9,37 +9,28 @@ import { Save, Copy, RefreshCw, ChevronDown, ChevronUp, CreditCard } from 'lucid
 import { SubcategoryBudgetEditor } from '@/components/budget/SubcategoryBudgetEditor';
 import { DuplicateBudgetModal } from '@/components/budget/DuplicateBudgetModal';
 import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList';
-import { ApplyRecurrencesModal } from '@/components/budget/ApplyRecurrencesModal';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { Recurrence, RecurrenceInstance } from '@/types/finance';
 
-type RecSnapshotEntry = { key: string; amount: number; type: 'receita' | 'despesa' };
-type RecSnapshot = Record<string, RecSnapshotEntry>;
-
-const snapKey = (y: number, m: number) => `budget_rec_snapshot_${y}_${m}`;
-
-function readSnapshot(y: number, m: number): RecSnapshot | null {
-  try {
-    const raw = localStorage.getItem(snapKey(y, m));
-    return raw ? JSON.parse(raw) as RecSnapshot : null;
-  } catch { return null; }
-}
-
-function writeSnapshot(y: number, m: number, snap: RecSnapshot) {
-  try { localStorage.setItem(snapKey(y, m), JSON.stringify(snap)); } catch { /* ignore */ }
-}
-
-// Compute the recurrence/installment contributions that apply to a given month.
-function computeRecurrenceContributions(
+/**
+ * Compute the automatic budget contributions from recurrences and installments
+ * that apply to a given month, grouped by category and subcategory.
+ * Only expenses contribute; income recurrences are aggregated separately.
+ */
+function computeAutoBudget(
   recurrences: Recurrence[],
   instances: RecurrenceInstance[],
   month: number,
   year: number,
-): RecSnapshot {
+) {
+  const byCategory: Record<string, number> = {};
+  const bySubcategory: Record<string, number> = {};
+  let autoIncome = 0;
+
   const monthStart = new Date(year, month, 1);
   const monthEnd = new Date(year, month + 1, 0);
-  const out: RecSnapshot = {};
+
   for (const rec of recurrences) {
     if (!rec.isActive) continue;
     const startDate = new Date(rec.startDate);
@@ -47,31 +38,41 @@ function computeRecurrenceContributions(
     if (startDate > monthEnd) continue;
     if (endDate && endDate < monthStart) continue;
     if (rec.totalInstallments) {
-      const currentNum = (year - startDate.getFullYear()) * 12 + (month - startDate.getMonth()) + 1;
+      const currentNum =
+        (year - startDate.getFullYear()) * 12 + (month - startDate.getMonth()) + 1;
       if (currentNum < 1 || currentNum > rec.totalInstallments) continue;
     }
+
     const instance = instances.find(i => i.recurrenceId === rec.id);
     const amount = instance?.amount ?? rec.amount;
-    const key = rec.type === 'receita'
-      ? 'income'
-      : (rec.subcategoryId ? `sub_${rec.subcategoryId}` : `cat_${rec.categoryId}`);
-    out[rec.id] = { key, amount, type: rec.type };
+
+    if (rec.type === 'receita') {
+      autoIncome += amount;
+      continue;
+    }
+
+    if (rec.subcategoryId) {
+      bySubcategory[rec.subcategoryId] = (bySubcategory[rec.subcategoryId] || 0) + amount;
+    } else {
+      byCategory[rec.categoryId] = (byCategory[rec.categoryId] || 0) + amount;
+    }
   }
-  return out;
+
+  return { byCategory, bySubcategory, autoIncome };
 }
 
 export function BudgetPage() {
-  const { 
-    selectedMonth, 
-    selectedYear, 
+  const {
+    selectedMonth,
+    selectedYear,
     categories,
-    subcategories, 
+    subcategories,
     transactions,
     budget,
     recurrences,
     recurrenceInstances,
     saveBudget,
-    refreshData 
+    refreshData,
   } = useApp();
   const { toast } = useToast();
 
@@ -82,11 +83,8 @@ export function BudgetPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [showApplyRecurrencesModal, setShowApplyRecurrencesModal] = useState(false);
   const [showRecurrences, setShowRecurrences] = useState(true);
   const [showInstallments, setShowInstallments] = useState(true);
-  const autoSyncRef = useRef(false);
-
 
   // Wrapped setters that mark form as dirty (user has unsaved edits)
   const updateCategoryBudget = (id: string, value: string) => {
@@ -100,10 +98,13 @@ export function BudgetPage() {
   const updatePlannedIncome = (v: string) => { setIsDirty(true); setPlannedIncome(v); };
   const updatePlannedExpenses = (v: string) => { setIsDirty(true); setPlannedExpenses(v); };
 
-  // Initialize from budget AND ensure all categories are represented.
-  // IMPORTANT: only re-sync from server when the user has no unsaved edits,
-  // otherwise background refreshes (recurrences sync, realtime, etc.) would
-  // wipe out the values the user is typing.
+  // Auto contributions from recurrences + installments for this month
+  const { byCategory: autoByCategory, bySubcategory: autoBySubcategory, autoIncome } = useMemo(
+    () => computeAutoBudget(recurrences, recurrenceInstances, selectedMonth, selectedYear),
+    [recurrences, recurrenceInstances, selectedMonth, selectedYear],
+  );
+
+  // Initialize manual values from saved budget (only when no unsaved edits)
   useEffect(() => {
     if (isDirty) return;
 
@@ -139,117 +140,23 @@ export function BudgetPage() {
     setSubcategoryBudgets(subBudgets);
   }, [budget, categories, subcategories, isDirty]);
 
-  // Reset dirty flag when user switches month/year (load fresh data from server)
-  useEffect(() => {
-    setIsDirty(false);
-  }, [selectedMonth, selectedYear]);
+  // Reset dirty flag when month changes
+  useEffect(() => { setIsDirty(false); }, [selectedMonth, selectedYear]);
 
-  // Auto-sync recurrence/installment changes into the saved budget:
-  // applies only the DELTA vs the last snapshot, so manual edits stay intact.
-  useEffect(() => {
-    if (isDirty || !budget || autoSyncRef.current) return;
-
-    const current = computeRecurrenceContributions(
-      recurrences, recurrenceInstances, selectedMonth, selectedYear,
-    );
-    const snap = readSnapshot(selectedYear, selectedMonth);
-
-    // First time on this month: just record the baseline, don't change budget.
-    if (!snap) {
-      writeSnapshot(selectedYear, selectedMonth, current);
-      return;
-    }
-
-    // Compute per-key deltas
-    const deltas: Record<string, number> = {};
-    const ids = new Set<string>([...Object.keys(current), ...Object.keys(snap)]);
-    let changed = false;
-    for (const id of ids) {
-      const cur = current[id];
-      const old = snap[id];
-      if (cur && !old) {
-        deltas[cur.key] = (deltas[cur.key] || 0) + cur.amount;
-        changed = true;
-      } else if (!cur && old) {
-        deltas[old.key] = (deltas[old.key] || 0) - old.amount;
-        changed = true;
-      } else if (cur && old) {
-        if (cur.key !== old.key) {
-          deltas[old.key] = (deltas[old.key] || 0) - old.amount;
-          deltas[cur.key] = (deltas[cur.key] || 0) + cur.amount;
-          changed = true;
-        } else if (Math.abs(cur.amount - old.amount) > 0.001) {
-          deltas[cur.key] = (deltas[cur.key] || 0) + (cur.amount - old.amount);
-          changed = true;
-        }
-      }
-    }
-
-    if (!changed) return;
-
-    // Build updated budget from current saved budget + deltas
-    autoSyncRef.current = true;
-    const byKey = new Map<string, { categoryId: string; subcategoryId?: string; plannedAmount: number }>();
-    budget.categoryBudgets.forEach(cb => {
-      const k = cb.subcategoryId ? `sub_${cb.subcategoryId}` : `cat_${cb.categoryId}`;
-      byKey.set(k, { ...cb });
-    });
-
-    let newIncome = budget.plannedIncome;
-    Object.entries(deltas).forEach(([key, delta]) => {
-      if (key === 'income') { newIncome = Math.max(0, newIncome + delta); return; }
-      if (key.startsWith('sub_')) {
-        const subId = key.slice(4);
-        const sub = subcategories.find(s => s.id === subId);
-        const existing = byKey.get(key);
-        const next = Math.max(0, (existing?.plannedAmount || 0) + delta);
-        byKey.set(key, { categoryId: sub?.categoryId || existing?.categoryId || '', subcategoryId: subId, plannedAmount: next });
-      } else if (key.startsWith('cat_')) {
-        const catId = key.slice(4);
-        const existing = byKey.get(key);
-        const next = Math.max(0, (existing?.plannedAmount || 0) + delta);
-        byKey.set(key, { categoryId: catId, plannedAmount: next });
-      }
-    });
-
-    const newCategoryBudgets = Array.from(byKey.values()).filter(cb => cb.plannedAmount > 0);
-
-    saveBudget({
-      month: selectedMonth,
-      year: selectedYear,
-      plannedIncome: newIncome,
-      plannedExpenses: budget.plannedExpenses,
-      categoryBudgets: newCategoryBudgets,
-    }).then(() => {
-      writeSnapshot(selectedYear, selectedMonth, current);
-      toast({
-        title: 'Orçamento atualizado',
-        description: 'As recorrências mudaram e o orçamento foi ajustado automaticamente.',
-      });
-    }).catch(() => {
-      // ignore
-    }).finally(() => {
-      autoSyncRef.current = false;
-    });
-  }, [budget, recurrences, recurrenceInstances, selectedMonth, selectedYear, isDirty, subcategories, saveBudget, toast]);
-
-
-  // Calculate realized amounts
+  // Realized amounts per category/subcategory
   const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
     const byCategory: Record<string, number> = {};
     const bySubcategory: Record<string, number> = {};
-    
     transactions.filter(t => t.type === 'despesa').forEach(t => {
       byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount;
       if (t.subcategoryId) {
         bySubcategory[t.subcategoryId] = (bySubcategory[t.subcategoryId] || 0) + t.amount;
       }
     });
-    
     return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
   }, [transactions]);
 
-  // Active installment plans for the selected month
+  // Active installment plans for the selected month (for the read-only block)
   const activeInstallments = useMemo(() => {
     return recurrences.filter(r => {
       if (!r.totalInstallments || !r.isActive) return false;
@@ -259,62 +166,33 @@ export function BudgetPage() {
     });
   }, [recurrences, selectedMonth, selectedYear]);
 
-  const handleApplyInstallments = (mode: 'sum' | 'replace') => {
-    const newCatBudgets = { ...categoryBudgets };
-    const newSubBudgets = { ...subcategoryBudgets };
-
-    activeInstallments.forEach(plan => {
-      if (plan.subcategoryId) {
-        const current = parseBRLToNumber(newSubBudgets[plan.subcategoryId] || '0');
-        newSubBudgets[plan.subcategoryId] = formatNumberToBRL(
-          mode === 'sum' ? current + plan.amount : plan.amount
-        );
-      } else {
-        const current = parseBRLToNumber(newCatBudgets[plan.categoryId] || '0');
-        newCatBudgets[plan.categoryId] = formatNumberToBRL(
-          mode === 'sum' ? current + plan.amount : plan.amount
-        );
-      }
-    });
-
-    setIsDirty(true);
-    setCategoryBudgets(newCatBudgets);
-    setSubcategoryBudgets(newSubBudgets);
-
-    toast({
-      title: 'Parcelamentos aplicados!',
-      description: `Valores ${mode === 'sum' ? 'somados ao' : 'substituídos no'} orçamento.`,
-    });
-  };
-
-  // Filter only expense categories for budget display - show ALL of them
   const expenseCategories = useMemo(() => {
     return categories.filter(c => c.type === 'despesa').sort((a, b) => a.name.localeCompare(b.name));
   }, [categories]);
 
+  // Total per category = manual + auto (across category + its subcategories)
   const totalCategoryBudget = useMemo(() => {
     let total = 0;
     expenseCategories.forEach(cat => {
+      const manualCat = parseBRLToNumber(categoryBudgets[cat.id] || '0');
+      const autoCat = autoByCategory[cat.id] || 0;
       const catSubs = subcategories.filter(s => s.categoryId === cat.id);
-      if (catSubs.length > 0) {
-        // Sum subcategories
-        catSubs.forEach(sub => {
-          total += parseBRLToNumber(subcategoryBudgets[sub.id] || '0');
-        });
-      } else {
-        // Use category value directly
-        total += parseBRLToNumber(categoryBudgets[cat.id] || '0');
-      }
+      let subTotal = 0;
+      catSubs.forEach(sub => {
+        subTotal +=
+          parseBRLToNumber(subcategoryBudgets[sub.id] || '0') + (autoBySubcategory[sub.id] || 0);
+      });
+      total += manualCat + autoCat + subTotal;
     });
-    return Math.round(total * 100) / 100; // Round to avoid floating point issues
-  }, [expenseCategories, subcategories, categoryBudgets, subcategoryBudgets]);
+    return Math.round(total * 100) / 100;
+  }, [expenseCategories, subcategories, categoryBudgets, subcategoryBudgets, autoByCategory, autoBySubcategory]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
       const parsedIncome = parseBRLToNumber(plannedIncome);
       const parsedExpenses = parseBRLToNumber(plannedExpenses) || totalCategoryBudget;
-      
+
       const categoryBudgetsArray = [
         ...Object.entries(categoryBudgets)
           .filter(([_, value]) => value && parseBRLToNumber(value) > 0)
@@ -342,66 +220,16 @@ export function BudgetPage() {
         categoryBudgets: categoryBudgetsArray,
       });
 
-      // Refresh recurrence snapshot baseline after a manual save so future
-      // recurrence changes only apply the delta vs this saved state.
-      const baseline = computeRecurrenceContributions(
-        recurrences, recurrenceInstances, selectedMonth, selectedYear,
-      );
-      writeSnapshot(selectedYear, selectedMonth, baseline);
-
       setIsDirty(false);
       toast({
         title: 'Orçamento salvo!',
         description: `Orçamento de ${formatMonthYear(selectedMonth, selectedYear)} atualizado.`,
       });
-    } catch (error) {
-      toast({
-        title: 'Erro ao salvar',
-        description: 'Tente novamente.',
-        variant: 'destructive',
-      });
+    } catch {
+      toast({ title: 'Erro ao salvar', description: 'Tente novamente.', variant: 'destructive' });
     } finally {
       setIsSaving(false);
     }
-  };
-
-  const handleApplyRecurrences = (
-    mode: 'sum' | 'replace',
-    amounts: Record<string, number>,
-    incomeTotal: number,
-    includeIncome: boolean,
-  ) => {
-    const newCatBudgets = { ...categoryBudgets };
-    const newSubBudgets = { ...subcategoryBudgets };
-
-    Object.entries(amounts).forEach(([key, amount]) => {
-      if (key.startsWith('cat_')) {
-        const catId = key.replace('cat_', '');
-        const current = parseBRLToNumber(newCatBudgets[catId] || '0');
-        const newValue = mode === 'sum' ? current + amount : amount;
-        newCatBudgets[catId] = formatNumberToBRL(newValue);
-      } else if (key.startsWith('sub_')) {
-        const subId = key.replace('sub_', '');
-        const current = parseBRLToNumber(newSubBudgets[subId] || '0');
-        const newValue = mode === 'sum' ? current + amount : amount;
-        newSubBudgets[subId] = formatNumberToBRL(newValue);
-      }
-    });
-
-    setIsDirty(true);
-    setCategoryBudgets(newCatBudgets);
-    setSubcategoryBudgets(newSubBudgets);
-
-    if (includeIncome && incomeTotal > 0) {
-      const currentIncome = parseBRLToNumber(plannedIncome || '0');
-      const newIncome = mode === 'sum' ? currentIncome + incomeTotal : incomeTotal;
-      setPlannedIncome(formatNumberToBRL(newIncome));
-    }
-
-    toast({
-      title: 'Orçamento atualizado!',
-      description: `Valores ${mode === 'sum' ? 'somados ao' : 'substituídos no'} orçamento.`,
-    });
   };
 
   return (
@@ -415,14 +243,6 @@ export function BudgetPage() {
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant="outline"
-            onClick={() => setShowApplyRecurrencesModal(true)}
-            className="gap-2"
-          >
-            <RefreshCw className="h-4 w-4" />
-            Montar Automático
-          </Button>
           <Button variant="outline" onClick={() => setShowDuplicateModal(true)} className="gap-2">
             <Copy className="h-4 w-4" />
             Duplicar Mês
@@ -446,6 +266,11 @@ export function BudgetPage() {
             onChange={updatePlannedIncome}
             className="mt-2 text-lg border-success/30 focus:border-success"
           />
+          {autoIncome > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Recorrências de receita previstas: {formatCurrency(autoIncome)}
+            </p>
+          )}
         </div>
         <div className="glass-card rounded-xl p-4">
           <Label htmlFor="expenses" className="text-sm text-muted-foreground">
@@ -463,7 +288,7 @@ export function BudgetPage() {
         </div>
       </div>
 
-      {/* Recurrences Block */}
+      {/* Recurrences Block (reference only) */}
       <Collapsible open={showRecurrences} onOpenChange={setShowRecurrences}>
         <div className="glass-card rounded-xl overflow-hidden">
           <CollapsibleTrigger asChild>
@@ -494,7 +319,7 @@ export function BudgetPage() {
         </div>
       </Collapsible>
 
-      {/* Installments Block */}
+      {/* Installments Block (reference only) */}
       {activeInstallments.length > 0 && (
         <Collapsible open={showInstallments} onOpenChange={setShowInstallments}>
           <div className="glass-card rounded-xl overflow-hidden">
@@ -539,20 +364,10 @@ export function BudgetPage() {
                     </div>
                   );
                 })}
-                <div className="flex items-center justify-between pt-2 border-t border-border">
-                  <div className="text-sm text-muted-foreground">
-                    Total: <span className="font-mono font-medium text-foreground">
-                      {formatCurrency(activeInstallments.reduce((s, p) => s + p.amount, 0))}
-                    </span>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleApplyInstallments('sum')}>
-                      Somar ao orçamento
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleApplyInstallments('replace')}>
-                      Substituir
-                    </Button>
-                  </div>
+                <div className="pt-2 border-t border-border text-sm text-muted-foreground">
+                  Total: <span className="font-mono font-medium text-foreground">
+                    {formatCurrency(activeInstallments.reduce((s, p) => s + p.amount, 0))}
+                  </span>
                 </div>
               </div>
             </CollapsibleContent>
@@ -562,8 +377,15 @@ export function BudgetPage() {
 
       {/* Category Budgets */}
       <div className="glass-card rounded-xl p-4 lg:p-6">
-        <h3 className="text-lg font-semibold mb-4">Orçamento por Categoria (Despesas)</h3>
-        
+        <div className="flex items-start justify-between mb-4 gap-3 flex-wrap">
+          <div>
+            <h3 className="text-lg font-semibold">Orçamento por Categoria (Despesas)</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              Inclui automaticamente os valores de recorrências e parcelamentos do mês. Adicione valores extras conforme necessário.
+            </p>
+          </div>
+        </div>
+
         {expenseCategories.length === 0 ? (
           <p className="text-center text-muted-foreground py-6">
             Nenhuma categoria de despesa cadastrada.
@@ -581,6 +403,8 @@ export function BudgetPage() {
                 onSubcategoryChange={updateSubcategoryBudget}
                 realizedByCategory={realizedByCategory}
                 realizedBySubcategory={realizedBySubcategory}
+                autoByCategory={autoByCategory}
+                autoBySubcategory={autoBySubcategory}
               />
             ))}
           </div>
@@ -605,18 +429,6 @@ export function BudgetPage() {
         isOpen={showDuplicateModal}
         onClose={() => setShowDuplicateModal(false)}
         onSuccess={refreshData}
-      />
-      
-      <ApplyRecurrencesModal
-        isOpen={showApplyRecurrencesModal}
-        onClose={() => setShowApplyRecurrencesModal(false)}
-        recurrences={recurrences}
-        instances={recurrenceInstances}
-        categories={categories}
-        subcategories={subcategories}
-        selectedMonth={selectedMonth}
-        selectedYear={selectedYear}
-        onApply={handleApplyRecurrences}
       />
     </div>
   );
