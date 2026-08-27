@@ -111,7 +111,7 @@ export function ExpenseChart({ onDrillDown }: ExpenseChartProps) {
                 outerRadius={80}
                 paddingAngle={2}
                 dataKey="value"
-                activeIndex={activeIndex}
+                {...({ activeIndex } as Record<string, unknown>)}
                 activeShape={renderActiveShape}
                 onMouseEnter={(_, index) => setActiveIndex(index)}
                 onMouseLeave={() => setActiveIndex(undefined)}

@@ -35,10 +35,17 @@ export function SettingsPage() {
     try {
       await saveFinancialCycle({ month: selectedMonth, year: selectedYear, startDate: start, endDate: end });
       toast({ title: 'Ciclo salvo', description: 'Este ciclo passa a ser a competência do mês selecionado.' });
-    } catch {
-      toast({ title: 'Erro ao salvar ciclo', description: 'Tente novamente.', variant: 'destructive' });
+    } catch (error) {
+      const detail = error instanceof Error
+        ? error.message
+        : typeof error === 'object' && error && 'message' in error
+          ? String((error as { message: unknown }).message)
+          : JSON.stringify(error);
+      console.error('Erro ao salvar ciclo financeiro:', error);
+      toast({ title: 'Erro ao salvar ciclo', description: detail || 'Erro desconhecido. Tente novamente.', variant: 'destructive' });
     }
   };
+
 
   return (
     <div className="space-y-6 max-w-2xl">
