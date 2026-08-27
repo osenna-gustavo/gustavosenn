@@ -279,20 +279,38 @@ export function BudgetPage() {
             </div>
           </div>
         </div>
-        <div className="grid sm:grid-cols-3 gap-3 mt-4">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4">
           <div className="rounded-lg bg-muted/40 p-3">
-            <div className="text-xs text-muted-foreground">Recorrências</div>
+            <div className="text-xs text-muted-foreground">Recorrências previstas</div>
             <div className="font-mono font-semibold mt-1">{formatCurrency(recurringExpenses)}</div>
           </div>
           <div className="rounded-lg bg-muted/40 p-3">
-            <div className="text-xs text-muted-foreground">Parcelamentos</div>
+            <div className="text-xs text-muted-foreground">Parcelas previstas</div>
             <div className="font-mono font-semibold mt-1">{formatCurrency(installmentExpenses)}</div>
           </div>
           <div className="rounded-lg bg-primary/10 p-3">
-            <div className="text-xs text-muted-foreground">Receitas recorrentes</div>
+            <div className="text-xs text-muted-foreground">Receitas recorrentes previstas</div>
             <div className="font-mono font-semibold text-success mt-1">{formatCurrency(autoIncome)}</div>
           </div>
+          <div className="rounded-lg bg-success/10 p-3">
+            <div className="text-xs text-muted-foreground">Livre após compromissos</div>
+            <div
+              className={`font-mono font-semibold mt-1 ${
+                Math.max(parseBRLToNumber(plannedIncome || '0'), autoIncome) - (recurringExpenses + installmentExpenses) < 0
+                  ? 'text-destructive'
+                  : 'text-success'
+              }`}
+            >
+              {formatCurrency(
+                Math.max(parseBRLToNumber(plannedIncome || '0'), autoIncome) - (recurringExpenses + installmentExpenses),
+              )}
+            </div>
+            <div className="text-[11px] text-muted-foreground mt-1">
+              Base: receita planejada do ciclo
+            </div>
+          </div>
         </div>
+
       </div>
 
       {/* Recurrences Block (reference only) */}

@@ -346,8 +346,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true);
     try {
-      const cycle = await db.getFinancialCycle(selectedMonth, selectedYear);
+      let cycle: FinancialCycle | null = null;
+      try {
+        cycle = await db.getFinancialCycle(selectedMonth, selectedYear);
+      } catch (cycleError) {
+        console.error('Error loading financial cycle:', cycleError);
+      }
       setFinancialCycle(cycle);
+
       const resolvedRange = cycle
         ? { start: cycle.startDate, end: new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate(), 23, 59, 59, 999) }
         : billingDateRange;

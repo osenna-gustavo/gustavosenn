@@ -946,7 +946,7 @@ export async function bulkUpdateTransactions(
 
   const { error } = await supabase
     .from('transactions')
-    .update(payload)
+    .update(payload as never)
     .in('id', ids);
 
   if (error) throw error;
@@ -1061,7 +1061,7 @@ export async function bulkUpdateRecurrences(
 
   const { error } = await supabase
     .from('recurrences')
-    .update(payload)
+    .update(payload as never)
     .in('id', ids);
 
   if (error) throw error;
