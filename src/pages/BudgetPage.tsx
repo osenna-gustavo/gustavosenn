@@ -60,7 +60,7 @@ export function BudgetPage() {
   const updatePlannedExpenses = (v: string) => { setIsDirty(true); setPlannedExpenses(v); };
 
   // Auto contributions from recurrences + installments for this month
-  const { byCategory: autoByCategory, bySubcategory: autoBySubcategory, autoIncome } = useMemo(
+  const { byCategory: autoByCategory, bySubcategory: autoBySubcategory, autoIncome, recurringExpenses, installmentExpenses } = useMemo(
     () => {
       const result = computeCycleCommitments(
         recurrences,
@@ -73,6 +73,8 @@ export function BudgetPage() {
         byCategory: result.expectedByCategory,
         bySubcategory: result.expectedBySubcategory,
         autoIncome: result.expectedIncome,
+        recurringExpenses: result.expectedRecurringExpenses,
+        installmentExpenses: result.expectedInstallmentExpenses,
       };
     },
     [recurrences, recurrenceInstances, transactions, selectedMonth, selectedYear],
@@ -259,6 +261,37 @@ export function BudgetPage() {
           <p className="text-xs text-muted-foreground mt-2">
             Soma das categorias: {formatCurrency(totalCategoryBudget)}
           </p>
+        </div>
+      </div>
+
+      <div className="glass-card rounded-xl p-4 lg:p-6 border-primary/20">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-lg font-semibold">Compromissos já reservados</h3>
+            <p className="text-sm text-muted-foreground mt-1">
+              Estes valores entram automaticamente no orçamento do ciclo. O restante fica livre para novos gastos.
+            </p>
+          </div>
+          <div className="text-right">
+            <div className="text-xs text-muted-foreground">Total reservado</div>
+            <div className="text-2xl font-mono font-bold text-primary">
+              {formatCurrency(recurringExpenses + installmentExpenses)}
+            </div>
+          </div>
+        </div>
+        <div className="grid sm:grid-cols-3 gap-3 mt-4">
+          <div className="rounded-lg bg-muted/40 p-3">
+            <div className="text-xs text-muted-foreground">Recorrências</div>
+            <div className="font-mono font-semibold mt-1">{formatCurrency(recurringExpenses)}</div>
+          </div>
+          <div className="rounded-lg bg-muted/40 p-3">
+            <div className="text-xs text-muted-foreground">Parcelamentos</div>
+            <div className="font-mono font-semibold mt-1">{formatCurrency(installmentExpenses)}</div>
+          </div>
+          <div className="rounded-lg bg-primary/10 p-3">
+            <div className="text-xs text-muted-foreground">Receitas recorrentes</div>
+            <div className="font-mono font-semibold text-success mt-1">{formatCurrency(autoIncome)}</div>
+          </div>
         </div>
       </div>
 

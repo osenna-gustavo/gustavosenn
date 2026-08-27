@@ -6,11 +6,12 @@ import type { DrillDownFilter } from './DrillDownDrawer';
 
 interface DashboardKPIsProps {
   onDrillDown?: (filter: DrillDownFilter) => void;
+  mode?: 'competence' | 'cash';
 }
 
 type KpiTrend = 'positive' | 'negative' | 'warning' | 'neutral';
 
-export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
+export function DashboardKPIs({ onDrillDown, mode = 'competence' }: DashboardKPIsProps) {
   const { monthSummary } = useApp();
 
   if (!monthSummary) {
@@ -34,7 +35,13 @@ export function DashboardKPIs({ onDrillDown }: DashboardKPIsProps) {
     description: string;
     percentage?: number;
     drillDownFilter?: DrillDownFilter;
-  }> = [
+  }> = mode === 'cash' ? [
+    { label: 'Entradas no caixa', value: monthSummary.cashIncome, icon: Banknote, trend: 'positive', description: 'movimentações efetivamente recebidas' },
+    { label: 'Saídas no caixa', value: monthSummary.cashExpenses, icon: ReceiptText, trend: 'negative', description: 'inclui pagamentos de fatura' },
+    { label: 'Saldo do caixa', value: monthSummary.cashBalance, icon: CircleDollarSign, trend: monthSummary.cashBalance >= 0 ? 'positive' : 'negative', description: 'entradas menos saídas' },
+    { label: 'Compras no cartão', value: monthSummary.creditCardExpenses, icon: Clock3, trend: 'warning', description: 'já comprometem o orçamento' },
+    { label: 'Modo atual', value: monthSummary.cashExpenses, icon: Target, trend: 'neutral', description: 'troque para Competência para ver o orçamento' },
+  ] : [
     {
       label: 'Receitas no ciclo',
       value: monthSummary.realizedIncome,

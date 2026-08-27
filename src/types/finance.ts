@@ -1,4 +1,5 @@
 export type TransactionType = 'receita' | 'despesa';
+export type PaymentMethod = 'account' | 'cash' | 'debit_card' | 'pix' | 'credit_card' | 'invoice_payment';
 
 export interface Category {
   id: string;
@@ -31,7 +32,22 @@ export interface Transaction {
   importBatchId?: string;
   recurrenceId?: string;
   recurrenceInstanceId?: string;
+  paymentMethod?: PaymentMethod;
+  cashDate?: Date;
+  affectsBudget?: boolean;
+  affectsCash?: boolean;
+  creditCardLabel?: string;
   createdAt: Date;
+}
+
+export interface FinancialCycle {
+  id: string;
+  month: number;
+  year: number;
+  startDate: Date;
+  endDate: Date;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export interface Budget {
@@ -140,6 +156,10 @@ export interface MonthSummary {
   projectedExpenses: number;
   availableBudget: number;
   budgetUsagePercentage: number;
+  cashIncome: number;
+  cashExpenses: number;
+  cashBalance: number;
+  creditCardExpenses: number;
   balance: number;
   remainingFixed: number;
   remainingVariable: number;

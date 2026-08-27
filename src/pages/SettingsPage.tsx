@@ -1,43 +1,44 @@
 import { useEffect, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatDateShort } from '@/lib/formatters';
-import { Settings, CreditCard, Info, Check } from 'lucide-react';
+import { Settings, CreditCard, Info, Check, CalendarDays } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 
 export function SettingsPage() {
-  const { billingCloseDay, setBillingCloseDay, billingDateRange, selectedMonth, selectedYear } = useApp();
+  const { billingDateRange, financialCycle, saveFinancialCycle, selectedMonth, selectedYear } = useApp();
   const { toast } = useToast();
 
-  const [draftDay, setDraftDay] = useState<string>(
-    billingCloseDay !== null ? String(billingCloseDay) : '__none__'
-  );
+  const toInputDate = (date: Date) => {
+    const y = date.getFullYear(); const m = String(date.getMonth() + 1).padStart(2, '0'); const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  };
+  const calendarStart = new Date(selectedYear, selectedMonth, 1);
+  const calendarEnd = new Date(selectedYear, selectedMonth + 1, 0);
+  const [draftStart, setDraftStart] = useState(toInputDate(financialCycle?.startDate ?? calendarStart));
+  const [draftEnd, setDraftEnd] = useState(toInputDate(financialCycle?.endDate ?? calendarEnd));
 
   // Keep dropdown in sync when cloud value loads/changes
   useEffect(() => {
-    setDraftDay(billingCloseDay !== null ? String(billingCloseDay) : '__none__');
-  }, [billingCloseDay]);
+    setDraftStart(toInputDate(financialCycle?.startDate ?? calendarStart));
+    setDraftEnd(toInputDate(financialCycle?.endDate ?? calendarEnd));
+  }, [financialCycle, selectedMonth, selectedYear]);
 
-  const handleSave = () => {
-    if (draftDay === '__none__' || draftDay === '') {
-      setBillingCloseDay(null);
-      toast({ title: 'Configurações salvas. Ciclo de fatura desativado.' });
-    } else {
-      const day = Number(draftDay);
-      setBillingCloseDay(day);
-      toast({ title: `Ciclo de fatura configurado: fechamento no dia ${day}.` });
+  const handleSave = async () => {
+    const start = new Date(`${draftStart}T00:00:00`);
+    const end = new Date(`${draftEnd}T00:00:00`);
+    if (!draftStart || !draftEnd || Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+      toast({ title: 'Período inválido', description: 'A data final deve ser igual ou posterior à inicial.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await saveFinancialCycle({ month: selectedMonth, year: selectedYear, startDate: start, endDate: end });
+      toast({ title: 'Ciclo salvo', description: 'Este ciclo passa a ser a competência do mês selecionado.' });
+    } catch {
+      toast({ title: 'Erro ao salvar ciclo', description: 'Tente novamente.', variant: 'destructive' });
     }
   };
-
-  const days = Array.from({ length: 28 }, (_, i) => i + 1);
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -56,29 +57,16 @@ export function SettingsPage() {
         <div className="flex items-start gap-2 p-3 rounded-lg bg-primary/5 text-sm text-muted-foreground">
           <Info className="h-4 w-4 mt-0.5 shrink-0 text-primary/60" />
           <p>
-            Quando ativado, cada "mês" exibe os lançamentos do período entre o fechamento do mês
-            anterior e o fechamento do mês selecionado — igual ao ciclo da sua fatura.
-            <br />
-            Exemplo: fechamento no dia 20 → "Abril" mostra de 21/Mar a 20/Abr.
+            O fechamento pode mudar de data quando cai em fim de semana. Por isso, cada mês tem seu próprio período real de competência.
+            Compras no cartão entram na competência na data da compra; o caixa só muda quando você lançar o pagamento da fatura.
           </p>
         </div>
 
         <div className="space-y-2">
-          <Label>Dia de fechamento da fatura</Label>
-          <div className="flex items-center gap-3">
-            <Select value={draftDay} onValueChange={setDraftDay}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Selecionar dia" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Desativado (mês normal)</SelectItem>
-                {days.map(d => (
-                  <SelectItem key={d} value={String(d)}>
-                    Dia {d}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          <Label>Período do ciclo de {new Date(selectedYear, selectedMonth, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}</Label>
+          <div className="grid sm:grid-cols-[1fr_1fr_auto] items-end gap-3">
+            <div><Label className="text-xs text-muted-foreground">Início</Label><input type="date" value={draftStart} onChange={e => setDraftStart(e.target.value)} className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
+            <div><Label className="text-xs text-muted-foreground">Fim / fechamento</Label><input type="date" value={draftEnd} onChange={e => setDraftEnd(e.target.value)} className="mt-1 flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" /></div>
             <Button onClick={handleSave} className="gap-1.5">
               <Check className="h-4 w-4" /> Salvar
             </Button>
@@ -87,7 +75,7 @@ export function SettingsPage() {
 
         {billingDateRange && (
           <div className="p-3 rounded-lg bg-success/10 text-sm">
-            <p className="font-medium text-success">Ciclo ativo — fechamento no dia {billingCloseDay}</p>
+            <p className="font-medium text-success flex items-center gap-2"><CalendarDays className="h-4 w-4" /> Ciclo personalizado ativo</p>
             <p className="text-muted-foreground mt-0.5">
               Período atual ({new Date(selectedYear, selectedMonth, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}):
               {' '}{formatDateShort(billingDateRange.start)} → {formatDateShort(billingDateRange.end)}
@@ -95,11 +83,7 @@ export function SettingsPage() {
           </div>
         )}
 
-        {(!billingCloseDay || billingCloseDay === null) && draftDay === '__none__' && (
-          <p className="text-sm text-muted-foreground">
-            Ciclo desativado. Os lançamentos são exibidos por mês calendário (dia 1 ao último dia do mês).
-          </p>
-        )}
+        {!financialCycle && <p className="text-sm text-muted-foreground">Ainda não há um fechamento personalizado salvo para este mês; o sistema usa o mês calendário como referência.</p>}
       </div>
     </div>
   );

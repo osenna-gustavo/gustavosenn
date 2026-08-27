@@ -8,7 +8,9 @@ import type {
   Recurrence,
   RecurrenceInstance,
   ImportBatch,
-  Project
+  Project,
+  FinancialCycle,
+  PaymentMethod,
 } from '@/types/finance';
 
 // Helper to get current user ID
@@ -210,6 +212,39 @@ export async function deleteSubcategory(id: string): Promise<void> {
 
 // ==================== TRANSACTIONS ====================
 
+type DatabaseTransaction = {
+  id: string; date: string; amount: number; type: string;
+  category_id: string | null; subcategory_id: string | null; description: string | null;
+  origin: string | null; needs_review: boolean | null; import_batch_id: string | null;
+  recurrence_id: string | null; recurrence_instance_id: string | null;
+  payment_method: string; cash_date: string | null; affects_budget: boolean; affects_cash: boolean;
+  credit_card_label: string | null; created_at: string | null;
+};
+
+function mapTransaction(t: DatabaseTransaction): Transaction {
+  return {
+    id: t.id,
+    date: new Date(t.date),
+    amount: Number(t.amount),
+    type: t.type as 'receita' | 'despesa',
+    categoryId: t.category_id || '',
+    subcategoryId: t.subcategory_id || undefined,
+    description: t.description || undefined,
+    origin: (t.origin || 'manual') as 'manual' | 'import' | 'recurrence',
+    needsReview: t.needs_review || false,
+    importBatchId: t.import_batch_id || undefined,
+    recurrenceId: t.recurrence_id || undefined,
+    recurrenceInstanceId: t.recurrence_instance_id || undefined,
+    paymentMethod: (t.payment_method || 'account') as PaymentMethod,
+    cashDate: t.cash_date ? new Date(t.cash_date) : undefined,
+    affectsBudget: t.affects_budget ?? true,
+    affectsCash: t.affects_cash ?? true,
+    creditCardLabel: t.credit_card_label || undefined,
+    createdAt: new Date(t.created_at!),
+  };
+}
+
+
 export async function getTransactions(
   month?: number,
   year?: number,
@@ -221,6 +256,7 @@ export async function getTransactions(
     .from('transactions')
     .select('*')
     .eq('user_id', userId)
+    .eq('affects_budget', true)
     .order('date', { ascending: false });
 
   if (dateRange) {
@@ -236,29 +272,43 @@ export async function getTransactions(
   const { data, error } = await query;
   if (error) throw error;
   
-  return (data || []).map(t => ({
-    id: t.id,
-    date: new Date(t.date),
-    amount: Number(t.amount),
-    type: t.type as 'receita' | 'despesa',
-    categoryId: t.category_id || '',
-    subcategoryId: t.subcategory_id || undefined,
-    description: t.description || undefined,
-    origin: (t.origin || 'manual') as 'manual' | 'import' | 'recurrence',
-    needsReview: t.needs_review || false,
-    importBatchId: t.import_batch_id || undefined,
-    recurrenceId: t.recurrence_id || undefined,
-    recurrenceInstanceId: t.recurrence_instance_id || undefined,
-    createdAt: new Date(t.created_at!),
-  }));
+  return (data || []).map(mapTransaction);
 }
 
 export async function getAllTransactions(): Promise<Transaction[]> {
   return getTransactions();
 }
 
+export async function getCashTransactions(
+  dateRange?: { start: Date; end: Date },
+): Promise<Transaction[]> {
+  const userId = await getUserId();
+
+  let query = supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('affects_cash', true)
+    .not('cash_date', 'is', null)
+    .order('cash_date', { ascending: false });
+
+  if (dateRange) {
+    query = query
+      .gte('cash_date', dateRange.start.toISOString())
+      .lte('cash_date', dateRange.end.toISOString());
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+  return (data || []).map(mapTransaction);
+}
+
 export async function addTransaction(transaction: Omit<Transaction, 'id' | 'createdAt'>): Promise<Transaction> {
   const userId = await getUserId();
+  const paymentMethod = transaction.paymentMethod ?? 'account';
+  const affectsBudget = transaction.affectsBudget ?? paymentMethod !== 'invoice_payment';
+  const affectsCash = transaction.affectsCash ?? paymentMethod !== 'credit_card';
+  const cashDate = affectsCash ? (transaction.cashDate ?? transaction.date) : undefined;
   
   const { data, error } = await supabase
     .from('transactions')
@@ -275,27 +325,18 @@ export async function addTransaction(transaction: Omit<Transaction, 'id' | 'crea
       import_batch_id: transaction.importBatchId || null,
       recurrence_id: transaction.recurrenceId || null,
       recurrence_instance_id: transaction.recurrenceInstanceId || null,
+      payment_method: paymentMethod,
+      cash_date: cashDate?.toISOString() ?? null,
+      affects_budget: affectsBudget,
+      affects_cash: affectsCash,
+      credit_card_label: transaction.creditCardLabel || null,
     })
     .select()
     .single();
     
   if (error) throw error;
   
-  return {
-    id: data.id,
-    date: new Date(data.date),
-    amount: Number(data.amount),
-    type: data.type as 'receita' | 'despesa',
-    categoryId: data.category_id || '',
-    subcategoryId: data.subcategory_id || undefined,
-    description: data.description || undefined,
-    origin: (data.origin || 'manual') as 'manual' | 'import' | 'recurrence',
-    needsReview: data.needs_review || false,
-    importBatchId: data.import_batch_id || undefined,
-    recurrenceId: data.recurrence_id || undefined,
-    recurrenceInstanceId: data.recurrence_instance_id || undefined,
-    createdAt: new Date(data.created_at!),
-  };
+  return mapTransaction(data);
 }
 
 export async function updateTransaction(transaction: Transaction): Promise<void> {
@@ -310,10 +351,75 @@ export async function updateTransaction(transaction: Transaction): Promise<void>
       description: transaction.description,
       origin: transaction.origin,
       needs_review: transaction.needsReview,
+      payment_method: transaction.paymentMethod ?? 'account',
+      cash_date: transaction.affectsCash === false
+        ? null
+        : (transaction.cashDate ?? transaction.date).toISOString(),
+      affects_budget: transaction.affectsBudget ?? transaction.paymentMethod !== 'invoice_payment',
+      affects_cash: transaction.affectsCash ?? transaction.paymentMethod !== 'credit_card',
+      credit_card_label: transaction.creditCardLabel || null,
     })
     .eq('id', transaction.id);
     
   if (error) throw error;
+}
+
+// ==================== FINANCIAL CYCLES ====================
+
+function parseLocalDate(value: string): Date {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day);
+}
+
+function toDateOnly(value: Date): string {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, '0');
+  const day = String(value.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export async function getFinancialCycle(month: number, year: number): Promise<FinancialCycle | null> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('financial_cycles')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('month', month)
+    .eq('year', year)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  return {
+    id: data.id,
+    month: data.month,
+    year: data.year,
+    startDate: parseLocalDate(data.start_date),
+    endDate: parseLocalDate(data.end_date),
+    createdAt: new Date(data.created_at),
+    updatedAt: new Date(data.updated_at),
+  };
+}
+
+export async function saveFinancialCycle(
+  cycle: Omit<FinancialCycle, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<FinancialCycle> {
+  const userId = await getUserId();
+  const { error } = await supabase
+    .from('financial_cycles')
+    .upsert({
+      user_id: userId,
+      month: cycle.month,
+      year: cycle.year,
+      start_date: toDateOnly(cycle.startDate),
+      end_date: toDateOnly(cycle.endDate),
+    }, { onConflict: 'user_id,month,year' });
+
+  if (error) throw error;
+  const saved = await getFinancialCycle(cycle.month, cycle.year);
+  if (!saved) throw new Error('Não foi possível carregar o ciclo salvo.');
+  return saved;
 }
 
 export async function deleteTransaction(id: string): Promise<void> {

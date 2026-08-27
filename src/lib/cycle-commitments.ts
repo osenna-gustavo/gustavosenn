@@ -9,6 +9,10 @@ export interface CycleCommitments {
   committedExpenses: number;
   expectedIncome: number;
   committedIncome: number;
+  expectedRecurringExpenses: number;
+  expectedInstallmentExpenses: number;
+  committedRecurringExpenses: number;
+  committedInstallmentExpenses: number;
 }
 
 function appliesToCycle(rec: Recurrence, month: number, year: number): boolean {
@@ -57,6 +61,10 @@ export function computeCycleCommitments(
     committedExpenses: 0,
     expectedIncome: 0,
     committedIncome: 0,
+    expectedRecurringExpenses: 0,
+    expectedInstallmentExpenses: 0,
+    committedRecurringExpenses: 0,
+    committedInstallmentExpenses: 0,
   };
 
   for (const recurrence of recurrences) {
@@ -79,6 +87,8 @@ export function computeCycleCommitments(
     }
 
     summary.expectedExpenses += amount;
+    if (recurrence.totalInstallments) summary.expectedInstallmentExpenses += amount;
+    else summary.expectedRecurringExpenses += amount;
     if (recurrence.subcategoryId) {
       addAmount(summary.expectedBySubcategory, recurrence.subcategoryId, amount);
       if (isStillCommitted) {
@@ -91,7 +101,11 @@ export function computeCycleCommitments(
       }
     }
 
-    if (isStillCommitted) summary.committedExpenses += amount;
+    if (isStillCommitted) {
+      summary.committedExpenses += amount;
+      if (recurrence.totalInstallments) summary.committedInstallmentExpenses += amount;
+      else summary.committedRecurringExpenses += amount;
+    }
   }
 
   return summary;

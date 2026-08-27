@@ -263,6 +263,39 @@ export type Database = {
           },
         ]
       }
+      financial_cycles: {
+        Row: {
+          created_at: string
+          end_date: string
+          id: string
+          month: number
+          start_date: string
+          updated_at: string
+          user_id: string
+          year: number
+        }
+        Insert: {
+          created_at?: string
+          end_date: string
+          id?: string
+          month: number
+          start_date: string
+          updated_at?: string
+          user_id: string
+          year: number
+        }
+        Update: {
+          created_at?: string
+          end_date?: string
+          id?: string
+          month?: number
+          start_date?: string
+          updated_at?: string
+          user_id?: string
+          year?: number
+        }
+        Relationships: []
+      }
       import_batches: {
         Row: {
           created_at: string | null
@@ -811,9 +844,13 @@ export type Database = {
       }
       transactions: {
         Row: {
+          affects_budget: boolean
+          affects_cash: boolean
           amount: number
+          cash_date: string | null
           category_id: string | null
           created_at: string | null
+          credit_card_label: string | null
           date: string
           description: string | null
           id: string
@@ -821,6 +858,7 @@ export type Database = {
           installment_id: string | null
           needs_review: boolean | null
           origin: string | null
+          payment_method: string
           recurrence_id: string | null
           recurrence_instance_id: string | null
           subcategory_id: string | null
@@ -828,9 +866,13 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          affects_budget?: boolean
+          affects_cash?: boolean
           amount: number
+          cash_date?: string | null
           category_id?: string | null
           created_at?: string | null
+          credit_card_label?: string | null
           date: string
           description?: string | null
           id?: string
@@ -838,6 +880,7 @@ export type Database = {
           installment_id?: string | null
           needs_review?: boolean | null
           origin?: string | null
+          payment_method?: string
           recurrence_id?: string | null
           recurrence_instance_id?: string | null
           subcategory_id?: string | null
@@ -845,9 +888,13 @@ export type Database = {
           user_id: string
         }
         Update: {
+          affects_budget?: boolean
+          affects_cash?: boolean
           amount?: number
+          cash_date?: string | null
           category_id?: string | null
           created_at?: string | null
+          credit_card_label?: string | null
           date?: string
           description?: string | null
           id?: string
@@ -855,6 +902,7 @@ export type Database = {
           installment_id?: string | null
           needs_review?: boolean | null
           origin?: string | null
+          payment_method?: string
           recurrence_id?: string | null
           recurrence_instance_id?: string | null
           subcategory_id?: string | null

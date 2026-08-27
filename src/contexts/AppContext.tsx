@@ -7,7 +7,8 @@ import type {
   Recurrence,
   RecurrenceInstance,
   MonthSummary,
-  AppScreen
+  AppScreen,
+  FinancialCycle,
 } from '@/types/finance';
 import * as db from '@/lib/supabase-database';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,8 @@ interface AppContextType {
   categories: Category[];
   subcategories: Subcategory[];
   transactions: Transaction[];
+  cashTransactions: Transaction[];
+  financialCycle: FinancialCycle | null;
   budget: Budget | null;
   recurrences: Recurrence[];
   recurrenceInstances: RecurrenceInstance[];
@@ -61,6 +64,7 @@ interface AppContextType {
   bulkUpdateRecurrences: (ids: string[], updates: { isActive?: boolean; categoryId?: string; subcategoryId?: string | null }) => Promise<void>;
   bulkDeleteRecurrences: (ids: string[]) => Promise<void>;
   linkTransactionsToRecurrence: (transactionIds: string[], recurrenceId: string) => Promise<void>;
+  saveFinancialCycle: (cycle: Omit<FinancialCycle, 'id' | 'createdAt' | 'updatedAt'>) => Promise<FinancialCycle>;
   
   // Billing cycle settings
   billingCloseDay: number | null;
@@ -88,6 +92,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [cashTransactions, setCashTransactions] = useState<Transaction[]>([]);
+  const [financialCycle, setFinancialCycle] = useState<FinancialCycle | null>(null);
   const [budget, setBudget] = useState<Budget | null>(null);
   const [recurrences, setRecurrences] = useState<Recurrence[]>([]);
   const [recurrenceInstances, setRecurrenceInstances] = useState<RecurrenceInstance[]>([]);
@@ -182,9 +188,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, [userId]);
 
   const billingDateRange = useMemo(() => {
+    if (financialCycle) return { start: financialCycle.startDate, end: new Date(financialCycle.endDate.getFullYear(), financialCycle.endDate.getMonth(), financialCycle.endDate.getDate(), 23, 59, 59, 999) };
     if (!billingCloseDay) return null;
     return getBillingPeriod(selectedMonth, selectedYear, billingCloseDay);
-  }, [billingCloseDay, selectedMonth, selectedYear]);
+  }, [billingCloseDay, financialCycle, selectedMonth, selectedYear]);
 
   const setSelectedMonth = useCallback((month: number, year: number) => {
     setSelectedMonthState(month);
@@ -198,6 +205,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     budg: Budget | null,
     recs: Recurrence[],
     instances: RecurrenceInstance[],
+    cashTrans: Transaction[],
     month: number,
     year: number,
     dateRange?: { start: Date; end: Date }
@@ -326,6 +334,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       remainingFixed: Math.max(0, plannedFixed - realizedFixed - committedFixed),
       remainingVariable: Math.max(0, plannedVariable - realizedVariable - (committedExpenses - committedFixed)),
       categoryBreakdown,
+      cashIncome: cashTrans.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.amount, 0),
+      cashExpenses: cashTrans.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.amount, 0),
+      cashBalance: cashTrans.reduce((sum, t) => sum + (t.type === 'receita' ? t.amount : -t.amount), 0),
+      creditCardExpenses: monthTransactions.filter(t => t.type === 'despesa' && t.paymentMethod === 'credit_card').reduce((sum, t) => sum + t.amount, 0),
     };
   }, []);
 
@@ -334,10 +346,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     setIsLoading(true);
     try {
-      const [cats, subs, trans, budg, recs, instances] = await Promise.all([
+      const cycle = await db.getFinancialCycle(selectedMonth, selectedYear);
+      setFinancialCycle(cycle);
+      const resolvedRange = cycle
+        ? { start: cycle.startDate, end: new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate(), 23, 59, 59, 999) }
+        : billingDateRange;
+      const [cats, subs, trans, cashTrans, budg, recs, instances] = await Promise.all([
         db.getCategories(),
         db.getSubcategories(),
-        db.getTransactions(selectedMonth, selectedYear, billingDateRange ?? undefined),
+        db.getTransactions(selectedMonth, selectedYear, resolvedRange ?? undefined),
+        db.getCashTransactions(resolvedRange ?? undefined),
         db.getBudget(selectedMonth, selectedYear),
         db.getRecurrences(),
         db.getRecurrenceInstances(selectedMonth, selectedYear),
@@ -346,14 +364,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setCategories(cats);
       setSubcategories(subs);
       setTransactions(trans);
+      setCashTransactions(cashTrans);
       setBudget(budg ?? null);
       setRecurrences(recs);
       setRecurrenceInstances(instances);
 
       const summary = calculateMonthSummary(
         cats, subs, trans, budg ?? null, recs, instances,
+        cashTrans,
         selectedMonth, selectedYear,
-        billingDateRange ?? undefined
+        resolvedRange ?? undefined
       );
       setMonthSummary(summary);
     } catch (error) {
@@ -490,6 +510,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await refreshData();
   }, [refreshData, recurrences, selectedMonth, selectedYear]);
 
+  const saveFinancialCycle = useCallback(async (cycle: Omit<FinancialCycle, 'id' | 'createdAt' | 'updatedAt'>) => {
+    const saved = await db.saveFinancialCycle(cycle);
+    setFinancialCycle(saved);
+    await refreshData();
+    return saved;
+  }, [refreshData]);
+
   return (
     <AppContext.Provider value={{
       currentScreen,
@@ -500,6 +527,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       categories,
       subcategories,
       transactions,
+      cashTransactions,
+      financialCycle,
       budget,
       recurrences,
       recurrenceInstances,
@@ -525,6 +554,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       bulkUpdateRecurrences,
       bulkDeleteRecurrences,
       linkTransactionsToRecurrence,
+      saveFinancialCycle,
       billingCloseDay,
       setBillingCloseDay,
       billingDateRange,

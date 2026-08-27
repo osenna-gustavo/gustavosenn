@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs';
 import { CategoryProgress } from '@/components/dashboard/CategoryProgress';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
@@ -10,6 +11,7 @@ import { formatDateShort, formatMonthYear } from '@/lib/formatters';
 
 export function DashboardPage() {
   const { selectedMonth, selectedYear, billingDateRange } = useApp();
+  const [mode, setMode] = useState<'competence' | 'cash'>('competence');
   
   const [drillDownFilter, setDrillDownFilter] = useState<DrillDownFilter | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -47,10 +49,15 @@ export function DashboardPage() {
         </p>
       </div>
 
-      {/* KPIs */}
-      <DashboardKPIs onDrillDown={handleDrillDown} />
+      <div className="flex items-center gap-2 rounded-lg bg-muted p-1 w-fit">
+        <Button size="sm" variant={mode === 'competence' ? 'default' : 'ghost'} onClick={() => setMode('competence')}>Competência</Button>
+        <Button size="sm" variant={mode === 'cash' ? 'default' : 'ghost'} onClick={() => setMode('cash')}>Caixa</Button>
+      </div>
 
-      <CategoryProgress onDrillDown={handleDrillDown} />
+      {/* KPIs */}
+      <DashboardKPIs onDrillDown={handleDrillDown} mode={mode} />
+
+      {mode === 'competence' && <CategoryProgress onDrillDown={handleDrillDown} />}
 
       {/* Recent Transactions */}
       <RecentTransactions />

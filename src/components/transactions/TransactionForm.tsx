@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { TransactionType } from '@/types/finance';
+import type { PaymentMethod, TransactionType } from '@/types/finance';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { parseBRLToNumber } from '@/lib/currencyInput';
@@ -39,6 +39,8 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   const [subcategoryId, setSubcategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [needsReview, setNeedsReview] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('account');
+  const [creditCardLabel, setCreditCardLabel] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -53,6 +55,8 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
     setSubcategoryId('');
     setDescription('');
     setNeedsReview(false);
+    setPaymentMethod('account');
+    setCreditCardLabel('');
     setShowDetails(false);
   }, [isOpen, lastUsedCategoryId, categories]);
 
@@ -64,6 +68,7 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
     setType(nextType);
     setCategoryId('');
     setSubcategoryId('');
+    if (nextType === 'receita') setPaymentMethod('account');
   };
 
   const resetForNextEntry = () => {
@@ -75,7 +80,7 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
 
   const saveTransaction = async (closeAfterSave: boolean) => {
     const parsedAmount = parseBRLToNumber(amount);
-    if (parsedAmount <= 0 || !categoryId) {
+    if (parsedAmount <= 0 || (paymentMethod !== 'invoice_payment' && !categoryId)) {
       toast({
         title: 'Falta pouca coisa',
         description: 'Informe o valor e escolha uma categoria.',
@@ -90,11 +95,16 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
         date: new Date(`${date}T12:00:00`),
         amount: parsedAmount,
         type,
-        categoryId,
+        categoryId: categoryId || '',
         subcategoryId: subcategoryId || undefined,
         description: description.trim() || undefined,
         origin: 'manual',
         needsReview,
+        paymentMethod,
+        cashDate: paymentMethod === 'credit_card' ? undefined : new Date(`${date}T12:00:00`),
+        affectsBudget: paymentMethod !== 'invoice_payment',
+        affectsCash: paymentMethod !== 'credit_card',
+        creditCardLabel: paymentMethod === 'credit_card' ? (creditCardLabel.trim() || 'Cartão') : undefined,
       });
 
       toast({
@@ -174,7 +184,26 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
             />
           </div>
 
-          <div className="space-y-2">
+          {type === 'despesa' && (
+            <div className="space-y-2">
+              <Label>Como foi pago?</Label>
+              <Select value={paymentMethod} onValueChange={value => setPaymentMethod(value as PaymentMethod)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="account">Conta / débito / Pix</SelectItem>
+                  <SelectItem value="cash">Dinheiro</SelectItem>
+                  <SelectItem value="credit_card">Cartão de crédito</SelectItem>
+                  <SelectItem value="invoice_payment">Pagamento de fatura (só caixa)</SelectItem>
+                </SelectContent>
+              </Select>
+              {paymentMethod === 'credit_card' && <Input placeholder="Nome do cartão (opcional)" value={creditCardLabel} onChange={event => setCreditCardLabel(event.target.value)} />}
+              <p className="text-xs text-muted-foreground">
+                {paymentMethod === 'credit_card' ? 'Consome o orçamento agora; o caixa muda somente no pagamento da fatura.' : paymentMethod === 'invoice_payment' ? 'Não entra nas categorias nem no orçamento para evitar dupla contagem.' : 'Entra na competência e no caixa na data informada.'}
+              </p>
+            </div>
+          )}
+
+          {paymentMethod !== 'invoice_payment' && <div className="space-y-2">
             <Label>Categoria</Label>
             <Select
               value={categoryId}
@@ -194,7 +223,7 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
                 ))}
               </SelectContent>
             </Select>
-          </div>
+          </div>}
 
           {filteredSubcategories.length > 0 && (
             <div className="space-y-2">
