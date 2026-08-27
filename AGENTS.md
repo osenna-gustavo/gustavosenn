@@ -9,6 +9,13 @@
 - Se a autenticação impedir a conferência, informar isso claramente ao usuário.
 - Atualizar o preview não autoriza publicar a aplicação em produção. Usar a ação **Publish** do Lovable somente com pedido explícito do usuário.
 
+## Backend e Supabase
+
+- Usar o MCP do Lovable para conversar com o agente do projeto e acompanhar alterações full-stack geradas pelo Lovable.
+- Usar o MCP oficial do Supabase, restrito ao projeto configurado, para inspecionar banco, migrations, logs e Edge Functions.
+- Toda mudança estrutural no banco deve ser criada como migration versionada no repositório antes de ser aplicada ao ambiente remoto.
+- Alterações remotas de dados, schema, autenticação, secrets ou Edge Functions exigem revisão explícita da ação antes da escrita.
+
 ## Regras financeiras do produto
 
 - O dia de fechamento dos cartões é global e define o ciclo financeiro familiar exibido pela aplicação.
