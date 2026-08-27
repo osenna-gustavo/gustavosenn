@@ -101,7 +101,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [lastUsedCategoryId, setLastUsedCategoryId] = useState<string | null>(null);
+
+  // Refs para preservar dados já carregados quando uma consulta falha,
+  // sem recriar refreshData (o que causaria loop de refetch).
+  const categoriesRef = useRef<Category[]>([]);
+  const subcategoriesRef = useRef<Subcategory[]>([]);
+  const recurrencesRef = useRef<Recurrence[]>([]);
+  categoriesRef.current = categories;
+  subcategoriesRef.current = subcategories;
+  recurrencesRef.current = recurrences;
 
   const [billingCloseDay, setBillingCloseDayState] = useState<number | null>(() => {
     try {
