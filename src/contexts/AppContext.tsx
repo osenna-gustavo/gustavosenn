@@ -378,12 +378,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         db.getRecurrenceInstances(selectedMonth, selectedYear),
       ]);
 
-      const cats = catsR.status === 'fulfilled' ? catsR.value : (fail('categorias', catsR.reason), categories);
-      const subs = subsR.status === 'fulfilled' ? subsR.value : (fail('subcategorias', subsR.reason), subcategories);
+      const cats = catsR.status === 'fulfilled' ? catsR.value : (fail('categorias', catsR.reason), categoriesRef.current);
+      const subs = subsR.status === 'fulfilled' ? subsR.value : (fail('subcategorias', subsR.reason), subcategoriesRef.current);
       const trans = transR.status === 'fulfilled' ? transR.value : (fail('lançamentos', transR.reason), []);
       const cashTrans = cashR.status === 'fulfilled' ? cashR.value : (fail('caixa', cashR.reason), []);
       const budg = budgR.status === 'fulfilled' ? (budgR.value ?? null) : (fail('orçamento', budgR.reason), null);
-      const recs = recsR.status === 'fulfilled' ? recsR.value : (fail('recorrências', recsR.reason), recurrences);
+      const recs = recsR.status === 'fulfilled' ? recsR.value : (fail('recorrências', recsR.reason), recurrencesRef.current);
       const instances = instancesR.status === 'fulfilled' ? instancesR.value : (fail('recorrências do mês', instancesR.reason), []);
 
       setCategories(cats);
