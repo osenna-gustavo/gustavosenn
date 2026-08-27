@@ -424,7 +424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
+  }, [userId, selectedMonth, selectedYear, billingCloseDay, calculateMonthSummary]);
 
   // Initialize app when user is authenticated
   useEffect(() => {
