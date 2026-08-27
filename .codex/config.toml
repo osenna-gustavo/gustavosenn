@@ -1,0 +1,5 @@
+[mcp_servers.lovable]
+url = "https://mcp.lovable.dev"
+auth = "oauth"
+enabled = true
+default_tools_approval_mode = "writes"

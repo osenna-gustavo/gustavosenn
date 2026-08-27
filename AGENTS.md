@@ -4,7 +4,9 @@
 
 - Toda otimização aprovada pelo usuário deve ser implementada, validada, commitada e enviada para a branch `main` conectada ao Lovable, para aparecer no preview imediatamente.
 - Não deixar uma alteração concluída apenas em branch de trabalho, salvo quando o usuário pedir explicitamente um rascunho ou solicitar que ela ainda não seja aplicada.
-- Depois do push, conferir o preview do Lovable sempre que houver uma sessão autenticada disponível. Se a autenticação impedir a conferência, informar isso claramente ao usuário.
+- Depois do push, usar o MCP do Lovable para confirmar a sincronização, obter o preview atual e inspecionar o estado do projeto.
+- Para alterações visuais ou de fluxo, conferir também o preview em navegador e registrar erros de console ou de execução encontrados.
+- Se a autenticação impedir a conferência, informar isso claramente ao usuário.
 - Atualizar o preview não autoriza publicar a aplicação em produção. Usar a ação **Publish** do Lovable somente com pedido explícito do usuário.
 
 ## Regras financeiras do produto
