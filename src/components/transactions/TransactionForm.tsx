@@ -1,89 +1,84 @@
-import { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import { useApp } from '@/contexts/AppContext';
 import { Button } from '@/components/ui/button';
+import { CurrencyInput } from '@/components/ui/currency-input';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import type { TransactionType } from '@/types/finance';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { parseBRLToNumber } from '@/lib/currencyInput';
 
 interface TransactionFormProps {
   isOpen: boolean;
   onClose: () => void;
 }
 
+function getTodayForInput() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   const { categories, subcategories, addTransaction, lastUsedCategoryId } = useApp();
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [type, setType] = useState<TransactionType>('despesa');
   const [amount, setAmount] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayForInput);
   const [categoryId, setCategoryId] = useState('');
   const [subcategoryId, setSubcategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [needsReview, setNeedsReview] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset form completely when opened (only on open, not on subsequent saves)
   useEffect(() => {
-    if (isOpen) {
-      setType('despesa');
-      setAmount('');
-      setDate(new Date().toISOString().split('T')[0]);
-      setCategoryId(lastUsedCategoryId || '');
-      setSubcategoryId('');
-      setDescription('');
-      setNeedsReview(false);
-    }
-  }, [isOpen, lastUsedCategoryId]);
+    if (!isOpen) return;
 
-  const filteredSubcategories = subcategories.filter(s => s.categoryId === categoryId);
+    const lastCategory = categories.find(category => category.id === lastUsedCategoryId);
+    setType('despesa');
+    setAmount('');
+    setDate(getTodayForInput());
+    setCategoryId(lastCategory?.type === 'despesa' ? lastCategory.id : '');
+    setSubcategoryId('');
+    setDescription('');
+    setNeedsReview(false);
+    setShowDetails(false);
+  }, [isOpen, lastUsedCategoryId, categories]);
 
-  // Reset only value/description fields after successful save (keep type, category, subcategory, date)
+  const availableCategories = categories.filter(category => category.type === type);
+  const filteredSubcategories = subcategories.filter(subcategory => subcategory.categoryId === categoryId);
+
+  const selectType = (nextType: TransactionType) => {
+    if (nextType === type) return;
+    setType(nextType);
+    setCategoryId('');
+    setSubcategoryId('');
+  };
+
   const resetForNextEntry = () => {
     setAmount('');
     setDescription('');
     setNeedsReview(false);
-    // Focus on amount field for next entry
-    setTimeout(() => {
-      amountInputRef.current?.focus();
-    }, 100);
+    setTimeout(() => amountInputRef.current?.focus(), 100);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!amount || !categoryId) {
+  const saveTransaction = async (closeAfterSave: boolean) => {
+    const parsedAmount = parseBRLToNumber(amount);
+    if (parsedAmount <= 0 || !categoryId) {
       toast({
-        title: 'Campos obrigatórios',
-        description: 'Preencha o valor e a categoria.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const parsedAmount = parseFloat(amount.replace(',', '.'));
-    if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast({
-        title: 'Valor inválido',
-        description: 'Digite um valor numérico positivo.',
+        title: 'Falta pouca coisa',
+        description: 'Informe o valor e escolha uma categoria.',
         variant: 'destructive',
       });
       return;
@@ -92,30 +87,29 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
     setIsSubmitting(true);
     try {
       await addTransaction({
-        date: new Date(date),
+        date: new Date(`${date}T12:00:00`),
         amount: parsedAmount,
         type,
         categoryId,
         subcategoryId: subcategoryId || undefined,
-        description: description || undefined,
+        description: description.trim() || undefined,
         origin: 'manual',
         needsReview,
       });
 
       toast({
         title: 'Lançamento salvo',
-        description: `${type === 'receita' ? 'Receita' : 'Despesa'} de R$ ${parsedAmount.toFixed(2)} adicionada.`,
+        description: `${type === 'receita' ? 'Receita' : 'Despesa'} adicionada ao ciclo.`,
       });
 
-      // Reset only specific fields, keep modal open for next entry
-      resetForNextEntry();
-    } catch (error) {
+      if (closeAfterSave) onClose();
+      else resetForNextEntry();
+    } catch {
       toast({
         title: 'Falha ao salvar',
         description: 'Tente novamente.',
         variant: 'destructive',
       });
-      // Keep modal open and data intact on error
     } finally {
       setIsSubmitting(false);
     }
@@ -123,138 +117,135 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[440px]">
         <DialogHeader>
-          <DialogTitle>Novo Lançamento</DialogTitle>
+          <DialogTitle>Novo lançamento</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4 mt-2">
-          {/* Type Toggle */}
+        <form
+          onSubmit={event => {
+            event.preventDefault();
+            void saveTransaction(true);
+          }}
+          className="space-y-4 mt-2"
+        >
           <div className="flex rounded-lg bg-muted p-1">
             <button
               type="button"
-              onClick={() => setType('despesa')}
+              onClick={() => selectType('despesa')}
               className={cn(
-                "flex-1 py-2 rounded-md text-sm font-medium transition-all",
-                type === 'despesa' 
-                  ? "bg-destructive text-destructive-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
+                'flex-1 py-2 rounded-md text-sm font-medium transition-all',
+                type === 'despesa' ? 'bg-destructive text-destructive-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               Despesa
             </button>
             <button
               type="button"
-              onClick={() => setType('receita')}
+              onClick={() => selectType('receita')}
               className={cn(
-                "flex-1 py-2 rounded-md text-sm font-medium transition-all",
-                type === 'receita' 
-                  ? "bg-success text-success-foreground" 
-                  : "text-muted-foreground hover:text-foreground"
+                'flex-1 py-2 rounded-md text-sm font-medium transition-all',
+                type === 'receita' ? 'bg-success text-success-foreground' : 'text-muted-foreground hover:text-foreground',
               )}
             >
               Receita
             </button>
           </div>
 
-          {/* Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Valor (R$)</Label>
-            <Input
+            <Label htmlFor="amount">Valor</Label>
+            <CurrencyInput
               ref={amountInputRef}
               id="amount"
-              type="text"
-              inputMode="decimal"
-              placeholder="0,00"
               value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              className="text-lg font-mono"
+              onChange={setAmount}
+              className="text-xl font-mono"
               autoFocus
             />
           </div>
 
-          {/* Date */}
           <div className="space-y-2">
-            <Label htmlFor="date">Data</Label>
+            <Label htmlFor="description">Descrição</Label>
             <Input
-              id="date"
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
+              id="description"
+              placeholder="Ex.: mercado, gasolina, salário"
+              value={description}
+              onChange={event => setDescription(event.target.value)}
             />
           </div>
 
-          {/* Category */}
           <div className="space-y-2">
             <Label>Categoria</Label>
-            <Select value={categoryId} onValueChange={(value) => {
-              setCategoryId(value);
-              setSubcategoryId('');
-            }}>
+            <Select
+              value={categoryId}
+              onValueChange={value => {
+                setCategoryId(value);
+                setSubcategoryId('');
+              }}
+            >
               <SelectTrigger>
-                <SelectValue placeholder="Selecione..." />
+                <SelectValue placeholder="Escolha a categoria" />
               </SelectTrigger>
               <SelectContent>
-                {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
+                {availableCategories.map(category => (
+                  <SelectItem key={category.id} value={category.id}>
+                    {category.icon} {category.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
 
-          {/* Subcategory */}
           {filteredSubcategories.length > 0 && (
             <div className="space-y-2">
-              <Label>Subcategoria (opcional)</Label>
-              <Select value={subcategoryId} onValueChange={setSubcategoryId}>
+              <Label>Subcategoria <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+              <Select value={subcategoryId || '__none__'} onValueChange={value => setSubcategoryId(value === '__none__' ? '' : value)}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredSubcategories.map((sub) => (
-                    <SelectItem key={sub.id} value={sub.id}>
-                      {sub.name}
-                    </SelectItem>
+                  <SelectItem value="__none__">Sem subcategoria</SelectItem>
+                  {filteredSubcategories.map(subcategory => (
+                    <SelectItem key={subcategory.id} value={subcategory.id}>{subcategory.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          {/* Description */}
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição (opcional)</Label>
-            <Textarea
-              id="description"
-              placeholder="Ex: Almoço no restaurante"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={2}
-            />
-          </div>
+          <Collapsible open={showDetails} onOpenChange={setShowDetails}>
+            <CollapsibleTrigger asChild>
+              <button type="button" className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
+                <ChevronDown className={cn('h-4 w-4 transition-transform', showDetails && 'rotate-180')} />
+                Data e opções
+              </button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="space-y-4 pt-3">
+              <div className="space-y-2">
+                <Label htmlFor="date">Data</Label>
+                <Input id="date" type="date" value={date} onChange={event => setDate(event.target.value)} />
+              </div>
+              <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                <Label htmlFor="needsReview" className="text-sm">Marcar para revisar depois</Label>
+                <Switch id="needsReview" checked={needsReview} onCheckedChange={setNeedsReview} />
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
 
-          {/* Needs Review */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="needsReview" className="text-sm">
-              Marcar para revisar
-            </Label>
-            <Switch
-              id="needsReview"
-              checked={needsReview}
-              onCheckedChange={setNeedsReview}
-            />
+          <div className="flex gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1"
+              disabled={isSubmitting}
+              onClick={() => void saveTransaction(false)}
+            >
+              Salvar e continuar
+            </Button>
+            <Button type="submit" className="flex-1" disabled={isSubmitting}>
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
+            </Button>
           </div>
-
-          {/* Submit */}
-          <Button 
-            type="submit" 
-            className="w-full"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? 'Salvando...' : 'Salvar Lançamento'}
-          </Button>
         </form>
       </DialogContent>
     </Dialog>

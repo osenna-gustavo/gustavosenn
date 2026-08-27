@@ -14,6 +14,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 import { computeRealized } from '@/lib/category-summary';
+import { computeCycleCommitments } from '@/lib/cycle-commitments';
 
 const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
@@ -216,8 +217,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .filter(t => t.type === 'despesa')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const plannedIncome = budg?.plannedIncome ?? 0;
-    const plannedExpenses = budg?.plannedExpenses ?? 0;
+    const commitments = computeCycleCommitments(recs, instances, monthTransactions, month, year);
+    const plannedIncome = Math.max(budg?.plannedIncome ?? 0, commitments.expectedIncome);
 
     // Calculate fixed vs variable
     const fixedCategoryIds = cats.filter(c => c.isFixed).map(c => c.id);
@@ -228,31 +229,39 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     const realizedVariable = realizedExpenses - realizedFixed;
 
-    // Calculate planned fixed from budget + recurrences
-    let plannedFixed = budg?.categoryBudgets
+    // Orçamento manual e compromissos automáticos formam um único plano do ciclo.
+    const manualPlannedFixed = budg?.categoryBudgets
       .filter(cb => fixedCategoryIds.includes(cb.categoryId))
       .reduce((sum, cb) => sum + cb.plannedAmount, 0) ?? 0;
 
-    // Add pending recurrences to planned fixed
-    const pendingRecurrences = instances.filter(i => i.status === 'pending');
-    for (const instance of pendingRecurrences) {
-      const rec = recs.find(r => r.id === instance.recurrenceId);
-      if (rec && rec.type === 'despesa') {
-        const cat = cats.find(c => c.id === rec.categoryId);
-        if (cat?.isFixed) {
-          plannedFixed += instance.amount;
-        }
-      }
-    }
-
-    const plannedVariable = plannedExpenses - plannedFixed;
+    const expectedFixed = fixedCategoryIds.reduce((sum, categoryId) => {
+      const categoryAmount = commitments.expectedByCategory[categoryId] ?? 0;
+      const subcategoryAmount = subs
+        .filter(sub => sub.categoryId === categoryId)
+        .reduce((subtotal, sub) => subtotal + (commitments.expectedBySubcategory[sub.id] ?? 0), 0);
+      return sum + categoryAmount + subcategoryAmount;
+    }, 0);
+    const committedFixed = fixedCategoryIds.reduce((sum, categoryId) => {
+      const categoryAmount = commitments.committedByCategory[categoryId] ?? 0;
+      const subcategoryAmount = subs
+        .filter(sub => sub.categoryId === categoryId)
+        .reduce((subtotal, sub) => subtotal + (commitments.committedBySubcategory[sub.id] ?? 0), 0);
+      return sum + categoryAmount + subcategoryAmount;
+    }, 0);
+    const plannedFixed = manualPlannedFixed + expectedFixed;
 
     // Category breakdown — use centralized matching so the dashboard numbers
     // are always equal to what the drill-down drawer shows for the same
     // (categoryId, subcategoryId) pair.
     const categoryBreakdown = cats.map(cat => {
-      const catBudget = budg?.categoryBudgets.find(cb => cb.categoryId === cat.id);
-      const planned = catBudget?.plannedAmount ?? 0;
+      const manualPlanned = budg?.categoryBudgets
+        .filter(cb => cb.categoryId === cat.id)
+        .reduce((sum, cb) => sum + cb.plannedAmount, 0) ?? 0;
+      const expectedAtCategory = commitments.expectedByCategory[cat.id] ?? 0;
+      const expectedAtSubcategories = subs
+        .filter(sub => sub.categoryId === cat.id)
+        .reduce((sum, sub) => sum + (commitments.expectedBySubcategory[sub.id] ?? 0), 0);
+      const planned = manualPlanned + expectedAtCategory + expectedAtSubcategories;
       const realized = computeRealized(
         monthTransactions,
         { categoryId: cat.id, type: 'despesa' },
@@ -260,7 +269,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         subs,
       );
 
-      const percentage = planned > 0 ? (realized / planned) * 100 : (realized > 0 ? 100 : 0);
+      const committedAtCategory = commitments.committedByCategory[cat.id] ?? 0;
+      const committedAtSubcategories = subs
+        .filter(sub => sub.categoryId === cat.id)
+        .reduce((sum, sub) => sum + (commitments.committedBySubcategory[sub.id] ?? 0), 0);
+      const committed = committedAtCategory + committedAtSubcategories;
+      const projected = realized + committed;
+      const available = planned - projected;
+      const percentage = planned > 0 ? (projected / planned) * 100 : (projected > 0 ? 100 : 0);
       let status: 'ok' | 'warning' | 'exceeded' = 'ok';
       if (percentage > 100) status = 'exceeded';
       else if (percentage >= 80) status = 'warning';
@@ -271,10 +287,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         isFixed: cat.isFixed,
         planned,
         realized,
+        committed,
+        projected,
+        available,
         status,
         percentage,
       };
     });
+
+    const categoryPlannedExpenses = categoryBreakdown
+      .filter(category => cats.find(cat => cat.id === category.categoryId)?.type === 'despesa')
+      .reduce((sum, category) => sum + category.planned, 0);
+    const plannedExpenses = Math.max(budg?.plannedExpenses ?? 0, categoryPlannedExpenses);
+    const committedExpenses = commitments.committedExpenses;
+    const projectedExpenses = realizedExpenses + committedExpenses;
+    const availableBudget = plannedExpenses - projectedExpenses;
+    const budgetUsagePercentage = plannedExpenses > 0
+      ? (projectedExpenses / plannedExpenses) * 100
+      : (projectedExpenses > 0 ? 100 : 0);
+    const plannedVariable = Math.max(0, plannedExpenses - plannedFixed);
 
     return {
       month,
@@ -287,9 +318,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       realizedFixed,
       plannedVariable,
       realizedVariable,
+      committedExpenses,
+      projectedExpenses,
+      availableBudget,
+      budgetUsagePercentage,
       balance: realizedIncome - realizedExpenses,
-      remainingFixed: Math.max(0, plannedFixed - realizedFixed),
-      remainingVariable: Math.max(0, plannedVariable - realizedVariable),
+      remainingFixed: Math.max(0, plannedFixed - realizedFixed - committedFixed),
+      remainingVariable: Math.max(0, plannedVariable - realizedVariable - (committedExpenses - committedFixed)),
       categoryBreakdown,
     };
   }, []);

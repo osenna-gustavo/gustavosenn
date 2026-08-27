@@ -86,7 +86,7 @@ export function MonthSelector() {
 
       {billingDateRange && (
         <p className="text-[10px] text-primary/70 font-medium">
-          {formatDateShort(billingDateRange.start)} → {formatDateShort(billingDateRange.end)}
+          Ciclo {formatDateShort(billingDateRange.start)} → {formatDateShort(billingDateRange.end)}
         </p>
       )}
     </div>

@@ -12,55 +12,7 @@ import { BudgetRecurrencesList } from '@/components/budget/BudgetRecurrencesList
 import { CollapsibleCategoryGroup } from '@/components/recurrences/CollapsibleCategoryGroup';
 import { CurrencyInput } from '@/components/ui/currency-input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { Recurrence, RecurrenceInstance } from '@/types/finance';
-
-/**
- * Compute the automatic budget contributions from recurrences and installments
- * that apply to a given month, grouped by category and subcategory.
- * Only expenses contribute; income recurrences are aggregated separately.
- */
-function computeAutoBudget(
-  recurrences: Recurrence[],
-  instances: RecurrenceInstance[],
-  month: number,
-  year: number,
-) {
-  const byCategory: Record<string, number> = {};
-  const bySubcategory: Record<string, number> = {};
-  let autoIncome = 0;
-
-  const monthStart = new Date(year, month, 1);
-  const monthEnd = new Date(year, month + 1, 0);
-
-  for (const rec of recurrences) {
-    if (!rec.isActive) continue;
-    const startDate = new Date(rec.startDate);
-    const endDate = rec.endDate ? new Date(rec.endDate) : null;
-    if (startDate > monthEnd) continue;
-    if (endDate && endDate < monthStart) continue;
-    if (rec.totalInstallments) {
-      const currentNum =
-        (year - startDate.getFullYear()) * 12 + (month - startDate.getMonth()) + 1;
-      if (currentNum < 1 || currentNum > rec.totalInstallments) continue;
-    }
-
-    const instance = instances.find(i => i.recurrenceId === rec.id);
-    const amount = instance?.amount ?? rec.amount;
-
-    if (rec.type === 'receita') {
-      autoIncome += amount;
-      continue;
-    }
-
-    if (rec.subcategoryId) {
-      bySubcategory[rec.subcategoryId] = (bySubcategory[rec.subcategoryId] || 0) + amount;
-    } else {
-      byCategory[rec.categoryId] = (byCategory[rec.categoryId] || 0) + amount;
-    }
-  }
-
-  return { byCategory, bySubcategory, autoIncome };
-}
+import { computeCycleCommitments } from '@/lib/cycle-commitments';
 
 export function BudgetPage() {
   const {
@@ -109,8 +61,21 @@ export function BudgetPage() {
 
   // Auto contributions from recurrences + installments for this month
   const { byCategory: autoByCategory, bySubcategory: autoBySubcategory, autoIncome } = useMemo(
-    () => computeAutoBudget(recurrences, recurrenceInstances, selectedMonth, selectedYear),
-    [recurrences, recurrenceInstances, selectedMonth, selectedYear],
+    () => {
+      const result = computeCycleCommitments(
+        recurrences,
+        recurrenceInstances,
+        transactions,
+        selectedMonth,
+        selectedYear,
+      );
+      return {
+        byCategory: result.expectedByCategory,
+        bySubcategory: result.expectedBySubcategory,
+        autoIncome: result.expectedIncome,
+      };
+    },
+    [recurrences, recurrenceInstances, transactions, selectedMonth, selectedYear],
   );
 
   // Initialize manual values from saved budget (only when no unsaved edits)

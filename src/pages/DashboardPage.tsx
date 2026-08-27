@@ -1,19 +1,15 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs';
 import { CategoryProgress } from '@/components/dashboard/CategoryProgress';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
-import { ExpenseChart } from '@/components/dashboard/ExpenseChart';
 import { DrillDownDrawer, type DrillDownFilter } from '@/components/dashboard/DrillDownDrawer';
 import { PlannedVsRealizedDrawer } from '@/components/dashboard/PlannedVsRealizedDrawer';
 import { FixedPendingDrawer } from '@/components/dashboard/FixedPendingDrawer';
 import { useApp } from '@/contexts/AppContext';
-import { useFilters } from '@/contexts/FilterContext';
-import { formatMonthYear } from '@/lib/formatters';
-import { FilterPanel } from '@/components/filters';
+import { formatDateShort, formatMonthYear } from '@/lib/formatters';
 
 export function DashboardPage() {
-  const { selectedMonth, selectedYear, categories, subcategories } = useApp();
-  const { hasActiveFilters } = useFilters();
+  const { selectedMonth, selectedYear, billingDateRange } = useApp();
   
   const [drillDownFilter, setDrillDownFilter] = useState<DrillDownFilter | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -44,27 +40,17 @@ export function DashboardPage() {
     <div className="space-y-6 animate-fade-in">
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold">Dashboard</h1>
+        <h1 className="text-2xl lg:text-3xl font-bold">Visão geral</h1>
         <p className="text-muted-foreground">
-          Resumo financeiro de {formatMonthYear(selectedMonth, selectedYear)}
+          Ciclo financeiro de {formatMonthYear(selectedMonth, selectedYear)}
+          {billingDateRange && ` · ${formatDateShort(billingDateRange.start)} a ${formatDateShort(billingDateRange.end)}`}
         </p>
       </div>
-
-      {/* Filters */}
-      <FilterPanel
-        screen="dashboard"
-        categories={categories}
-        subcategories={subcategories}
-      />
 
       {/* KPIs */}
       <DashboardKPIs onDrillDown={handleDrillDown} />
 
-      {/* Charts and Lists */}
-      <div className="grid lg:grid-cols-2 gap-6">
-        <ExpenseChart onDrillDown={handleDrillDown} />
-        <CategoryProgress onDrillDown={handleDrillDown} />
-      </div>
+      <CategoryProgress onDrillDown={handleDrillDown} />
 
       {/* Recent Transactions */}
       <RecentTransactions />

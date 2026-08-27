@@ -7,8 +7,6 @@ import {
   Tags,
   RefreshCw,
   Upload,
-  BarChart3,
-  FolderKanban,
   Menu,
   X,
   LogOut,
@@ -35,18 +33,16 @@ const settingsSubItems: { screen: AppScreen; label: string; icon: React.ReactNod
   { screen: 'categories', label: 'Categorias', icon: <Tags className="h-4 w-4" /> },
   { screen: 'recurrences', label: 'Recorrências', icon: <RefreshCw className="h-4 w-4" /> },
   { screen: 'installments', label: 'Parcelamentos', icon: <CreditCard className="h-4 w-4" /> },
-  { screen: 'import', label: 'Importar', icon: <Upload className="h-4 w-4" /> },
-  { screen: 'reports', label: 'Relatórios', icon: <BarChart3 className="h-4 w-4" /> },
-  { screen: 'projects', label: 'Projetos', icon: <FolderKanban className="h-4 w-4" /> },
+  { screen: 'import', label: 'Importar dados', icon: <Upload className="h-4 w-4" /> },
 ];
 
 const settingsSubScreens = settingsSubItems.map(i => i.screen);
 
 const navItems: NavItem[] = [
-  { screen: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="h-5 w-5" /> },
+  { screen: 'dashboard', label: 'Visão geral', icon: <LayoutDashboard className="h-5 w-5" /> },
   { screen: 'transactions', label: 'Lançamentos', icon: <Receipt className="h-5 w-5" /> },
   { screen: 'budget', label: 'Orçamento', icon: <Wallet className="h-5 w-5" /> },
-  { screen: 'settings', label: 'Configurações', icon: <Settings className="h-5 w-5" />, subItems: settingsSubItems },
+  { screen: 'settings', label: 'Organizar', icon: <Settings className="h-5 w-5" />, subItems: settingsSubItems },
 ];
 
 export function Sidebar() {

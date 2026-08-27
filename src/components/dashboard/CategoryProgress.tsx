@@ -3,8 +3,7 @@ import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { computeRealized } from '@/lib/category-summary';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import type { DrillDownFilter } from './DrillDownDrawer';
 
 const INITIAL_LIMIT = 8;
@@ -13,294 +12,123 @@ interface CategoryProgressProps {
   onDrillDown?: (filter: DrillDownFilter) => void;
 }
 
-interface SubcategoryData {
-  subcategoryId: string;
-  subcategoryName: string;
-  planned: number;
-  realized: number;
-  percentage: number;
-  status: 'ok' | 'warning' | 'exceeded';
-}
-
-interface GroupedCategoryData {
-  categoryId: string;
-  categoryName: string;
-  icon?: string;
-  isFixed: boolean;
-  planned: number;
-  realized: number;
-  percentage: number;
-  status: 'ok' | 'warning' | 'exceeded';
-  subcategories: SubcategoryData[];
-  isExpanded: boolean;
-}
-
 export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
-  const { monthSummary, categories, subcategories: allSubcategories, transactions, budget } = useApp();
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const { monthSummary, categories } = useApp();
   const [showAll, setShowAll] = useState(false);
 
   if (!monthSummary || categories.length === 0) {
     return (
       <div className="glass-card rounded-xl p-4 lg:p-6">
-        <h3 className="text-lg font-semibold mb-4">Categorias</h3>
+        <div className="h-5 bg-muted rounded w-48 mb-5 animate-pulse" />
         <div className="space-y-4">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="animate-pulse">
-              <div className="h-4 bg-muted rounded w-32 mb-2" />
-              <div className="h-2 bg-muted rounded" />
-            </div>
+          {[...Array(5)].map((_, index) => (
+            <div key={index} className="h-16 bg-muted/60 rounded-lg animate-pulse" />
           ))}
         </div>
       </div>
     );
   }
 
-  const monthTransactions = transactions;
-
-  // Build grouped data with subcategories
-  const groupedCategories: GroupedCategoryData[] = categories
-    .filter(c => c.type === 'despesa')
-    .map(cat => {
-      const catBudgets = budget?.categoryBudgets.filter(cb => cb.categoryId === cat.id) ?? [];
-      const planned = catBudgets.reduce((sum, cb) => sum + cb.plannedAmount, 0);
-      const realized = computeRealized(
-        monthTransactions,
-        { categoryId: cat.id, type: 'despesa' },
-        categories,
-        allSubcategories,
-      );
-
-      const percentage = planned > 0 ? (realized / planned) * 100 : (realized > 0 ? 100 : 0);
-      let status: 'ok' | 'warning' | 'exceeded' = 'ok';
-      if (percentage > 100) status = 'exceeded';
-      else if (percentage >= 80) status = 'warning';
-
-      // Get subcategories with data
-      const catSubcategories = allSubcategories.filter(s => s.categoryId === cat.id);
-      const subcategoriesData: SubcategoryData[] = catSubcategories
-        .map(sub => {
-          const subPlanned = catBudgets
-            .filter(cb => cb.subcategoryId === sub.id)
-            .reduce((sum, cb) => sum + cb.plannedAmount, 0);
-          const subRealized = computeRealized(
-            monthTransactions,
-            { categoryId: cat.id, subcategoryId: sub.id, type: 'despesa' },
-            categories,
-            allSubcategories,
-          );
-
-          const subPercentage = subPlanned > 0 ? (subRealized / subPlanned) * 100 : (subRealized > 0 ? 100 : 0);
-          let subStatus: 'ok' | 'warning' | 'exceeded' = 'ok';
-          if (subPercentage > 100) subStatus = 'exceeded';
-          else if (subPercentage >= 80) subStatus = 'warning';
-
-          return {
-            subcategoryId: sub.id,
-            subcategoryName: sub.name,
-            planned: subPlanned,
-            realized: subRealized,
-            percentage: subPercentage,
-            status: subStatus,
-          };
-        })
-        .filter(s => s.planned > 0 || s.realized > 0);
-
-      return {
-        categoryId: cat.id,
-        categoryName: cat.name,
-        icon: cat.icon,
-        isFixed: cat.isFixed,
-        planned,
-        realized,
-        percentage,
-        status,
-        subcategories: subcategoriesData,
-        isExpanded: expandedCategories.has(cat.id),
-      };
+  const categoryRows = monthSummary.categoryBreakdown
+    .filter(summary => {
+      const category = categories.find(item => item.id === summary.categoryId);
+      return category?.type === 'despesa' && (summary.planned > 0 || summary.projected > 0);
     })
-    .filter(c => c.planned > 0 || c.realized > 0)
-    .sort((a, b) => b.realized - a.realized);
+    .sort((a, b) => b.projected - a.projected);
 
-  const displayCategories = showAll ? groupedCategories : groupedCategories.slice(0, INITIAL_LIMIT);
-  const hasMore = groupedCategories.length > INITIAL_LIMIT;
-  const hiddenCount = groupedCategories.length - INITIAL_LIMIT;
-
-  const handleCategoryClick = (categoryId: string, categoryName: string) => {
-    if (onDrillDown) {
-      onDrillDown({
-        type: 'expenses',
-        categoryId,
-        title: `Despesas: ${categoryName}`,
-      });
-    }
-  };
-
-  const handleSubcategoryClick = (categoryId: string, subcategoryId: string, subcategoryName: string) => {
-    if (onDrillDown) {
-      onDrillDown({
-        type: 'expenses',
-        categoryId,
-        subcategoryId,
-        title: `Despesas: ${subcategoryName}`,
-      });
-    }
-  };
-
-  const toggleCategoryExpansion = (categoryId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setExpandedCategories(prev => {
-      const next = new Set(prev);
-      if (next.has(categoryId)) {
-        next.delete(categoryId);
-      } else {
-        next.add(categoryId);
-      }
-      return next;
-    });
-  };
+  const displayedRows = showAll ? categoryRows : categoryRows.slice(0, INITIAL_LIMIT);
+  const hiddenCount = Math.max(0, categoryRows.length - INITIAL_LIMIT);
 
   return (
     <div className="glass-card rounded-xl p-4 lg:p-6">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold">Categorias do Mês</h3>
+      <div className="flex items-start justify-between gap-4 mb-5">
+        <div>
+          <h3 className="text-lg font-semibold">Orçamento por categoria</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            Gasto + comprometido mostram quanto do ciclo já está reservado.
+          </p>
+        </div>
+        <div className="hidden sm:flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-primary" /> Gasto</span>
+          <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-warning" /> Comprometido</span>
+        </div>
       </div>
 
-      <div className="flex gap-3 text-xs mb-4">
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-success" />
-          OK
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-warning" />
-          Atenção
-        </span>
-        <span className="flex items-center gap-1">
-          <span className="h-2 w-2 rounded-full bg-destructive" />
-          Estourou
-        </span>
-      </div>
-
-      {displayCategories.length === 0 ? (
+      {displayedRows.length === 0 ? (
         <p className="text-muted-foreground text-sm text-center py-8">
-          Nenhum lançamento ou orçamento definido para este mês.
+          Defina um orçamento ou adicione lançamentos para acompanhar o ciclo.
         </p>
       ) : (
-        <div className="space-y-2">
-          {displayCategories.map((cat) => (
-            <div key={cat.categoryId} className="rounded-lg border border-border overflow-hidden">
-              {/* Category header */}
-              <div 
-                className="flex items-center justify-between p-3 bg-muted/30 hover:bg-muted/50 cursor-pointer transition-colors"
-                onClick={() => handleCategoryClick(cat.categoryId, cat.categoryName)}
-              >
-                <div className="flex items-center gap-2 flex-1">
-                  {cat.subcategories.length > 0 && (
-                    <button
-                      onClick={(e) => toggleCategoryExpansion(cat.categoryId, e)}
-                      className="p-0.5 hover:bg-muted rounded"
-                    >
-                      {expandedCategories.has(cat.categoryId) ? (
-                        <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                      )}
-                    </button>
-                  )}
-                  <span className="text-base">{cat.icon || '📦'}</span>
-                  <span className="font-medium text-sm">{cat.categoryName}</span>
-                  {cat.isFixed && (
-                    <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                      Fixo
-                    </span>
-                  )}
-                  {cat.subcategories.length > 0 && (
-                    <span className="text-[10px] text-muted-foreground">
-                      ({cat.subcategories.length})
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="font-mono font-medium">
-                        {formatCurrency(cat.realized)}
-                      </span>
-                      {cat.planned > 0 && (
-                        <span className="text-muted-foreground text-xs">
-                          / {formatCurrency(cat.planned)}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <span className={cn(
-                    "text-xs font-medium w-12 text-right",
-                    cat.status === 'ok' && "text-success",
-                    cat.status === 'warning' && "text-warning",
-                    cat.status === 'exceeded' && "text-destructive"
-                  )}>
-                    {formatPercentage(Math.round(cat.percentage))}
-                  </span>
-                </div>
-              </div>
+        <div className="space-y-3">
+          {displayedRows.map(row => {
+            const category = categories.find(item => item.id === row.categoryId);
+            const realizedWidth = row.planned > 0
+              ? Math.min(100, (row.realized / row.planned) * 100)
+              : row.realized > 0 ? 100 : 0;
+            const committedWidth = row.planned > 0
+              ? Math.min(Math.max(0, 100 - realizedWidth), (row.committed / row.planned) * 100)
+              : 0;
 
-              {/* Subcategories */}
-              {expandedCategories.has(cat.categoryId) && cat.subcategories.length > 0 && (
-                <div className="border-t border-border">
-                  {cat.subcategories.map((sub) => (
-                    <div
-                      key={sub.subcategoryId}
-                      className="flex items-center justify-between py-2 px-3 pl-10 hover:bg-muted/30 cursor-pointer transition-colors border-b border-border last:border-b-0"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleSubcategoryClick(cat.categoryId, sub.subcategoryId, sub.subcategoryName);
-                      }}
-                    >
-                      <span className="text-sm text-muted-foreground">{sub.subcategoryName}</span>
-                      <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-2 text-sm">
-                          <span className="font-mono">{formatCurrency(sub.realized)}</span>
-                          {sub.planned > 0 && (
-                            <span className="text-muted-foreground text-xs">
-                              / {formatCurrency(sub.planned)}
-                            </span>
-                          )}
-                        </div>
-                        <span className={cn(
-                          "text-xs font-medium w-10 text-right",
-                          sub.status === 'ok' && "text-success",
-                          sub.status === 'warning' && "text-warning",
-                          sub.status === 'exceeded' && "text-destructive"
-                        )}>
-                          {formatPercentage(Math.round(sub.percentage))}
-                        </span>
-                      </div>
+            return (
+              <button
+                type="button"
+                key={row.categoryId}
+                onClick={() => onDrillDown?.({
+                  type: 'expenses',
+                  categoryId: row.categoryId,
+                  title: `Gastos: ${row.categoryName}`,
+                })}
+                className="w-full rounded-lg border border-border p-3 text-left hover:bg-muted/30 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-base">{category?.icon || '📦'}</span>
+                    <span className="font-medium text-sm truncate">{row.categoryName}</span>
+                    {row.isFixed && (
+                      <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                        Fixo
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-mono text-sm font-medium">
+                      {formatCurrency(row.projected)}
+                      <span className="text-muted-foreground font-normal"> / {formatCurrency(row.planned)}</span>
                     </div>
-                  ))}
+                    <span className={cn(
+                      'text-xs font-medium',
+                      row.status === 'ok' && 'text-success',
+                      row.status === 'warning' && 'text-warning',
+                      row.status === 'exceeded' && 'text-destructive',
+                    )}>
+                      {formatPercentage(row.percentage)}
+                    </span>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
-          
-          {/* Ver mais / Ver menos button */}
-          {hasMore && (
+
+                <div className="h-2 bg-muted rounded-full overflow-hidden flex mt-3">
+                  <div className="h-full bg-primary transition-all" style={{ width: `${realizedWidth}%` }} />
+                  <div className="h-full bg-warning transition-all" style={{ width: `${committedWidth}%` }} />
+                </div>
+
+                <div className="grid grid-cols-3 gap-2 mt-2 text-[11px] text-muted-foreground">
+                  <span>Gasto <strong className="text-foreground font-mono">{formatCurrency(row.realized)}</strong></span>
+                  <span>Reservado <strong className="text-foreground font-mono">{formatCurrency(row.committed)}</strong></span>
+                  <span className="text-right">Disponível <strong className={cn('font-mono', row.available < 0 ? 'text-destructive' : 'text-success')}>{formatCurrency(row.available)}</strong></span>
+                </div>
+              </button>
+            );
+          })}
+
+          {hiddenCount > 0 && (
             <Button
               variant="ghost"
               size="sm"
               className="w-full text-muted-foreground hover:text-foreground"
-              onClick={() => setShowAll(!showAll)}
+              onClick={() => setShowAll(value => !value)}
             >
-              {showAll ? (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1 rotate-[-90deg]" />
-                  Ver menos
-                </>
-              ) : (
-                <>
-                  <ChevronRight className="h-4 w-4 mr-1 rotate-90" />
-                  Ver mais {hiddenCount} {hiddenCount === 1 ? 'categoria' : 'categorias'}
-                </>
-              )}
+              {showAll ? <ChevronUp className="h-4 w-4 mr-1" /> : <ChevronDown className="h-4 w-4 mr-1" />}
+              {showAll ? 'Ver menos' : `Ver mais ${hiddenCount} ${hiddenCount === 1 ? 'categoria' : 'categorias'}`}
             </Button>
           )}
         </div>

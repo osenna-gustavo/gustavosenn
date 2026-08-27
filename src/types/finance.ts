@@ -136,6 +136,10 @@ export interface MonthSummary {
   realizedFixed: number;
   plannedVariable: number;
   realizedVariable: number;
+  committedExpenses: number;
+  projectedExpenses: number;
+  availableBudget: number;
+  budgetUsagePercentage: number;
   balance: number;
   remainingFixed: number;
   remainingVariable: number;
@@ -148,6 +152,9 @@ export interface CategorySummary {
   isFixed: boolean;
   planned: number;
   realized: number;
+  committed: number;
+  projected: number;
+  available: number;
   status: 'ok' | 'warning' | 'exceeded';
   percentage: number;
 }
