@@ -61,6 +61,17 @@ export function MainLayout({ children }: MainLayoutProps) {
 
         {/* Page Content */}
         <div className="p-4 lg:p-6">
+          {loadError && (
+            <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <div className="flex-1 text-sm">
+                <p className="font-medium text-destructive">Não foi possível carregar todos os dados.</p>
+                <p className="text-muted-foreground break-words">{loadError}</p>
+              </div>
+              <Button variant="outline" size="sm" onClick={() => refreshData()} disabled={isLoading}>
+                Tentar novamente
+              </Button>
+            </div>
+          )}
           {children}
         </div>
       </main>
