@@ -580,6 +580,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       recurrenceInstances,
       monthSummary,
       isLoading,
+      loadError,
       isInitialized,
       refreshData,
       addTransaction,
