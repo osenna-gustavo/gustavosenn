@@ -37,7 +37,7 @@ import { cn } from '@/lib/utils';
 import { RecurrenceInstances } from '@/components/recurrences/RecurrenceInstances';
 
 export function RecurrencesPage() {
-  const { categories, subcategories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence, bulkUpdateRecurrences, bulkDeleteRecurrences } = useApp();
+  const { categories, subcategories, recurrences, selectedMonth, selectedYear, addRecurrence, updateRecurrence, deleteRecurrence, bulkUpdateRecurrences, bulkDeleteRecurrences, isLoading, loadError, refreshData } = useApp();
   const { toast } = useToast();
 
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -269,8 +269,13 @@ export function RecurrencesPage() {
 
           <div className="glass-card rounded-xl divide-y divide-border">
             {regularRecurrences.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                Nenhuma recorrência criada.
+              <div className="p-8 text-center text-muted-foreground space-y-3">
+                <p>{isLoading ? 'Carregando recorrências...' : 'Nenhuma recorrência cadastrada.'}</p>
+                {!isLoading && loadError && (
+                  <Button variant="outline" size="sm" onClick={() => refreshData()}>
+                    Tentar novamente
+                  </Button>
+                )}
               </div>
             ) : (
               <>
