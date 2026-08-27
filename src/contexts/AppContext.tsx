@@ -43,6 +43,7 @@ interface AppContextType {
   // Loading states
   isLoading: boolean;
   isInitialized: boolean;
+  loadError: string | null;
   
   // Actions
   refreshData: () => Promise<void>;
@@ -423,7 +424,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary, categories, subcategories, recurrences]);
+  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
 
   // Initialize app when user is authenticated
   useEffect(() => {
