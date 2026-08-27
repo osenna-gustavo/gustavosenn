@@ -1,3 +1,14 @@
+## Regras permanentes do projeto
+
+- Toda otimização aprovada deve ser validada e enviada para a branch `main` conectada ao Lovable, para ficar disponível no preview imediatamente.
+- Alterações concluídas não devem permanecer somente em branches de trabalho, salvo quando o usuário pedir explicitamente um rascunho ou solicitar que ainda não sejam aplicadas.
+- Atualizar o preview não significa publicar em produção. A ação **Publish** do Lovable depende de pedido explícito do usuário.
+- O fechamento dos cartões é global e define o ciclo financeiro familiar.
+- Compras no cartão consomem o orçamento no ciclo da compra; o pagamento da fatura não deve ser contabilizado como uma segunda despesa.
+- O orçamento disponível desconta tanto o realizado quanto recorrências e parcelas ainda pendentes.
+
+---
+
 ## Objetivo
 
 Corrigir dois problemas que quebram a confiança nos números:
