@@ -345,19 +345,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (!user) return;
 
     setIsLoading(true);
+    const errors: string[] = [];
+    const fail = (label: string, error: unknown) => {
+      console.error(`[AppContext] Falha ao carregar ${label}:`, error);
+      const message = error instanceof Error ? error.message : String(error);
+      errors.push(`${label}: ${message}`);
+    };
+
     try {
+      // O ciclo financeiro é opcional: uma falha aqui não pode impedir o
+      // carregamento de categorias, recorrências e lançamentos.
       let cycle: FinancialCycle | null = null;
       try {
         cycle = await db.getFinancialCycle(selectedMonth, selectedYear);
       } catch (cycleError) {
-        console.error('Error loading financial cycle:', cycleError);
+        fail('ciclo financeiro', cycleError);
       }
       setFinancialCycle(cycle);
 
       const resolvedRange = cycle
         ? { start: cycle.startDate, end: new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate(), 23, 59, 59, 999) }
         : billingDateRange;
-      const [cats, subs, trans, cashTrans, budg, recs, instances] = await Promise.all([
+
+      // Cada consulta é independente: uma falha isolada não zera o restante.
+      const [catsR, subsR, transR, cashR, budgR, recsR, instancesR] = await Promise.allSettled([
         db.getCategories(),
         db.getSubcategories(),
         db.getTransactions(selectedMonth, selectedYear, resolvedRange ?? undefined),
@@ -367,41 +378,59 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         db.getRecurrenceInstances(selectedMonth, selectedYear),
       ]);
 
+      const cats = catsR.status === 'fulfilled' ? catsR.value : (fail('categorias', catsR.reason), categories);
+      const subs = subsR.status === 'fulfilled' ? subsR.value : (fail('subcategorias', subsR.reason), subcategories);
+      const trans = transR.status === 'fulfilled' ? transR.value : (fail('lançamentos', transR.reason), []);
+      const cashTrans = cashR.status === 'fulfilled' ? cashR.value : (fail('caixa', cashR.reason), []);
+      const budg = budgR.status === 'fulfilled' ? (budgR.value ?? null) : (fail('orçamento', budgR.reason), null);
+      const recs = recsR.status === 'fulfilled' ? recsR.value : (fail('recorrências', recsR.reason), recurrences);
+      const instances = instancesR.status === 'fulfilled' ? instancesR.value : (fail('recorrências do mês', instancesR.reason), []);
+
       setCategories(cats);
       setSubcategories(subs);
       setTransactions(trans);
       setCashTransactions(cashTrans);
-      setBudget(budg ?? null);
+      setBudget(budg);
       setRecurrences(recs);
       setRecurrenceInstances(instances);
 
-      const summary = calculateMonthSummary(
-        cats, subs, trans, budg ?? null, recs, instances,
-        cashTrans,
-        selectedMonth, selectedYear,
-        resolvedRange ?? undefined
-      );
-      setMonthSummary(summary);
+      try {
+        const summary = calculateMonthSummary(
+          cats, subs, trans, budg, recs, instances,
+          cashTrans,
+          selectedMonth, selectedYear,
+          resolvedRange ?? undefined
+        );
+        setMonthSummary(summary);
+      } catch (summaryError) {
+        fail('resumo do mês', summaryError);
+      }
+
+      setLoadError(errors.length > 0 ? errors.join(' | ') : null);
     } catch (error) {
       console.error('Error refreshing data:', error);
+      setLoadError(error instanceof Error ? error.message : String(error));
     } finally {
       setIsLoading(false);
     }
-  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary]);
+  }, [userId, selectedMonth, selectedYear, billingDateRange, calculateMonthSummary, categories, subcategories, recurrences]);
 
   // Initialize app when user is authenticated
   useEffect(() => {
     const init = async () => {
       if (!user) return;
-      
+
       try {
         await db.initializeDefaultCategories();
         await db.setAppInitialized();
-        setIsInitialized(true);
-        await refreshData();
       } catch (error) {
         console.error('Error initializing app:', error);
+        setLoadError(error instanceof Error ? error.message : String(error));
+      } finally {
+        // O app deve sempre sair do estado "Carregando...", mesmo com erro.
+        setIsInitialized(true);
       }
+      await refreshData();
     };
     init();
   }, [userId]);
