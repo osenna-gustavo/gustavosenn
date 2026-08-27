@@ -11,7 +11,7 @@ interface MainLayoutProps {
 }
 
 export function MainLayout({ children }: MainLayoutProps) {
-  const { isLoading, isInitialized } = useApp();
+  const { isLoading, isInitialized, loadError, refreshData } = useApp();
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   if (!isInitialized) {
