@@ -51,6 +51,9 @@ export function RecurrenceInstances() {
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
 
+  // Parcelamentos usam a mesma tabela, mas pertencem exclusivamente à tela de Parcelamentos.
+  const regularRecurrences = recurrences.filter(recurrence => !recurrence.totalInstallments);
+
   const toggleGroup = (key: string) => {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
@@ -71,10 +74,11 @@ export function RecurrenceInstances() {
       setIsLoading(true);
       try {
         // Get existing instances for this month
-        let existingInstances = await db.getRecurrenceInstances(selectedMonth, selectedYear);
+        let existingInstances = (await db.getRecurrenceInstances(selectedMonth, selectedYear))
+          .filter(instance => regularRecurrences.some(recurrence => recurrence.id === instance.recurrenceId));
         
         // Check each active recurrence and create instance if needed
-        for (const rec of recurrences) {
+        for (const rec of regularRecurrences) {
           if (!rec.isActive) continue;
           
           const startDate = new Date(rec.startDate);
