@@ -376,7 +376,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const resolvedRange = cycle
         ? { start: cycle.startDate, end: new Date(cycle.endDate.getFullYear(), cycle.endDate.getMonth(), cycle.endDate.getDate(), 23, 59, 59, 999) }
-        : billingDateRange;
+        : (billingCloseDay ? getBillingPeriod(selectedMonth, selectedYear, billingCloseDay) : null);
 
       // Cada consulta é independente: uma falha isolada não zera o restante.
       const [catsR, subsR, transR, cashR, budgR, recsR, instancesR] = await Promise.allSettled([
