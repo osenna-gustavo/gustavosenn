@@ -2,9 +2,11 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MonthSelector } from './MonthSelector';
 import { useApp } from '@/contexts/AppContext';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { FloatingAIAssistant } from '@/components/tools/FloatingAIAssistant';
+
 
 interface MainLayoutProps {
   children: ReactNode;
