@@ -245,44 +245,63 @@ async function handle(action: string, params: Record<string, unknown>) {
     }
 
     case 'parcelamentos_ativos': {
-      const { catById } = await loadCategories();
+      const { catById, subById } = await loadCategories();
+      // Fonte real usada pela tela de Parcelamentos: recurrences com total_installments
       const { data: plans, error } = await supabase
-        .from('installments')
-        .select('id, name, installment_amount, total_installments, first_payment_date, category_id, is_active')
+        .from('recurrences')
+        .select('id, name, type, amount, category_id, subcategory_id, start_date, total_installments, is_active')
         .eq('user_id', USER_ID)
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .not('total_installments', 'is', null);
       if (error) throw new Error(error.message);
 
-      const { data: paid } = await supabase
-        .from('transactions')
-        .select('installment_id')
-        .eq('user_id', USER_ID)
-        .not('installment_id', 'is', null);
+      const activePlans = (plans ?? []).filter((p) => Number(p.total_installments) > 0);
+
+      const { data: paidInstances } = activePlans.length
+        ? await supabase
+            .from('recurrence_instances')
+            .select('recurrence_id')
+            .eq('user_id', USER_ID)
+            .eq('status', 'confirmed')
+            .not('linked_transaction_id', 'is', null)
+            .in('recurrence_id', activePlans.map((p) => p.id))
+        : { data: [] as { recurrence_id: string }[] };
 
       const paidCount = new Map<string, number>();
-      for (const p of paid ?? []) {
-        if (!p.installment_id) continue;
-        paidCount.set(p.installment_id, (paidCount.get(p.installment_id) ?? 0) + 1);
+      for (const i of paidInstances ?? []) {
+        paidCount.set(i.recurrence_id, (paidCount.get(i.recurrence_id) ?? 0) + 1);
       }
 
       return ok(
-        (plans ?? [])
+        activePlans
           .map((p) => {
+            const total = Number(p.total_installments);
             const pagas = paidCount.get(p.id) ?? 0;
+            const start = new Date(p.start_date);
+            const proxima = new Date(Date.UTC(
+              start.getUTCFullYear(),
+              start.getUTCMonth() + Math.min(pagas, total - 1),
+              start.getUTCDate(),
+            ));
             return {
               nome: p.name,
-              parcela_atual: Math.min(pagas + 1, p.total_installments),
+              tipo: p.type,
+              parcela_atual: Math.min(pagas + 1, total),
               parcelas_pagas: pagas,
-              total_parcelas: p.total_installments,
-              valor_parcela: Number(p.installment_amount),
+              parcelas_restantes: Math.max(0, total - pagas),
+              total_parcelas: total,
+              valor_parcela: Number(p.amount),
               categoria: (p.category_id && catById.get(p.category_id)?.name) || null,
-              primeira_parcela: p.first_payment_date,
-              quitado: pagas >= p.total_installments,
+              subcategoria: (p.subcategory_id && subById.get(p.subcategory_id)?.name) || null,
+              primeira_parcela: p.start_date,
+              proxima_parcela: proxima.toISOString().slice(0, 10),
+              quitado: pagas >= total,
             };
           })
           .filter((p) => !p.quitado),
       );
     }
+
 
     case 'orcamento_vs_realizado': {
       const mv = validMonthYear(params);
