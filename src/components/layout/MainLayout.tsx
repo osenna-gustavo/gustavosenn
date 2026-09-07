@@ -77,6 +77,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
 
       <TransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      <FloatingAIAssistant open={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} />
     </div>
+
   );
 }
