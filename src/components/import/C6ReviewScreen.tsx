@@ -428,7 +428,7 @@ export function C6ReviewScreen({
         description: tx.descriptionOriginal,
         origin: 'import',
         needsReview: false,
-        recurrenceId: normalizeOptionalId(recurrenceId) ?? normalizeOptionalId(tx.suggestedRecurrenceId),
+        recurrenceId: finalRecurrenceId,
       });
 
       await updateInvoiceTransactionStatus(tx.id, 'confirmed').catch(() => {});
