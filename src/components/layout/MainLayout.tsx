@@ -53,6 +53,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               )}
               <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                aria-label="Assistente Financeiro"
+                onClick={() => setIsAssistantOpen(true)}
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+
+              <Button
                 className="h-9 gap-2 rounded-full px-3 sm:px-4 glow-primary"
                 onClick={() => setIsFormOpen(true)}
               >
