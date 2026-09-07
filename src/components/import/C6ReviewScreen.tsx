@@ -408,6 +408,12 @@ export function C6ReviewScreen({
         return;
       }
 
+      const finalRecurrenceId =
+        normalizeOptionalId(recurrenceId) ?? normalizeOptionalId(tx.suggestedRecurrenceId);
+      const matchedRecurrence = finalRecurrenceId
+        ? recurrences.find(r => r.id === finalRecurrenceId)
+        : undefined;
+
       await addTransaction({
         date: tx.transactionDate,
         amount: tx.amount,
@@ -415,7 +421,9 @@ export function C6ReviewScreen({
         categoryId: finalCategoryId,
         subcategoryId: subcategoryForCategory(
           finalCategoryId,
-          normalizeOptionalId(subcategoryId) ?? normalizeOptionalId(tx.suggestedSubcategoryId),
+          normalizeOptionalId(subcategoryId)
+            ?? normalizeOptionalId(tx.suggestedSubcategoryId)
+            ?? normalizeOptionalId(matchedRecurrence?.subcategoryId),
         ),
         description: tx.descriptionOriginal,
         origin: 'import',
