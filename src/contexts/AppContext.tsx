@@ -16,6 +16,7 @@ import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 import { computeRealized } from '@/lib/category-summary';
 import { computeCycleCommitments } from '@/lib/cycle-commitments';
+import { buildPlannedBudgetMaps } from '@/lib/planned-budget';
 
 const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
