@@ -2,9 +2,11 @@ import { ReactNode, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { MonthSelector } from './MonthSelector';
 import { useApp } from '@/contexts/AppContext';
-import { Loader2, Plus } from 'lucide-react';
+import { Loader2, Plus, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TransactionForm } from '@/components/transactions/TransactionForm';
+import { FloatingAIAssistant } from '@/components/tools/FloatingAIAssistant';
+
 
 interface MainLayoutProps {
   children: ReactNode;
@@ -13,6 +15,8 @@ interface MainLayoutProps {
 export function MainLayout({ children }: MainLayoutProps) {
   const { isLoading, isInitialized, loadError, refreshData } = useApp();
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isAssistantOpen, setIsAssistantOpen] = useState(false);
+
 
   if (!isInitialized) {
     return (
@@ -49,6 +53,16 @@ export function MainLayout({ children }: MainLayoutProps) {
                 </div>
               )}
               <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 rounded-full"
+                aria-label="Assistente Financeiro"
+                onClick={() => setIsAssistantOpen(true)}
+              >
+                <Sparkles className="h-4 w-4" />
+              </Button>
+
+              <Button
                 className="h-9 gap-2 rounded-full px-3 sm:px-4 glow-primary"
                 onClick={() => setIsFormOpen(true)}
               >
@@ -77,6 +91,8 @@ export function MainLayout({ children }: MainLayoutProps) {
       </main>
 
       <TransactionForm isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} />
+      <FloatingAIAssistant open={isAssistantOpen} onClose={() => setIsAssistantOpen(false)} />
     </div>
+
   );
 }

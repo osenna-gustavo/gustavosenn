@@ -1,67 +1,79 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { corsHeaders } from 'npm:@supabase/supabase-js@2/cors';
 
 const SYSTEM_PROMPT = `Você é um assistente financeiro objetivo dentro de um app de fluxo de caixa pessoal.
 Responda sempre em português, de forma direta e curta — sem rodeios, sem disclaimers.
 Use exclusivamente os dados em "Dados financeiros" abaixo. Nunca invente números.
+Formate valores em reais (R$ 1.234,56).
 Se perguntarem sobre duplicidade de lançamentos, baseie-se no campo "possiveisDuplicidades" (já calculado por código, não por você).
 Se perguntarem sobre orçamento, saldo disponível ou gasto por categoria, baseie-se em "resumoDoMes" (campo "categoryBreakdown" tem planejado/realizado/percentual por categoria).
 Se a informação pedida não estiver nos dados, diga isso claramente em vez de estimar.`;
 
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
-    if (!ANTHROPIC_API_KEY) {
-      throw new Error('ANTHROPIC_API_KEY não configurada nos secrets do projeto.');
+    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
+    if (!LOVABLE_API_KEY) {
+      return jsonResponse({ error: 'Assistente indisponível: chave de IA não configurada.' }, 500);
     }
 
-    const { messages, context } = await req.json();
+    const { messages, context } = await req.json().catch(() => ({}));
     if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ error: 'messages é obrigatório' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'messages é obrigatório' }, 400);
     }
 
-    const system = `${SYSTEM_PROMPT}\n\nDados financeiros:\n${JSON.stringify(context ?? {})}`;
+    const safeMessages = messages
+      .filter((m: unknown): m is { role: string; content: string } =>
+        !!m && typeof (m as { content?: unknown }).content === 'string')
+      .slice(-12)
+      .map((m) => ({
+        role: m.role === 'assistant' ? 'assistant' : 'user',
+        content: m.content.slice(0, 4000),
+      }));
 
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    const system = `${SYSTEM_PROMPT}\n\nDados financeiros:\n${JSON.stringify(context ?? {}).slice(0, 120000)}`;
+
+    const resp = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'content-type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system,
-        messages,
+        model: 'google/gemini-3-flash-preview',
+        messages: [{ role: 'system', content: system }, ...safeMessages],
       }),
     });
 
+    if (resp.status === 429) {
+      return jsonResponse({ error: 'Muitas perguntas em sequência. Aguarde alguns instantes.' }, 429);
+    }
+    if (resp.status === 402) {
+      return jsonResponse({ error: 'Créditos de IA esgotados no workspace.' }, 402);
+    }
     if (!resp.ok) {
       const errText = await resp.text();
-      throw new Error(`Anthropic API error (${resp.status}): ${errText}`);
+      console.error('[financial-assistant] gateway error', resp.status, errText);
+      return jsonResponse({ error: 'Não foi possível consultar a IA agora.' }, 500);
     }
 
     const data = await resp.json();
-    const reply = data.content?.[0]?.text ?? 'Não consegui gerar uma resposta.';
+    const reply = data?.choices?.[0]?.message?.content ?? 'Não consegui gerar uma resposta.';
 
-    return new Response(JSON.stringify({ reply }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ reply });
   } catch (error) {
     console.error('[financial-assistant] Error:', error);
-    return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : 'Erro desconhecido' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    return jsonResponse(
+      { error: error instanceof Error ? error.message : 'Erro desconhecido' },
+      500,
     );
   }
 });
