@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   CheckCircle2, XCircle, AlertCircle, RotateCcw, ChevronDown,
   ChevronRight, Repeat2, Plus, BookOpen, Eye, EyeOff, Edit2, Link2,
@@ -345,8 +345,19 @@ export function C6ReviewScreen({
   onAllConfirmed,
   onCancel,
 }: C6ReviewScreenProps) {
-  const { addTransaction, recurrences } = useApp();
+  const { addTransaction, recurrences, subcategories } = useApp();
   const { toast } = useToast();
+
+  // Nunca deixa passar uma subcategoria que pertence a outra categoria.
+  const subcategoryForCategory = useCallback((
+    categoryId: string | undefined,
+    subcategoryId: string | undefined,
+  ) => {
+    if (!categoryId || !subcategoryId) return undefined;
+    const sub = subcategories.find(s => s.id === subcategoryId);
+    return sub && sub.categoryId === categoryId ? subcategoryId : undefined;
+  }, [subcategories]);
+
   const [localGroups, setLocalGroups] = useState(groups);
   const [loading, setLoading] = useState<string | null>(null);
   const [showLogs, setShowLogs] = useState(false);
@@ -427,7 +438,7 @@ export function C6ReviewScreen({
     } finally {
       setLoading(null);
     }
-  }, [addTransaction, removeFromGroups, toast]);
+  }, [addTransaction, removeFromGroups, subcategoryForCategory, toast]);
 
   // ── Ignore a transaction ────────────────────────────────────────────────────
 
@@ -495,7 +506,7 @@ export function C6ReviewScreen({
         variant: 'destructive',
       });
     }
-  }, [toast]);
+  }, [subcategoryForCategory, toast]);
 
   // ── Manually link a transaction to a recurrence ─────────────────────────────
 
