@@ -103,7 +103,7 @@ interface TransactionRowProps {
   tx: InvoiceTransaction;
   onConfirm: (tx: InvoiceTransaction, categoryId?: string, subcategoryId?: string, recurrenceId?: string) => Promise<void>;
   onIgnore: (tx: InvoiceTransaction) => void;
-  onSaveRule: (tx: InvoiceTransaction, categoryId: string, recurrenceId?: string) => Promise<void>;
+  onSaveRule: (tx: InvoiceTransaction, categoryId: string, subcategoryId?: string, recurrenceId?: string) => Promise<void>;
   onLinkRecurrence: (tx: InvoiceTransaction, recurrenceId: string) => Promise<void>;
   loading: boolean;
 }
@@ -120,6 +120,27 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
 
   const cat = categories.find(c => c.id === (selectedCat || tx.suggestedCategoryId));
   const catSubs = subcategories.filter(s => s.categoryId === selectedCat);
+
+  // A subcategoria só é válida se pertencer à categoria selecionada — evita
+  // gravar pares categoria/subcategoria de categorias diferentes.
+  const validSubId = (() => {
+    const id = normalizeOptionalId(selectedSub);
+    if (!id) return undefined;
+    const sub = subcategories.find(s => s.id === id);
+    return sub && sub.categoryId === (selectedCat || tx.suggestedCategoryId) ? id : undefined;
+  })();
+
+  // Se a sugestão vinda de uma regra antiga aponta para outra categoria, limpa.
+  useEffect(() => {
+    const id = normalizeOptionalId(selectedSub);
+    if (!id) return;
+    const sub = subcategories.find(s => s.id === id);
+    const effectiveCat = selectedCat || tx.suggestedCategoryId;
+    if (!sub || (effectiveCat && sub.categoryId !== effectiveCat)) {
+      setSelectedSub(NONE_SELECT_VALUE);
+    }
+  }, [selectedSub, selectedCat, subcategories, tx.suggestedCategoryId]);
+
   const expenseCategories = categories.filter(c => c.type === 'despesa');
   const activeRecurrences = recurrences.filter(r => r.isActive);
 
@@ -127,7 +148,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
   const linkedRec = recurrences.find(r => r.id === (selectedRecId ?? suggestedRecurrenceId));
 
   const handleConfirm = () => {
-    onConfirm(tx, normalizeOptionalId(selectedCat), normalizeOptionalId(selectedSub), selectedRecId);
+    onConfirm(tx, normalizeOptionalId(selectedCat), validSubId, selectedRecId);
   };
 
   return (
@@ -256,7 +277,7 @@ function TransactionRow({ tx, onConfirm, onIgnore, onSaveRule, onLinkRecurrence,
             {selectedCat && (
               <Button
                 size="sm" variant="outline" className="text-xs h-7 gap-1"
-                onClick={() => onSaveRule(tx, selectedCat, selectedRecId)}
+                onClick={() => onSaveRule(tx, selectedCat, validSubId, selectedRecId)}
               >
                 <BookOpen className="h-3 w-3" />
                 Lembrar categoria
@@ -381,7 +402,10 @@ export function C6ReviewScreen({
         amount: tx.amount,
         type: tx.transactionType === 'estorno' ? 'receita' : 'despesa',
         categoryId: finalCategoryId,
-        subcategoryId: normalizeOptionalId(subcategoryId) ?? normalizeOptionalId(tx.suggestedSubcategoryId),
+        subcategoryId: subcategoryForCategory(
+          finalCategoryId,
+          normalizeOptionalId(subcategoryId) ?? normalizeOptionalId(tx.suggestedSubcategoryId),
+        ),
         description: tx.descriptionOriginal,
         origin: 'import',
         needsReview: false,
@@ -442,13 +466,17 @@ export function C6ReviewScreen({
   const handleSaveRule = useCallback(async (
     tx: InvoiceTransaction,
     categoryId: string,
+    subcategoryId?: string,
     recurrenceId?: string,
   ) => {
     try {
       await saveCategorizationRule(
         tx.merchantNormalized,
         categoryId,
-        normalizeOptionalId(tx.suggestedSubcategoryId),
+        subcategoryForCategory(
+          categoryId,
+          normalizeOptionalId(subcategoryId) ?? normalizeOptionalId(tx.suggestedSubcategoryId),
+        ),
         normalizeOptionalId(recurrenceId) ?? normalizeOptionalId(tx.suggestedRecurrenceId),
         'manual',
         tx.descriptionOriginal,
@@ -499,7 +527,7 @@ export function C6ReviewScreen({
       await saveCategorizationRule(
         tx.merchantNormalized,
         tx.suggestedCategoryId,
-        normalizeOptionalId(tx.suggestedSubcategoryId),
+        subcategoryForCategory(tx.suggestedCategoryId, normalizeOptionalId(tx.suggestedSubcategoryId)),
         recurrenceId,
         'manual',
         tx.descriptionOriginal,
