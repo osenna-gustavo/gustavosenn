@@ -209,15 +209,38 @@ export async function getCategorizationRules(): Promise<CategorizationRule[]> {
   return (data ?? []).map(mapRule);
 }
 
+/**
+ * Garante que a subcategoria realmente pertence à categoria escolhida.
+ * Se não pertencer (ou a categoria estiver vazia), devolve undefined em vez de
+ * gravar um par categoria/subcategoria inconsistente.
+ */
+async function sanitizeSubcategoryForCategory(
+  categoryId: string | undefined,
+  subcategoryId: string | undefined,
+): Promise<string | undefined> {
+  if (!subcategoryId) return undefined;
+  if (!categoryId) return undefined;
+
+  const { data, error } = await supabase
+    .from('subcategories')
+    .select('category_id')
+    .eq('id', subcategoryId)
+    .maybeSingle();
+
+  if (error || !data) return undefined;
+  return data.category_id === categoryId ? subcategoryId : undefined;
+}
+
 export async function saveCategorizationRule(
   merchantNormalized: string,
   categoryId: string | undefined,
-  subcategoryId: string | undefined,
+  subcategoryIdInput: string | undefined,
   recurrenceId: string | undefined,
   origin: RuleOrigin,
   descriptionExample?: string,
 ): Promise<CategorizationRule> {
   const userId = await getUserId();
+  const subcategoryId = await sanitizeSubcategoryForCategory(categoryId, subcategoryIdInput);
 
   // Check if rule exists for this merchant
   const { data: existing } = await (supabase
