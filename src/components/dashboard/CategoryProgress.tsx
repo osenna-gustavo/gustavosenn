@@ -4,7 +4,7 @@ import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
-import { computeCycleCommitments } from '@/lib/cycle-commitments';
+import { buildPlannedBudgetMaps } from '@/lib/planned-budget';
 import { computeRealized } from '@/lib/category-summary';
 import type { DrillDownFilter } from './DrillDownDrawer';
 
@@ -42,21 +42,21 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const subcategoryRowsByCategory = useMemo(() => {
-    const commitments = computeCycleCommitments(
+    const plannedMaps = buildPlannedBudgetMaps(
+      budget,
+      subcategories,
       recurrences,
       recurrenceInstances,
       transactions,
       selectedMonth,
       selectedYear,
     );
+    const commitments = plannedMaps.commitments;
 
     const map: Record<string, SubcategoryRow[]> = {};
 
     for (const sub of subcategories) {
-      const planned = (budget?.categoryBudgets ?? [])
-        .filter(cb => cb.subcategoryId === sub.id)
-        .reduce((sum, cb) => sum + cb.plannedAmount, 0)
-        + (commitments.expectedBySubcategory[sub.id] ?? 0);
+      const planned = plannedMaps.bySubcategory[sub.id] ?? 0;
 
       const realized = computeRealized(
         transactions,
@@ -70,6 +70,7 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
 
       const projected = realized + committed;
       const percentage = planned > 0 ? (projected / planned) * 100 : (projected > 0 ? 100 : 0);
+
       let status: 'ok' | 'warning' | 'exceeded' = 'ok';
       if (percentage > 100) status = 'exceeded';
       else if (percentage >= 80) status = 'warning';

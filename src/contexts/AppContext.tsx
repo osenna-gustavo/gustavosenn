@@ -16,6 +16,7 @@ import { getCurrentMonthYear, getBillingPeriod } from '@/lib/formatters';
 import { useAuth } from '@/contexts/AuthContext';
 import { computeRealized } from '@/lib/category-summary';
 import { computeCycleCommitments } from '@/lib/cycle-commitments';
+import { buildPlannedBudgetMaps } from '@/lib/planned-budget';
 
 const BILLING_CLOSE_DAY_KEY = 'fluxocaixa_billing_close_day';
 
@@ -272,15 +273,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Category breakdown — use centralized matching so the dashboard numbers
     // are always equal to what the drill-down drawer shows for the same
     // (categoryId, subcategoryId) pair.
+    const plannedMaps = buildPlannedBudgetMaps(
+      budg,
+      subs,
+      recs,
+      instances,
+      monthTransactions,
+      month,
+      year,
+    );
+
     const categoryBreakdown = cats.map(cat => {
-      const manualPlanned = budg?.categoryBudgets
-        .filter(cb => cb.categoryId === cat.id)
-        .reduce((sum, cb) => sum + cb.plannedAmount, 0) ?? 0;
-      const expectedAtCategory = commitments.expectedByCategory[cat.id] ?? 0;
-      const expectedAtSubcategories = subs
-        .filter(sub => sub.categoryId === cat.id)
-        .reduce((sum, sub) => sum + (commitments.expectedBySubcategory[sub.id] ?? 0), 0);
-      const planned = manualPlanned + expectedAtCategory + expectedAtSubcategories;
+      const planned = plannedMaps.byCategory[cat.id] ?? 0;
+
       const realized = computeRealized(
         monthTransactions,
         { categoryId: cat.id, type: 'despesa' },
