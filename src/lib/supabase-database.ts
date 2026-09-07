@@ -1046,6 +1046,24 @@ export async function linkTransactionsToRecurrence(
       .update({ recurrence_id: recurrenceId, recurrence_instance_id: null })
       .in('id', rest);
   }
+
+  // Propagate the recurrence's subcategory to linked transactions that have
+  // none yet (only when the category matches, never overwriting a value).
+  const { data: rec } = await supabase
+    .from('recurrences')
+    .select('category_id, subcategory_id')
+    .eq('id', recurrenceId)
+    .maybeSingle();
+
+  if (rec?.subcategory_id && rec.category_id) {
+    await supabase
+      .from('transactions')
+      .update({ subcategory_id: rec.subcategory_id })
+      .in('id', transactionIds)
+      .eq('user_id', userId)
+      .eq('category_id', rec.category_id)
+      .is('subcategory_id', null);
+  }
 }
 
 export async function bulkUpdateRecurrences(
