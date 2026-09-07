@@ -18,6 +18,15 @@ const supabase = createClient(
   { auth: { persistSession: false } },
 );
 
+/** Normaliza texto: minúsculas, sem acentos, sem espaços extras (NFC/NFD safe). */
+function norm(v: unknown): string {
+  return String(v ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 function pad(n: number) {
   return String(n).padStart(2, '0');
 }
@@ -182,9 +191,9 @@ async function handle(action: string, params: Record<string, unknown>) {
         loadCategories(),
       ]);
 
-      const categoria = typeof params.categoria === 'string' ? params.categoria.toLowerCase() : null;
-      const subcategoria = typeof params.subcategoria === 'string' ? params.subcategoria.toLowerCase() : null;
-      const busca = typeof params.busca === 'string' ? params.busca.toLowerCase() : null;
+      const categoria = typeof params.categoria === 'string' && params.categoria.trim() ? norm(params.categoria) : null;
+      const subcategoria = typeof params.subcategoria === 'string' && params.subcategoria.trim() ? norm(params.subcategoria) : null;
+      const busca = typeof params.busca === 'string' && params.busca.trim() ? norm(params.busca) : null;
 
       const result = txs
         .map((t) => ({
@@ -197,9 +206,9 @@ async function handle(action: string, params: Record<string, unknown>) {
           forma_pagamento: t.payment_method,
         }))
         .filter((t) => {
-          if (categoria && !(t.categoria ?? '').toLowerCase().includes(categoria)) return false;
-          if (subcategoria && !(t.subcategoria ?? '').toLowerCase().includes(subcategoria)) return false;
-          if (busca && !t.descricao.toLowerCase().includes(busca)) return false;
+          if (categoria && !norm(t.categoria).includes(categoria)) return false;
+          if (subcategoria && !norm(t.subcategoria).includes(subcategoria)) return false;
+          if (busca && !norm(t.descricao).includes(busca)) return false;
           return true;
         });
 
