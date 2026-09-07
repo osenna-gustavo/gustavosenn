@@ -47,24 +47,38 @@ export function PlannedVsRealizedDrawer({ isOpen, onClose }: PlannedVsRealizedDr
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'realizado' | 'planejado'>('realizado');
 
-  // Calculate totals
-  const plannedExpenses = budget?.plannedExpenses ?? 0;
-  
+  // Planejado = manual salvo + recorrências/parcelamentos do ciclo (fonte única)
+  const plannedMaps = useMemo(
+    () => buildPlannedBudgetMaps(
+      budget,
+      allSubcategories,
+      recurrences,
+      recurrenceInstances,
+      transactions,
+      selectedMonth,
+      selectedYear,
+    ),
+    [budget, allSubcategories, recurrences, recurrenceInstances, transactions, selectedMonth, selectedYear],
+  );
+
   // Realized = transactions + confirmed recurrence instances
   const monthTransactions = transactions.filter(t => t.type === 'despesa');
   const realizedExpenses = monthTransactions.reduce((sum, t) => sum + t.amount, 0);
-  
-  const difference = realizedExpenses - plannedExpenses;
-  const percentRealized = plannedExpenses > 0 ? (realizedExpenses / plannedExpenses) * 100 : 0;
 
   // Build category breakdown
   const expenseCategories = categories.filter(c => c.type === 'despesa');
-  
+
+  const plannedExpenses = expenseCategories.reduce(
+    (sum, cat) => sum + (plannedMaps.byCategory[cat.id] ?? 0),
+    0,
+  );
+
+  const difference = realizedExpenses - plannedExpenses;
+  const percentRealized = plannedExpenses > 0 ? (realizedExpenses / plannedExpenses) * 100 : 0;
+
   const categoryBreakdown: CategoryBreakdownItem[] = expenseCategories.map(cat => {
-    // Planned from budget
-    const catBudgets = budget?.categoryBudgets.filter(cb => cb.categoryId === cat.id) ?? [];
-    const planned = catBudgets.reduce((sum, cb) => sum + cb.plannedAmount, 0);
-    
+    const planned = plannedMaps.byCategory[cat.id] ?? 0;
+
     // Realized from transactions
     const realized = monthTransactions
       .filter(t => t.categoryId === cat.id)
@@ -83,9 +97,7 @@ export function PlannedVsRealizedDrawer({ isOpen, onClose }: PlannedVsRealizedDr
     // Subcategories breakdown
     const catSubcategories = allSubcategories.filter(s => s.categoryId === cat.id);
     const subcategoriesBreakdown: SubcategoryBreakdownItem[] = catSubcategories.map(sub => {
-      const subPlanned = catBudgets
-        .filter(cb => cb.subcategoryId === sub.id)
-        .reduce((sum, cb) => sum + cb.plannedAmount, 0);
+      const subPlanned = plannedMaps.bySubcategory[sub.id] ?? 0;
       const subRealized = monthTransactions
         .filter(t => t.subcategoryId === sub.id)
         .reduce((sum, t) => sum + t.amount, 0);
@@ -110,6 +122,7 @@ export function PlannedVsRealizedDrawer({ isOpen, onClose }: PlannedVsRealizedDr
     };
   }).filter(c => c.planned > 0 || c.realized > 0)
     .sort((a, b) => b.realized - a.realized);
+
 
   const selectedCategory = selectedCategoryId 
     ? categoryBreakdown.find(c => c.categoryId === selectedCategoryId) 
