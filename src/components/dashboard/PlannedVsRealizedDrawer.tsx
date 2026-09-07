@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useApp } from '@/contexts/AppContext';
 import { formatCurrency, formatPercentage, formatMonthYear, formatDateShort } from '@/lib/formatters';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -6,6 +6,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { ArrowUpRight, ArrowDownRight, TrendingDown, TrendingUp, Target, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { buildPlannedBudgetMaps } from '@/lib/planned-budget';
+
 
 interface PlannedVsRealizedDrawerProps {
   isOpen: boolean;
