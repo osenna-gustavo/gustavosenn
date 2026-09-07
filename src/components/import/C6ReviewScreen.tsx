@@ -446,7 +446,7 @@ export function C6ReviewScreen({
     } finally {
       setLoading(null);
     }
-  }, [addTransaction, removeFromGroups, subcategoryForCategory, toast]);
+  }, [addTransaction, recurrences, removeFromGroups, subcategoryForCategory, toast]);
 
   // ── Ignore a transaction ────────────────────────────────────────────────────
 
