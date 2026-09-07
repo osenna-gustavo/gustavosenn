@@ -4,7 +4,7 @@ import { formatCurrency, formatPercentage } from '@/lib/formatters';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronRight, ChevronUp } from 'lucide-react';
-import { computeCycleCommitments } from '@/lib/cycle-commitments';
+import { buildPlannedBudgetMaps } from '@/lib/planned-budget';
 import { computeRealized } from '@/lib/category-summary';
 import type { DrillDownFilter } from './DrillDownDrawer';
 
