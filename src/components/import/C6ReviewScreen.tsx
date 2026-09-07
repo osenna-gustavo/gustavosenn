@@ -557,7 +557,7 @@ export function C6ReviewScreen({
         variant: isTableMissing ? 'default' : 'destructive',
       });
     }
-  }, [recurrences, toast]);
+  }, [recurrences, subcategoryForCategory, toast]);
 
   // ── Confirm all actionable ──────────────────────────────────────────────────
 
