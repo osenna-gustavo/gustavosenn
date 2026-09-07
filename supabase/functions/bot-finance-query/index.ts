@@ -186,7 +186,7 @@ async function handle(action: string, params: Record<string, unknown>) {
     case 'transacoes': {
       const mv = validMonthYear(params);
       if ('error' in mv) return fail(mv.error);
-      const [txs, { catById, subById }] = await Promise.all([
+      const [txs, { catById, subById, cats, subs }] = await Promise.all([
         loadTransactions(mv.month, mv.year),
         loadCategories(),
       ]);
@@ -194,8 +194,25 @@ async function handle(action: string, params: Record<string, unknown>) {
       const categoria = typeof params.categoria === 'string' && params.categoria.trim() ? norm(params.categoria) : null;
       const subcategoria = typeof params.subcategoria === 'string' && params.subcategoria.trim() ? norm(params.subcategoria) : null;
       const busca = typeof params.busca === 'string' && params.busca.trim() ? norm(params.busca) : null;
+      const categoryIds = categoria
+        ? new Set(cats.filter((item) => norm(item.name) === categoria).map((item) => item.id))
+        : null;
+      const subcategoryIds = subcategoria
+        ? new Set(
+            subs
+              .filter((item) => norm(item.name) === subcategoria)
+              .filter((item) => !categoryIds || categoryIds.has(item.category_id))
+              .map((item) => item.id),
+          )
+        : null;
 
       const result = txs
+        .filter((t) => {
+          if (categoryIds && (!t.category_id || !categoryIds.has(t.category_id))) return false;
+          if (subcategoryIds && (!t.subcategory_id || !subcategoryIds.has(t.subcategory_id))) return false;
+          if (busca && !norm(t.description).includes(busca)) return false;
+          return true;
+        })
         .map((t) => ({
           data: t.date,
           descricao: t.description ?? '',
@@ -204,13 +221,7 @@ async function handle(action: string, params: Record<string, unknown>) {
           valor: Number(t.amount),
           tipo: t.type,
           forma_pagamento: t.payment_method,
-        }))
-        .filter((t) => {
-          if (categoria && !norm(t.categoria).includes(categoria)) return false;
-          if (subcategoria && !norm(t.subcategoria).includes(subcategoria)) return false;
-          if (busca && !norm(t.descricao).includes(busca)) return false;
-          return true;
-        });
+        }));
 
       return ok(result);
     }
