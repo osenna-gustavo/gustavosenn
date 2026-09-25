@@ -393,10 +393,11 @@ async function handle(action: string, params: Record<string, unknown>) {
       const limit = params.limit === undefined ? 1000 : Number(params.limit);
       if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return fail('Parâmetro "limit" inválido (1-1000).');
 
+      const orderColumn = tabela === 'user_settings' ? 'user_id' : 'id';
       const { data, error, count } = await supabase
         .from(tabela)
         .select('*', { count: 'exact' })
-        .order('id', { ascending: true })
+        .order(orderColumn, { ascending: true })
         .range(offset, offset + limit - 1);
       if (error) throw new Error(error.message);
 
