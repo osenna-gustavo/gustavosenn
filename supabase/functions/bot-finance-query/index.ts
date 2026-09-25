@@ -378,6 +378,31 @@ async function handle(action: string, params: Record<string, unknown>) {
       });
     }
 
+    case 'backup_export': {
+      const tabela = typeof params.tabela === 'string' ? params.tabela : '';
+      const allowedTables = new Set([
+        'budget_allocations', 'budget_items', 'budgets', 'categories', 'categorization_rules',
+        'financial_cycles', 'import_batches', 'installments', 'invoice_imports', 'invoice_transactions',
+        'projects', 'recurrence_instances', 'recurrences', 'saved_filters', 'subcategories',
+        'transaction_matches', 'transactions', 'user_notes', 'user_settings',
+      ]);
+      if (!allowedTables.has(tabela)) return fail('Tabela não permitida');
+
+      const offset = params.offset === undefined ? 0 : Number(params.offset);
+      if (!Number.isInteger(offset) || offset < 0) return fail('Parâmetro "offset" inválido (inteiro >= 0).');
+      const limit = params.limit === undefined ? 1000 : Number(params.limit);
+      if (!Number.isInteger(limit) || limit < 1 || limit > 1000) return fail('Parâmetro "limit" inválido (1-1000).');
+
+      const { data, error, count } = await supabase
+        .from(tabela)
+        .select('*', { count: 'exact' })
+        .order('id', { ascending: true })
+        .range(offset, offset + limit - 1);
+      if (error) throw new Error(error.message);
+
+      return ok({ tabela, total: count, offset, linhas: data ?? [] });
+    }
+
     default:
       return fail(`Action desconhecida: "${action}".`, 400);
   }
