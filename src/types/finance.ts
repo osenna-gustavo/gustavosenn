@@ -1,5 +1,17 @@
 export type TransactionType = 'receita' | 'despesa';
 export type PaymentMethod = 'account' | 'cash' | 'debit_card' | 'pix' | 'credit_card' | 'invoice_payment';
+export type TransactionStatus = 'confirmed' | 'to_classify' | 'ignored';
+
+export interface Account {
+  id: string;
+  name: string;
+  kind: string;
+  institution?: string;
+  last4?: string;
+  isActive: boolean;
+  notes?: string;
+  createdAt: Date;
+}
 
 export interface Category {
   id: string;
@@ -37,6 +49,9 @@ export interface Transaction {
   affectsBudget?: boolean;
   affectsCash?: boolean;
   creditCardLabel?: string;
+  accountId?: string;
+  status?: TransactionStatus;
+  ignoreReason?: string;
   createdAt: Date;
 }
 
@@ -160,6 +175,8 @@ export interface MonthSummary {
   cashExpenses: number;
   cashBalance: number;
   creditCardExpenses: number;
+  toClassifyExpenses: number;
+  toClassifyCount: number;
   balance: number;
   remainingFixed: number;
   remainingVariable: number;
