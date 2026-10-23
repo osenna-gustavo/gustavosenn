@@ -58,6 +58,7 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
     transactions,
     categories,
     subcategories,
+    accounts,
     recurrences,
     bulkUpdateTransactions,
     bulkDeleteTransactions,
@@ -67,6 +68,8 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
 
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [accountFilter, setAccountFilter] = useState<string>('all');
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
 
   // Bulk edit state
@@ -89,6 +92,8 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
       .filter(t => {
         if (!t || !t.id) return false;
         if (categoryFilter !== 'all' && t.categoryId !== categoryFilter) return false;
+        if (statusFilter !== 'all' && (t.status || 'confirmed') !== statusFilter) return false;
+        if (accountFilter !== 'all' && (t.accountId || '') !== accountFilter) return false;
         if (searchQuery) {
           const query = searchQuery.toLowerCase().trim();
           const category = categories.find(c => c.id === t.categoryId);
@@ -118,7 +123,7 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
         const dateB = b.date instanceof Date ? b.date : new Date(b.date);
         return dateB.getTime() - dateA.getTime();
       });
-  }, [transactions, externalFiltered, categories, searchQuery, categoryFilter]);
+  }, [transactions, externalFiltered, categories, searchQuery, categoryFilter, statusFilter, accountFilter]);
 
   const totals = useMemo(() => {
     const income = filteredTransactions
@@ -271,6 +276,30 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
             ))}
           </SelectContent>
         </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-full sm:w-[160px]">
+            <SelectValue placeholder="Status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            <SelectItem value="confirmed">Confirmado</SelectItem>
+            <SelectItem value="to_classify">A classificar</SelectItem>
+            <SelectItem value="ignored">Ignorado</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={accountFilter} onValueChange={setAccountFilter}>
+          <SelectTrigger className="w-full sm:w-[180px]">
+            <SelectValue placeholder="Conta" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas as contas</SelectItem>
+            {accounts.map(account => (
+              <SelectItem key={account.id} value={account.id}>
+                {account.name}{account.last4 ? ` ••${account.last4}` : ''}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Button
           variant={bulkMode ? 'default' : 'outline'}
           size="sm"
@@ -387,6 +416,11 @@ export function TransactionList({ filteredTransactions: externalFiltered }: Tran
                       <p className="font-medium">{category?.name || 'Sem categoria'}</p>
                       {transaction.needsReview && (
                         <AlertTriangle className="h-4 w-4 text-warning" />
+                      )}
+                      {transaction.status === 'to_classify' && (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-warning/10 text-warning font-medium">
+                          A classificar
+                        </span>
                       )}
                       {transaction.origin === 'recurrence' && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary">
