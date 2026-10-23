@@ -119,17 +119,30 @@ export function BudgetPage() {
   // Reset dirty flag when month changes
   useEffect(() => { setIsDirty(false); }, [selectedMonth, selectedYear]);
 
-  // Realized amounts per category/subcategory
-  const { realizedByCategory, realizedBySubcategory } = useMemo(() => {
+  // Realized amounts per category/subcategory.
+  // Ignorados ficam fora dos totais; "A classificar" aparece em linha separada.
+  const { realizedByCategory, realizedBySubcategory, toClassifyTotal, toClassifyCount } = useMemo(() => {
     const byCategory: Record<string, number> = {};
     const bySubcategory: Record<string, number> = {};
-    transactions.filter(t => t.type === 'despesa').forEach(t => {
+    let toClassifySum = 0;
+    let toClassifyQty = 0;
+    transactions.filter(t => t.type === 'despesa' && t.status !== 'ignored').forEach(t => {
+      if (t.status === 'to_classify') {
+        toClassifySum += t.amount;
+        toClassifyQty += 1;
+        return;
+      }
       byCategory[t.categoryId] = (byCategory[t.categoryId] || 0) + t.amount;
       if (t.subcategoryId) {
         bySubcategory[t.subcategoryId] = (bySubcategory[t.subcategoryId] || 0) + t.amount;
       }
     });
-    return { realizedByCategory: byCategory, realizedBySubcategory: bySubcategory };
+    return {
+      realizedByCategory: byCategory,
+      realizedBySubcategory: bySubcategory,
+      toClassifyTotal: toClassifySum,
+      toClassifyCount: toClassifyQty,
+    };
   }, [transactions]);
 
   // Active installment plans for the selected month (for the read-only block)
@@ -465,6 +478,19 @@ export function BudgetPage() {
                 autoBySubcategory={autoBySubcategory}
               />
             ))}
+            {toClassifyCount > 0 && (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-dashed border-warning/50 bg-warning/5">
+                <div className="flex items-center gap-2">
+                  <span className="font-medium text-sm">A classificar</span>
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-warning/10 text-warning">
+                    {toClassifyCount} {toClassifyCount === 1 ? 'lançamento' : 'lançamentos'}
+                  </span>
+                </div>
+                <span className="font-mono text-sm font-medium">
+                  {formatCurrency(toClassifyTotal)}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
