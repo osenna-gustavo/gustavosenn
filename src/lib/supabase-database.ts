@@ -11,6 +11,8 @@ import type {
   Project,
   FinancialCycle,
   PaymentMethod,
+  Account,
+  TransactionStatus,
 } from '@/types/finance';
 
 // Helper to get current user ID
@@ -210,6 +212,32 @@ export async function deleteSubcategory(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// ==================== ACCOUNTS ====================
+
+export async function getAccounts(): Promise<Account[]> {
+  const userId = await getUserId();
+
+  const { data, error } = await supabase
+    .from('accounts')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .order('name');
+
+  if (error) throw error;
+
+  return (data || []).map(a => ({
+    id: a.id,
+    name: a.name,
+    kind: a.kind,
+    institution: a.institution || undefined,
+    last4: a.last4 || undefined,
+    isActive: a.is_active,
+    notes: a.notes || undefined,
+    createdAt: new Date(a.created_at!),
+  }));
+}
+
 // ==================== TRANSACTIONS ====================
 
 type DatabaseTransaction = {
@@ -218,7 +246,8 @@ type DatabaseTransaction = {
   origin: string | null; needs_review: boolean | null; import_batch_id: string | null;
   recurrence_id: string | null; recurrence_instance_id: string | null;
   payment_method: string; cash_date: string | null; affects_budget: boolean; affects_cash: boolean;
-  credit_card_label: string | null; created_at: string | null;
+  credit_card_label: string | null; account_id: string | null;
+  status: string | null; ignore_reason: string | null; created_at: string | null;
 };
 
 function mapTransaction(t: DatabaseTransaction): Transaction {
@@ -240,6 +269,9 @@ function mapTransaction(t: DatabaseTransaction): Transaction {
     affectsBudget: t.affects_budget ?? true,
     affectsCash: t.affects_cash ?? true,
     creditCardLabel: t.credit_card_label || undefined,
+    accountId: t.account_id || undefined,
+    status: (t.status || 'confirmed') as TransactionStatus,
+    ignoreReason: t.ignore_reason || undefined,
     createdAt: new Date(t.created_at!),
   };
 }
@@ -330,6 +362,9 @@ export async function addTransaction(transaction: Omit<Transaction, 'id' | 'crea
       affects_budget: affectsBudget,
       affects_cash: affectsCash,
       credit_card_label: transaction.creditCardLabel || null,
+      account_id: transaction.accountId || null,
+      status: transaction.status ?? 'confirmed',
+      ignore_reason: transaction.status === 'ignored' ? (transaction.ignoreReason || null) : null,
     })
     .select()
     .single();
@@ -358,6 +393,9 @@ export async function updateTransaction(transaction: Transaction): Promise<void>
       affects_budget: transaction.affectsBudget ?? transaction.paymentMethod !== 'invoice_payment',
       affects_cash: transaction.affectsCash ?? transaction.paymentMethod !== 'credit_card',
       credit_card_label: transaction.creditCardLabel || null,
+      account_id: transaction.accountId || null,
+      status: transaction.status ?? 'confirmed',
+      ignore_reason: transaction.status === 'ignored' ? (transaction.ignoreReason || null) : null,
     })
     .eq('id', transaction.id);
     

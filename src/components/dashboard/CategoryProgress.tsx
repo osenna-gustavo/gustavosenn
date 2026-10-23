@@ -63,6 +63,7 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
         { categoryId: sub.categoryId, subcategoryId: sub.id, type: 'despesa' },
         categories,
         subcategories,
+        { excludeToClassify: true },
       );
       const committed = commitments.committedBySubcategory[sub.id] ?? 0;
 
@@ -288,6 +289,27 @@ export function CategoryProgress({ onDrillDown }: CategoryProgressProps) {
               </div>
             );
           })}
+
+          {monthSummary.toClassifyCount > 0 && (
+            <div className="rounded-lg border border-dashed border-warning/50 bg-warning/5 p-3">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="h-4 w-4 shrink-0" />
+                  <span className="text-base">🏷️</span>
+                  <span className="font-medium text-sm truncate">A classificar</span>
+                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-warning/10 text-warning">
+                    {monthSummary.toClassifyCount} {monthSummary.toClassifyCount === 1 ? 'lançamento' : 'lançamentos'}
+                  </span>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-mono text-sm font-medium">
+                    {formatCurrency(monthSummary.toClassifyExpenses)}
+                  </div>
+                  <span className="text-xs text-muted-foreground">somam no Já gasto</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {hiddenCount > 0 && (
             <Button

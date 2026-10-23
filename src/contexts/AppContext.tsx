@@ -9,6 +9,7 @@ import type {
   MonthSummary,
   AppScreen,
   FinancialCycle,
+  Account,
 } from '@/types/finance';
 import * as db from '@/lib/supabase-database';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +34,7 @@ interface AppContextType {
   // Data
   categories: Category[];
   subcategories: Subcategory[];
+  accounts: Account[];
   transactions: Transaction[];
   cashTransactions: Transaction[];
   financialCycle: FinancialCycle | null;
@@ -93,6 +95,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   
   const [categories, setCategories] = useState<Category[]>([]);
   const [subcategories, setSubcategories] = useState<Subcategory[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [cashTransactions, setCashTransactions] = useState<Transaction[]>([]);
   const [financialCycle, setFinancialCycle] = useState<FinancialCycle | null>(null);
@@ -229,13 +232,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       return date.getMonth() === month && date.getFullYear() === year;
     });
 
-    const realizedIncome = monthTransactions
+    // Lançamentos ignorados ficam fora dos totais de gasto e receita.
+    const countedTransactions = monthTransactions.filter(t => t.status !== 'ignored');
+    const countedCashTransactions = cashTrans.filter(t => t.status !== 'ignored');
+
+    const realizedIncome = countedTransactions
       .filter(t => t.type === 'receita')
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const realizedExpenses = monthTransactions
+    const realizedExpenses = countedTransactions
       .filter(t => t.type === 'despesa')
       .reduce((sum, t) => sum + t.amount, 0);
+
+    const toClassifyExpenses = countedTransactions
+      .filter(t => t.type === 'despesa' && t.status === 'to_classify')
+      .reduce((sum, t) => sum + t.amount, 0);
+    const toClassifyCount = countedTransactions
+      .filter(t => t.type === 'despesa' && t.status === 'to_classify')
+      .length;
 
     const commitments = computeCycleCommitments(recs, instances, monthTransactions, month, year);
     const plannedIncome = Math.max(budg?.plannedIncome ?? 0, commitments.expectedIncome);
@@ -243,7 +257,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     // Calculate fixed vs variable
     const fixedCategoryIds = cats.filter(c => c.isFixed).map(c => c.id);
     
-    const realizedFixed = monthTransactions
+    const realizedFixed = countedTransactions
       .filter(t => t.type === 'despesa' && fixedCategoryIds.includes(t.categoryId))
       .reduce((sum, t) => sum + t.amount, 0);
 
@@ -291,6 +305,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         { categoryId: cat.id, type: 'despesa' },
         cats,
         subs,
+        { excludeToClassify: true },
       );
 
       const committedAtCategory = commitments.committedByCategory[cat.id] ?? 0;
@@ -350,10 +365,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       remainingFixed: Math.max(0, plannedFixed - realizedFixed - committedFixed),
       remainingVariable: Math.max(0, plannedVariable - realizedVariable - (committedExpenses - committedFixed)),
       categoryBreakdown,
-      cashIncome: cashTrans.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.amount, 0),
-      cashExpenses: cashTrans.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.amount, 0),
-      cashBalance: cashTrans.reduce((sum, t) => sum + (t.type === 'receita' ? t.amount : -t.amount), 0),
-      creditCardExpenses: monthTransactions.filter(t => t.type === 'despesa' && t.paymentMethod === 'credit_card').reduce((sum, t) => sum + t.amount, 0),
+      cashIncome: countedCashTransactions.filter(t => t.type === 'receita').reduce((sum, t) => sum + t.amount, 0),
+      cashExpenses: countedCashTransactions.filter(t => t.type === 'despesa').reduce((sum, t) => sum + t.amount, 0),
+      cashBalance: countedCashTransactions.reduce((sum, t) => sum + (t.type === 'receita' ? t.amount : -t.amount), 0),
+      creditCardExpenses: countedTransactions.filter(t => t.type === 'despesa' && t.paymentMethod === 'credit_card').reduce((sum, t) => sum + t.amount, 0),
+      toClassifyExpenses,
+      toClassifyCount,
     };
   }, []);
 
@@ -384,9 +401,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         : (billingCloseDay ? getBillingPeriod(selectedMonth, selectedYear, billingCloseDay) : null);
 
       // Cada consulta é independente: uma falha isolada não zera o restante.
-      const [catsR, subsR, transR, cashR, budgR, recsR, instancesR] = await Promise.allSettled([
+      const [catsR, subsR, accountsR, transR, cashR, budgR, recsR, instancesR] = await Promise.allSettled([
         db.getCategories(),
         db.getSubcategories(),
+        db.getAccounts(),
         db.getTransactions(selectedMonth, selectedYear, resolvedRange ?? undefined),
         db.getCashTransactions(resolvedRange ?? undefined),
         db.getBudget(selectedMonth, selectedYear),
@@ -396,6 +414,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       const cats = catsR.status === 'fulfilled' ? catsR.value : (fail('categorias', catsR.reason), categoriesRef.current);
       const subs = subsR.status === 'fulfilled' ? subsR.value : (fail('subcategorias', subsR.reason), subcategoriesRef.current);
+      const accts = accountsR.status === 'fulfilled' ? accountsR.value : (fail('contas', accountsR.reason), []);
       const trans = transR.status === 'fulfilled' ? transR.value : (fail('lançamentos', transR.reason), []);
       const cashTrans = cashR.status === 'fulfilled' ? cashR.value : (fail('caixa', cashR.reason), []);
       const budg = budgR.status === 'fulfilled' ? (budgR.value ?? null) : (fail('orçamento', budgR.reason), null);
@@ -404,6 +423,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       setCategories(cats);
       setSubcategories(subs);
+      setAccounts(accts);
       setTransactions(trans);
       setCashTransactions(cashTrans);
       setBudget(budg);
@@ -577,6 +597,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setSelectedMonth,
       categories,
       subcategories,
+      accounts,
       transactions,
       cashTransactions,
       financialCycle,

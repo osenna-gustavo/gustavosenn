@@ -10,10 +10,46 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.5"
+    PostgrestVersion: "14.1"
   }
   public: {
     Tables: {
+      accounts: {
+        Row: {
+          created_at: string
+          id: string
+          institution: string | null
+          is_active: boolean
+          kind: string
+          last4: string | null
+          name: string
+          notes: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          institution?: string | null
+          is_active?: boolean
+          kind: string
+          last4?: string | null
+          name: string
+          notes?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          institution?: string | null
+          is_active?: boolean
+          kind?: string
+          last4?: string | null
+          name?: string
+          notes?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       budget_allocations: {
         Row: {
           amount: number
@@ -567,6 +603,137 @@ export type Database = {
           },
         ]
       }
+      learned_links: {
+        Row: {
+          account_id: string | null
+          approved_at: string
+          approved_by: string
+          category_id: string | null
+          confidence: number
+          created_at: string
+          description_example: string | null
+          id: string
+          ignore: boolean
+          is_active: boolean
+          kind: string
+          last_used_at: string | null
+          max_amount: number | null
+          merchant_key: string
+          min_amount: number | null
+          recurrence_id: string | null
+          source: string | null
+          subcategory_id: string | null
+          updated_at: string
+          usage_count: number
+          user_id: string
+        }
+        Insert: {
+          account_id?: string | null
+          approved_at?: string
+          approved_by?: string
+          category_id?: string | null
+          confidence?: number
+          created_at?: string
+          description_example?: string | null
+          id?: string
+          ignore?: boolean
+          is_active?: boolean
+          kind?: string
+          last_used_at?: string | null
+          max_amount?: number | null
+          merchant_key: string
+          min_amount?: number | null
+          recurrence_id?: string | null
+          source?: string | null
+          subcategory_id?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id: string
+        }
+        Update: {
+          account_id?: string | null
+          approved_at?: string
+          approved_by?: string
+          category_id?: string | null
+          confidence?: number
+          created_at?: string
+          description_example?: string | null
+          id?: string
+          ignore?: boolean
+          is_active?: boolean
+          kind?: string
+          last_used_at?: string | null
+          max_amount?: number | null
+          merchant_key?: string
+          min_amount?: number | null
+          recurrence_id?: string | null
+          source?: string | null
+          subcategory_id?: string | null
+          updated_at?: string
+          usage_count?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learned_links_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learned_links_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learned_links_recurrence_id_fkey"
+            columns: ["recurrence_id"]
+            isOneToOne: false
+            referencedRelation: "recurrences"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "learned_links_subcategory_id_fkey"
+            columns: ["subcategory_id"]
+            isOneToOne: false
+            referencedRelation: "subcategories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      learned_links_history: {
+        Row: {
+          action: string
+          changed_at: string
+          id: number
+          link_id: string
+          new_row: Json | null
+          old_row: Json | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string
+          id?: number
+          link_id: string
+          new_row?: Json | null
+          old_row?: Json | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string
+          id?: number
+          link_id?: string
+          new_row?: Json | null
+          old_row?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       projects: {
         Row: {
           created_at: string
@@ -844,6 +1011,7 @@ export type Database = {
       }
       transactions: {
         Row: {
+          account_id: string | null
           affects_budget: boolean
           affects_cash: boolean
           amount: number
@@ -854,6 +1022,7 @@ export type Database = {
           date: string
           description: string | null
           id: string
+          ignore_reason: string | null
           import_batch_id: string | null
           installment_id: string | null
           needs_review: boolean | null
@@ -861,11 +1030,13 @@ export type Database = {
           payment_method: string
           recurrence_id: string | null
           recurrence_instance_id: string | null
+          status: string
           subcategory_id: string | null
           type: string
           user_id: string
         }
         Insert: {
+          account_id?: string | null
           affects_budget?: boolean
           affects_cash?: boolean
           amount: number
@@ -876,6 +1047,7 @@ export type Database = {
           date: string
           description?: string | null
           id?: string
+          ignore_reason?: string | null
           import_batch_id?: string | null
           installment_id?: string | null
           needs_review?: boolean | null
@@ -883,11 +1055,13 @@ export type Database = {
           payment_method?: string
           recurrence_id?: string | null
           recurrence_instance_id?: string | null
+          status?: string
           subcategory_id?: string | null
           type: string
           user_id: string
         }
         Update: {
+          account_id?: string | null
           affects_budget?: boolean
           affects_cash?: boolean
           amount?: number
@@ -898,6 +1072,7 @@ export type Database = {
           date?: string
           description?: string | null
           id?: string
+          ignore_reason?: string | null
           import_batch_id?: string | null
           installment_id?: string | null
           needs_review?: boolean | null
@@ -905,11 +1080,19 @@ export type Database = {
           payment_method?: string
           recurrence_id?: string | null
           recurrence_instance_id?: string | null
+          status?: string
           subcategory_id?: string | null
           type?: string
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "transactions_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "transactions_category_id_fkey"
             columns: ["category_id"]

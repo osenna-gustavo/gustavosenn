@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import type { Transaction, TransactionType } from '@/types/finance';
+import type { Transaction, TransactionStatus, TransactionType } from '@/types/finance';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Trash2 } from 'lucide-react';
@@ -40,7 +40,7 @@ interface EditTransactionModalProps {
 }
 
 export function EditTransactionModal({ transaction, isOpen, onClose }: EditTransactionModalProps) {
-  const { categories, subcategories, updateTransaction, deleteTransaction } = useApp();
+  const { categories, subcategories, accounts, updateTransaction, deleteTransaction } = useApp();
   const { toast } = useToast();
   
   const [type, setType] = useState<TransactionType>('despesa');
@@ -50,6 +50,9 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
   const [subcategoryId, setSubcategoryId] = useState('');
   const [description, setDescription] = useState('');
   const [needsReview, setNeedsReview] = useState(false);
+  const [accountId, setAccountId] = useState('');
+  const [status, setStatus] = useState<TransactionStatus>('confirmed');
+  const [ignoreReason, setIgnoreReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
@@ -77,6 +80,9 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
       setSubcategoryId(transaction.subcategoryId || '');
       setDescription(transaction.description || '');
       setNeedsReview(transaction.needsReview || false);
+      setAccountId(transaction.accountId || '');
+      setStatus(transaction.status || 'confirmed');
+      setIgnoreReason(transaction.ignoreReason || '');
     }
   }, [transaction]);
 
@@ -106,6 +112,15 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
       return;
     }
 
+    if (status === 'ignored' && !ignoreReason.trim()) {
+      toast({
+        title: 'Motivo obrigatório',
+        description: 'Informe o motivo para ignorar este lançamento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     // Parse amount safely (handles pt-BR format)
     const cleanedAmount = amount.replace(/\s/g, '').replace(/\./g, '').replace(',', '.');
     const parsedAmount = parseFloat(cleanedAmount);
@@ -130,6 +145,9 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
         subcategoryId: subcategoryId || undefined,
         description: description || undefined,
         needsReview,
+        accountId: accountId || undefined,
+        status,
+        ignoreReason: status === 'ignored' ? ignoreReason.trim() : undefined,
       });
 
       toast({
@@ -300,6 +318,55 @@ export function EditTransactionModal({ transaction, isOpen, onClose }: EditTrans
                 rows={2}
               />
             </div>
+
+            {/* Account */}
+            <div className="space-y-2">
+              <Label>Conta (opcional)</Label>
+              <Select
+                value={accountId || '__none__'}
+                onValueChange={(val) => setAccountId(val === '__none__' ? '' : val)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Sem conta" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sem conta</SelectItem>
+                  {accounts.map((account) => (
+                    <SelectItem key={account.id} value={account.id}>
+                      {account.name}{account.last4 ? ` ••${account.last4}` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Status */}
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={status} onValueChange={(val) => setStatus(val as TransactionStatus)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="confirmed">Confirmado</SelectItem>
+                  <SelectItem value="to_classify">A classificar</SelectItem>
+                  <SelectItem value="ignored">Ignorado</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Ignore Reason */}
+            {status === 'ignored' && (
+              <div className="space-y-2">
+                <Label htmlFor="ignoreReason">Motivo</Label>
+                <Input
+                  id="ignoreReason"
+                  placeholder="Por que este lançamento deve ser ignorado?"
+                  value={ignoreReason}
+                  onChange={(e) => setIgnoreReason(e.target.value)}
+                />
+              </div>
+            )}
 
             {/* Needs Review */}
             <div className="flex items-center justify-between">

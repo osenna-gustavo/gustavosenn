@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import type { PaymentMethod, TransactionType } from '@/types/finance';
+import type { PaymentMethod, TransactionStatus, TransactionType } from '@/types/finance';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { parseBRLToNumber } from '@/lib/currencyInput';
@@ -28,7 +28,7 @@ function getTodayForInput() {
 }
 
 export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
-  const { categories, subcategories, addTransaction, lastUsedCategoryId } = useApp();
+  const { categories, subcategories, accounts, addTransaction, lastUsedCategoryId } = useApp();
   const { toast } = useToast();
   const amountInputRef = useRef<HTMLInputElement>(null);
 
@@ -41,6 +41,9 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
   const [needsReview, setNeedsReview] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('account');
   const [creditCardLabel, setCreditCardLabel] = useState('');
+  const [accountId, setAccountId] = useState('');
+  const [status, setStatus] = useState<TransactionStatus>('confirmed');
+  const [ignoreReason, setIgnoreReason] = useState('');
   const [showDetails, setShowDetails] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -57,6 +60,9 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
     setNeedsReview(false);
     setPaymentMethod('account');
     setCreditCardLabel('');
+    setAccountId('');
+    setStatus('confirmed');
+    setIgnoreReason('');
     setShowDetails(false);
   }, [isOpen, lastUsedCategoryId, categories]);
 
@@ -89,6 +95,15 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
       return;
     }
 
+    if (status === 'ignored' && !ignoreReason.trim()) {
+      toast({
+        title: 'Motivo obrigatório',
+        description: 'Informe o motivo para ignorar este lançamento.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await addTransaction({
@@ -105,6 +120,9 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
         affectsBudget: paymentMethod !== 'invoice_payment',
         affectsCash: paymentMethod !== 'credit_card',
         creditCardLabel: paymentMethod === 'credit_card' ? (creditCardLabel.trim() || 'Cartão') : undefined,
+        accountId: accountId || undefined,
+        status,
+        ignoreReason: status === 'ignored' ? ignoreReason.trim() : undefined,
       });
 
       toast({
@@ -254,6 +272,46 @@ export function TransactionForm({ isOpen, onClose }: TransactionFormProps) {
                 <Label htmlFor="date">Data</Label>
                 <Input id="date" type="date" value={date} onChange={event => setDate(event.target.value)} />
               </div>
+              <div className="space-y-2">
+                <Label>Conta <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+                <Select value={accountId || '__none__'} onValueChange={value => setAccountId(value === '__none__' ? '' : value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem conta</SelectItem>
+                    {accounts.map(account => (
+                      <SelectItem key={account.id} value={account.id}>
+                        {account.name}{account.last4 ? ` ••${account.last4}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Status</Label>
+                <Select value={status} onValueChange={value => setStatus(value as TransactionStatus)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="confirmed">Confirmado</SelectItem>
+                    <SelectItem value="to_classify">A classificar</SelectItem>
+                    <SelectItem value="ignored">Ignorado</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {status === 'ignored' && (
+                <div className="space-y-2">
+                  <Label htmlFor="ignoreReason">Motivo</Label>
+                  <Input
+                    id="ignoreReason"
+                    placeholder="Por que este lançamento deve ser ignorado?"
+                    value={ignoreReason}
+                    onChange={event => setIgnoreReason(event.target.value)}
+                  />
+                </div>
+              )}
               <div className="flex items-center justify-between rounded-lg border border-border p-3">
                 <Label htmlFor="needsReview" className="text-sm">Marcar para revisar depois</Label>
                 <Switch id="needsReview" checked={needsReview} onCheckedChange={setNeedsReview} />
