@@ -61,8 +61,11 @@ export function computeRealized(
   filter: { categoryId?: string; subcategoryId?: string; type?: 'receita' | 'despesa' },
   categories: Category[],
   subcategories: Subcategory[],
+  options?: { excludeToClassify?: boolean },
 ): number {
   return transactions.reduce((sum, t) => {
+    if (t.status === 'ignored') return sum;
+    if (options?.excludeToClassify && t.status === 'to_classify') return sum;
     if (filter.type && t.type !== filter.type) return sum;
     if (!transactionMatchesCategory(t, filter, categories, subcategories)) return sum;
     return sum + t.amount;
