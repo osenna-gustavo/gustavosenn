@@ -31,6 +31,8 @@ interface RentalProperty {
   pros: string | null;
   cons: string | null;
   status: RentalStatus;
+  broker_name: string | null;
+  broker_phone: string | null;
 }
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
@@ -46,6 +48,15 @@ const STATUS_CLASS: Record<RentalStatus, string> = {
 };
 
 const brl = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+
+export function formatBRPhone(v: string): string {
+  const d = v.replace(/\D/g, '').slice(0, 11);
+  if (d.length === 0) return '';
+  if (d.length <= 2) return `(${d}`;
+  if (d.length <= 6) return `(${d.slice(0, 2)}) ${d.slice(2)}`;
+  if (d.length <= 10) return `(${d.slice(0, 2)}) ${d.slice(2, 6)}-${d.slice(6)}`;
+  return `(${d.slice(0, 2)}) ${d.slice(2, 7)}-${d.slice(7)}`;
+}
 
 const isValidUrl = (v: string) => /^https?:\/\/\S+$/i.test(v.trim());
 
@@ -70,10 +81,12 @@ interface FormState {
   pros: string;
   cons: string;
   status: RentalStatus;
+  broker_name: string;
+  broker_phone: string;
 }
 
 const emptyForm: FormState = {
-  address: '', rent: '', condo: '', photo_url: '', listing_url: '', pros: '', cons: '', status: 'visitar',
+  address: '', rent: '', condo: '', photo_url: '', listing_url: '', pros: '', cons: '', status: 'visitar', broker_name: '', broker_phone: '',
 };
 
 function Photo({ url }: { url: string | null }) {
@@ -141,6 +154,8 @@ export function RentalsPage() {
       pros: p.pros ?? '',
       cons: p.cons ?? '',
       status: p.status,
+      broker_name: p.broker_name ?? '',
+      broker_phone: p.broker_phone ? formatBRPhone(p.broker_phone) : '',
     });
     setErrors({});
     setDialogOpen(true);
@@ -155,6 +170,8 @@ export function RentalsPage() {
     else if (address.length > 300) e.address = 'Máximo de 300 caracteres';
     if (form.photo_url.trim() && !isValidUrl(form.photo_url)) e.photo_url = 'O link deve começar com http:// ou https://';
     if (form.listing_url.trim() && !isValidUrl(form.listing_url)) e.listing_url = 'O link deve começar com http:// ou https://';
+    if (form.broker_name.length > 120) e.broker_name = 'Máximo de 120 caracteres';
+    if (form.broker_phone.length > 30) e.broker_phone = 'Máximo de 30 caracteres';
     if (form.pros.length > 2000) e.pros = 'Máximo de 2000 caracteres';
     if (form.cons.length > 2000) e.cons = 'Máximo de 2000 caracteres';
     setErrors(e);
@@ -169,6 +186,8 @@ export function RentalsPage() {
       pros: form.pros.trim() || null,
       cons: form.cons.trim() || null,
       status: form.status,
+      broker_name: form.broker_name.trim() || null,
+      broker_phone: form.broker_phone.trim() || null,
     };
     setSaving(true);
     const { error } = editingId
@@ -237,6 +256,16 @@ export function RentalsPage() {
               </div>
               <CardContent className="flex flex-1 flex-col gap-3 p-4">
                 <p className="font-semibold text-foreground break-words">{p.address}</p>
+                {(p.broker_name || p.broker_phone) && (
+                  <div className="-mt-2 space-y-0.5 text-sm text-muted-foreground">
+                    {p.broker_name && <p className="break-words">Corretora: {p.broker_name}</p>}
+                    {p.broker_phone && (
+                      <a href={`tel:${p.broker_phone.replace(/\D/g, '')}`} className="text-primary underline-offset-2 hover:underline">
+                        {formatBRPhone(p.broker_phone)}
+                      </a>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-1 text-sm">
                   <div className="flex justify-between text-muted-foreground"><span>Aluguel</span><span>{brl(Number(p.rent_amount))}</span></div>
                   <div className="flex justify-between text-muted-foreground"><span>Condomínio</span><span>{brl(Number(p.condo_amount))}</span></div>
@@ -304,6 +333,16 @@ export function RentalsPage() {
               <Label htmlFor="r-listing">Link da imobiliária</Label>
               <Input id="r-listing" placeholder="https://..." value={form.listing_url} onChange={e => setForm(f => ({ ...f, listing_url: e.target.value }))} />
               {errors.listing_url && <p className="text-xs text-destructive">{errors.listing_url}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="r-broker">Corretora</Label>
+              <Input id="r-broker" maxLength={120} value={form.broker_name} onChange={e => setForm(f => ({ ...f, broker_name: e.target.value }))} />
+              {errors.broker_name && <p className="text-xs text-destructive">{errors.broker_name}</p>}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="r-phone">Telefone</Label>
+              <Input id="r-phone" type="tel" inputMode="tel" maxLength={30} placeholder="(19) 99999-9999" value={form.broker_phone} onChange={e => setForm(f => ({ ...f, broker_phone: formatBRPhone(e.target.value) }))} />
+              {errors.broker_phone && <p className="text-xs text-destructive">{errors.broker_phone}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="r-pros">Pontos positivos</Label>
