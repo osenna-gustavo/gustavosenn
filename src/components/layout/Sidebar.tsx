@@ -15,6 +15,7 @@ import {
   Settings,
   ChevronDown,
   ChevronRight,
+  Home,
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
 import { useState, useEffect } from 'react';
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
   { screen: 'dashboard', label: 'Visão geral', icon: <LayoutDashboard className="h-5 w-5" /> },
   { screen: 'transactions', label: 'Lançamentos', icon: <Receipt className="h-5 w-5" /> },
   { screen: 'budget', label: 'Orçamento', icon: <Wallet className="h-5 w-5" /> },
+  { screen: 'rentals', label: 'Aluguel', icon: <Home className="h-5 w-5" /> },
   { screen: 'settings', label: 'Organizar', icon: <Settings className="h-5 w-5" />, subItems: settingsSubItems },
 ];
 
