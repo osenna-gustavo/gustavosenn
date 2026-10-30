@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Home, Plus, Pencil, Trash2, ExternalLink, Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Home, Plus, Pencil, Trash2, ExternalLink, Loader2, ImagePlus, X } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ interface RentalProperty {
   rent_amount: number;
   condo_amount: number;
   photo_url: string | null;
+  photo_path: string | null;
   listing_url: string | null;
   pros: string | null;
   cons: string | null;
@@ -59,6 +60,14 @@ export function formatBRPhone(v: string): string {
 }
 
 const isValidUrl = (v: string) => /^https?:\/\/\S+$/i.test(v.trim());
+
+const BUCKET = 'rental-photos';
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export function validateImage(file: { type: string; size: number }): string | null {
+  if (!file.type.startsWith('image/')) return 'O arquivo precisa ser uma imagem (JPG, PNG, WEBP...).';
+  if (file.size > MAX_IMAGE_BYTES) return 'A imagem deve ter no máximo 5 MB.';
+  return null;
+}
 
 export const rentalTotal = (p: { rent_amount: number; condo_amount: number }) =>
   (Number(p.rent_amount) || 0) + (Number(p.condo_amount) || 0);
@@ -117,6 +126,12 @@ export function RentalsPage() {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [existingPath, setExistingPath] = useState<string | null>(null);
+  const [removeExisting, setRemoveExisting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = async () => {
     setLoading(true);
@@ -127,7 +142,15 @@ export function RentalsPage() {
     if (error) {
       toast({ title: 'Erro ao carregar imóveis', description: error.message, variant: 'destructive' });
     } else {
-      setItems((data ?? []) as RentalProperty[]);
+      const list = (data ?? []) as RentalProperty[];
+      setItems(list);
+      const paths = list.map(i => i.photo_path).filter((x): x is string => !!x);
+      if (paths.length) {
+        const { data: signed } = await supabase.storage.from(BUCKET).createSignedUrls(paths, 3600);
+        const map: Record<string, string> = {};
+        (signed ?? []).forEach(s => { if (s.path && s.signedUrl) map[s.path] = s.signedUrl; });
+        setSignedUrls(map);
+      } else setSignedUrls({});
     }
     setLoading(false);
   };
@@ -139,8 +162,56 @@ export function RentalsPage() {
     [items, filter],
   );
 
+  const resetImage = (path: string | null = null, previewUrl: string | null = null) => {
+    setImageFile(null); setExistingPath(path); setRemoveExisting(false); setImagePreview(previewUrl);
+  };
+
+  const pickImage = (file: File) => {
+    const err = validateImage(file);
+    if (err) { setErrors(e => ({ ...e, image: err })); return; }
+    setErrors(e => { const { image, ...rest } = e; return rest; });
+    setImageFile(file);
+    setImagePreview(URL.createObjectURL(file));
+  };
+
+  const removeImage = () => {
+    setImageFile(null); setImagePreview(null);
+    if (existingPath) setRemoveExisting(true);
+  };
+
+  const handlePaste = (e: ClipboardEvent) => {
+    const cd = e.clipboardData;
+    if (!cd) return;
+    const item = Array.from(cd.items).find(i => i.kind === 'file' && i.type.startsWith('image/'));
+    const file = item?.getAsFile() ?? Array.from(cd.files).find(f => f.type.startsWith('image/'));
+    if (file) { e.preventDefault(); pickImage(file); return; }
+    const anyFile = cd.files[0];
+    if (anyFile) { e.preventDefault(); pickImage(anyFile); return; }
+    const target = e.target as HTMLElement | null;
+    const inZone = !!target?.closest?.('[data-testid="paste-zone"]');
+    if (inZone) {
+      const text = cd.getData('text/plain').trim();
+      e.preventDefault();
+      if (isValidUrl(text)) setForm(f => ({ ...f, photo_url: text }));
+    }
+  };
+
+  useEffect(() => {
+    if (!dialogOpen) return;
+    const listener = (e: ClipboardEvent) => {
+      // Text fields keep normal paste unless the clipboard holds an image
+      const t = e.target as HTMLElement | null;
+      const isField = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA');
+      const hasImage = Array.from(e.clipboardData?.items ?? []).some(i => i.kind === 'file');
+      if (isField && !hasImage) return;
+      handlePaste(e);
+    };
+    document.addEventListener('paste', listener);
+    return () => document.removeEventListener('paste', listener);
+  }, [dialogOpen, existingPath]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const openNew = () => {
-    setEditingId(null); setForm(emptyForm); setErrors({}); setDialogOpen(true);
+    setEditingId(null); setForm(emptyForm); setErrors({}); resetImage(); setDialogOpen(true);
   };
 
   const openEdit = (p: RentalProperty) => {
@@ -158,6 +229,7 @@ export function RentalsPage() {
       broker_phone: p.broker_phone ? formatBRPhone(p.broker_phone) : '',
     });
     setErrors({});
+    resetImage(p.photo_path, p.photo_path ? signedUrls[p.photo_path] ?? null : null);
     setDialogOpen(true);
   };
 
@@ -190,14 +262,31 @@ export function RentalsPage() {
       broker_phone: form.broker_phone.trim() || null,
     };
     setSaving(true);
+    const oldPath = existingPath;
+    let photo_path: string | null = removeExisting ? null : oldPath;
+    let uploadedPath: string | null = null;
+    if (imageFile) {
+      const ext = (imageFile.type.split('/')[1] || 'png').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'png';
+      uploadedPath = `${user!.id}/${crypto.randomUUID()}.${ext}`;
+      const up = await supabase.storage.from(BUCKET).upload(uploadedPath, imageFile, { contentType: imageFile.type });
+      if (up.error) {
+        setSaving(false);
+        toast({ title: 'Erro ao enviar imagem', description: up.error.message, variant: 'destructive' });
+        return;
+      }
+      photo_path = uploadedPath;
+    }
+    const full = { ...payload, photo_path };
     const { error } = editingId
-      ? await supabase.from('rental_properties').update(payload).eq('id', editingId)
-      : await supabase.from('rental_properties').insert({ ...payload, user_id: user!.id });
+      ? await supabase.from('rental_properties').update(full).eq('id', editingId)
+      : await supabase.from('rental_properties').insert({ ...full, user_id: user!.id });
     setSaving(false);
     if (error) {
+      if (uploadedPath) await supabase.storage.from(BUCKET).remove([uploadedPath]);
       toast({ title: 'Erro ao salvar imóvel', description: error.message, variant: 'destructive' });
       return;
     }
+    if (oldPath && oldPath !== photo_path) await supabase.storage.from(BUCKET).remove([oldPath]);
     toast({ title: editingId ? 'Imóvel atualizado' : 'Imóvel cadastrado' });
     setDialogOpen(false);
     load();
@@ -205,12 +294,14 @@ export function RentalsPage() {
 
   const confirmDelete = async () => {
     if (!deleteId) return;
+    const path = items.find(i => i.id === deleteId)?.photo_path;
     const { error } = await supabase.from('rental_properties').delete().eq('id', deleteId);
     setDeleteId(null);
     if (error) {
       toast({ title: 'Erro ao excluir imóvel', description: error.message, variant: 'destructive' });
       return;
     }
+    if (path) await supabase.storage.from(BUCKET).remove([path]);
     toast({ title: 'Imóvel excluído' });
     load();
   };
@@ -249,7 +340,7 @@ export function RentalsPage() {
           {visible.map(p => (
             <Card key={p.id} data-testid="rental-card" className={cn('overflow-hidden flex flex-col', p.status === 'descartado' && 'opacity-50')}>
               <div className="relative">
-                <Photo url={p.photo_url} />
+                <Photo url={(p.photo_path && signedUrls[p.photo_path]) || p.photo_url} />
                 <Badge variant="outline" className={cn('absolute left-3 top-3 backdrop-blur', STATUS_CLASS[p.status])}>
                   {STATUS_LABEL[p.status]}
                 </Badge>
@@ -323,6 +414,30 @@ export function RentalsPage() {
             </div>
             <div className="flex justify-between rounded-md bg-primary/10 px-3 py-2 font-semibold text-primary">
               <span>Total do mês</span><span>{brl(liveTotal)}</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Imagem do imóvel</Label>
+              {imagePreview ? (
+                <div className="space-y-2">
+                  <img src={imagePreview} alt="Pré-visualização" className="aspect-video w-full rounded-md object-cover" />
+                  <Button type="button" variant="outline" size="sm" onClick={removeImage}>
+                    <X className="mr-1 h-4 w-4" />Remover imagem
+                  </Button>
+                </div>
+              ) : (
+                <div
+                  tabIndex={0}
+                  data-testid="paste-zone"
+                  onPaste={(e) => { e.stopPropagation(); handlePaste(e.nativeEvent); }}
+                  className="flex flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed border-border px-3 py-5 text-center text-sm text-muted-foreground outline-none focus:border-primary"
+                >
+                  <ImagePlus className="h-6 w-6" />
+                  <span>Cole a imagem aqui (Ctrl+V)</span>
+                </div>
+              )}
+              <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) pickImage(f); e.target.value = ''; }} />
+              <Button type="button" variant="secondary" size="sm" onClick={() => fileInputRef.current?.click()}>Escolher arquivo</Button>
+              {errors.image && <p className="text-xs text-destructive">{errors.image}</p>}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="r-photo">Link da foto</Label>
