@@ -906,6 +906,7 @@ export type Database = {
           created_at: string
           id: string
           listing_url: string | null
+          photo_path: string | null
           photo_url: string | null
           pros: string | null
           rent_amount: number
@@ -922,6 +923,7 @@ export type Database = {
           created_at?: string
           id?: string
           listing_url?: string | null
+          photo_path?: string | null
           photo_url?: string | null
           pros?: string | null
           rent_amount?: number
@@ -938,6 +940,7 @@ export type Database = {
           created_at?: string
           id?: string
           listing_url?: string | null
+          photo_path?: string | null
           photo_url?: string | null
           pros?: string | null
           rent_amount?: number

@@ -1,0 +1,5 @@
+ALTER TABLE public.rental_properties ADD COLUMN IF NOT EXISTS photo_path text;
+CREATE POLICY "rental photos select own" ON storage.objects FOR SELECT TO authenticated USING (bucket_id = 'rental-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "rental photos insert own" ON storage.objects FOR INSERT TO authenticated WITH CHECK (bucket_id = 'rental-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "rental photos update own" ON storage.objects FOR UPDATE TO authenticated USING (bucket_id = 'rental-photos' AND (storage.foldername(name))[1] = auth.uid()::text) WITH CHECK (bucket_id = 'rental-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
+CREATE POLICY "rental photos delete own" ON storage.objects FOR DELETE TO authenticated USING (bucket_id = 'rental-photos' AND (storage.foldername(name))[1] = auth.uid()::text);
