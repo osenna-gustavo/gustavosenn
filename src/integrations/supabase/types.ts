@@ -896,6 +896,51 @@ export type Database = {
           },
         ]
       }
+      rental_properties: {
+        Row: {
+          address: string
+          condo_amount: number
+          cons: string | null
+          created_at: string
+          id: string
+          listing_url: string | null
+          photo_url: string | null
+          pros: string | null
+          rent_amount: number
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          address: string
+          condo_amount?: number
+          cons?: string | null
+          created_at?: string
+          id?: string
+          listing_url?: string | null
+          photo_url?: string | null
+          pros?: string | null
+          rent_amount?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Update: {
+          address?: string
+          condo_amount?: number
+          cons?: string | null
+          created_at?: string
+          id?: string
+          listing_url?: string | null
+          photo_url?: string | null
+          pros?: string | null
+          rent_amount?: number
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       saved_filters: {
         Row: {
           created_at: string | null
