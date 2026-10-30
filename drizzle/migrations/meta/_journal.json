@@ -15,6 +15,13 @@
       "when": 1793393983959,
       "tag": "0001_add_broker_to_rental_properties",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793395541807,
+      "tag": "0002_rental_photo_path",
+      "breakpoints": true
     }
   ]
 }
