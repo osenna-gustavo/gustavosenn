@@ -206,4 +206,5 @@ export type AppScreen =
   | 'import'
   | 'reports'
   | 'projects'
-  | 'settings';
+  | 'settings'
+  | 'rentals';

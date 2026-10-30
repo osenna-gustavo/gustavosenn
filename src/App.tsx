@@ -15,6 +15,7 @@ import { ImportPage } from '@/pages/ImportPage';
 import { ReportsPage } from '@/pages/ReportsPage';
 import { ProjectsPage } from '@/pages/ProjectsPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { RentalsPage } from '@/pages/RentalsPage';
 import { AuthPage } from '@/pages/AuthPage';
 import { TransactionsErrorBoundary } from '@/components/transactions/TransactionsErrorBoundary';
 import { Toaster } from '@/components/ui/toaster';
@@ -44,6 +45,7 @@ function AppContent() {
       case 'reports': return <ReportsPage />;
       case 'projects': return <ProjectsPage />;
       case 'settings': return <SettingsPage />;
+      case 'rentals': return <RentalsPage />;
       default: return <DashboardPage />;
     }
   };
