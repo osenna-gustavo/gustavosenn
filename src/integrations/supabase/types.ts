@@ -899,6 +899,8 @@ export type Database = {
       rental_properties: {
         Row: {
           address: string
+          broker_name: string | null
+          broker_phone: string | null
           condo_amount: number
           cons: string | null
           created_at: string
@@ -913,6 +915,8 @@ export type Database = {
         }
         Insert: {
           address: string
+          broker_name?: string | null
+          broker_phone?: string | null
           condo_amount?: number
           cons?: string | null
           created_at?: string
@@ -927,6 +931,8 @@ export type Database = {
         }
         Update: {
           address?: string
+          broker_name?: string | null
+          broker_phone?: string | null
           condo_amount?: number
           cons?: string | null
           created_at?: string
