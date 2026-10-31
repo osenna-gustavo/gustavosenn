@@ -1,5 +1,7 @@
 # Regras permanentes do projeto
 
+- Rental visit date conversion lives in a focused rental helper using the named America/Sao_Paulo timezone, so browser timezone settings cannot shift saved or displayed visits.
+
 ## Entrega e preview no Lovable
 
 - Toda otimização aprovada pelo usuário deve ser implementada, validada, commitada e enviada para a branch `main` conectada ao Lovable, para aparecer no preview imediatamente.
