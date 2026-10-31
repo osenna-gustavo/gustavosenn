@@ -1,6 +1,7 @@
 # Regras permanentes do projeto
 
 - Rental visit date conversion lives in a focused rental helper using the named America/Sao_Paulo timezone, so browser timezone settings cannot shift saved or displayed visits.
+- Brand assets (logo, banner) live as lovable-assets pointers in `src/assets/`; the Vite dev server proxies `/__l5e` to the published domain because CDN asset routes only resolve outside the sandbox dev server.
 
 ## Entrega e preview no Lovable
 
