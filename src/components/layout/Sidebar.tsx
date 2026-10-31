@@ -18,6 +18,7 @@ import {
   Home,
 } from 'lucide-react';
 import type { AppScreen } from '@/types/finance';
+import logoAsset from '@/assets/fluxocaixa-logo.png.asset.json';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -185,9 +186,7 @@ export function Sidebar() {
       {/* Mobile Header */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-50 h-14 bg-card border-b border-border flex items-center justify-between px-4">
         <div className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-sm">FC</span>
-          </div>
+          <img src={logoAsset.url} alt="FluxoCaixa" className="h-8 w-8 rounded-lg object-cover" />
           <span className="font-semibold text-foreground">FluxoCaixa</span>
         </div>
         <div className="flex items-center gap-2">
@@ -243,9 +242,7 @@ export function Sidebar() {
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-6 border-b border-sidebar-border">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-lg bg-primary flex items-center justify-center glow-primary">
-              <span className="text-primary-foreground font-bold">FC</span>
-            </div>
+            <img src={logoAsset.url} alt="FluxoCaixa" className="h-9 w-9 rounded-lg object-cover glow-primary" />
             <div className="flex flex-col">
               <span className="font-semibold text-sidebar-foreground">FluxoCaixa</span>
               <span className="text-xs text-muted-foreground">Gestão Financeira</span>
