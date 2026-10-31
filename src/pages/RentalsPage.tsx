@@ -18,8 +18,7 @@ import { CurrencyInput } from '@/components/ui/currency-input';
 import { parseBRLToNumber } from '@/lib/currencyInput';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-
-type RentalStatus = 'visitar' | 'visitado' | 'descartado';
+import { DEFAULT_RENTAL_STATUS, RENTAL_STATUSES, formatVisit, visitToInput, visitToISO, type RentalStatus } from '@/lib/rental-visits';
 
 interface RentalProperty {
   id: string;
@@ -32,19 +31,22 @@ interface RentalProperty {
   pros: string | null;
   cons: string | null;
   status: RentalStatus;
+  visit_at: string | null;
   broker_name: string | null;
   broker_phone: string | null;
 }
 
 const STATUS_LABEL: Record<RentalStatus, string> = {
-  visitar: 'Visitar',
+  agendar_visita: 'Agendar visita',
+  visita_agendada: 'Visita agendada',
   visitado: 'Visitado',
   descartado: 'Descartado',
 };
 
 const STATUS_CLASS: Record<RentalStatus, string> = {
-  visitar: 'bg-blue-500/15 text-blue-600 dark:text-blue-400 border-blue-500/30',
-  visitado: 'bg-green-500/15 text-green-600 dark:text-green-400 border-green-500/30',
+  agendar_visita: 'bg-info/15 text-info border-info/30',
+  visita_agendada: 'bg-warning/15 text-warning border-warning/30',
+  visitado: 'bg-success/15 text-success border-success/30',
   descartado: 'bg-muted text-muted-foreground border-border',
 };
 
@@ -90,12 +92,13 @@ interface FormState {
   pros: string;
   cons: string;
   status: RentalStatus;
+  visit_at: string;
   broker_name: string;
   broker_phone: string;
 }
 
 const emptyForm: FormState = {
-  address: '', rent: '', condo: '', photo_url: '', listing_url: '', pros: '', cons: '', status: 'visitar', broker_name: '', broker_phone: '',
+  address: '', rent: '', condo: '', photo_url: '', listing_url: '', pros: '', cons: '', status: DEFAULT_RENTAL_STATUS, visit_at: '', broker_name: '', broker_phone: '',
 };
 
 function Photo({ url }: { url: string | null }) {
@@ -225,6 +228,7 @@ export function RentalsPage() {
       pros: p.pros ?? '',
       cons: p.cons ?? '',
       status: p.status,
+      visit_at: visitToInput(p.visit_at),
       broker_name: p.broker_name ?? '',
       broker_phone: p.broker_phone ? formatBRPhone(p.broker_phone) : '',
     });
@@ -258,6 +262,7 @@ export function RentalsPage() {
       pros: form.pros.trim() || null,
       cons: form.cons.trim() || null,
       status: form.status,
+      visit_at: visitToISO(form.visit_at),
       broker_name: form.broker_name.trim() || null,
       broker_phone: form.broker_phone.trim() || null,
     };
@@ -315,14 +320,12 @@ export function RentalsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
-            <SelectTrigger className="w-40" aria-label="Filtrar por situação">
+            <SelectTrigger className="w-44" aria-label="Filtrar por situação">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos</SelectItem>
-              <SelectItem value="visitar">Visitar</SelectItem>
-              <SelectItem value="visitado">Visitado</SelectItem>
-              <SelectItem value="descartado">Descartado</SelectItem>
+              {RENTAL_STATUSES.map(status => <SelectItem key={status} value={status}>{STATUS_LABEL[status]}</SelectItem>)}
             </SelectContent>
           </Select>
           <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" />Novo imóvel</Button>
@@ -347,6 +350,7 @@ export function RentalsPage() {
               </div>
               <CardContent className="flex flex-1 flex-col gap-3 p-4">
                 <p className="font-semibold text-foreground break-words">{p.address}</p>
+                {p.visit_at && <p className="text-sm text-muted-foreground">Visita: {formatVisit(p.visit_at)}</p>}
                 {(p.broker_name || p.broker_phone) && (
                   <div className="-mt-2 space-y-0.5 text-sm text-muted-foreground">
                     {p.broker_name && <p className="break-words">Corretora: {p.broker_name}</p>}
@@ -474,11 +478,19 @@ export function RentalsPage() {
               <Select value={form.status} onValueChange={v => setForm(f => ({ ...f, status: v as RentalStatus }))}>
                 <SelectTrigger aria-label="Situação"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="visitar">Visitar</SelectItem>
-                  <SelectItem value="visitado">Visitado</SelectItem>
-                  <SelectItem value="descartado">Descartado</SelectItem>
+                  {RENTAL_STATUSES.map(status => <SelectItem key={status} value={status}>{STATUS_LABEL[status]}</SelectItem>)}
                 </SelectContent>
               </Select>
+              {form.status === 'visita_agendada' && !form.visit_at && (
+                <p className="text-xs text-muted-foreground">Informe a data e o horário da visita</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="r-visit">Data e horário da visita</Label>
+              <div className="flex items-center gap-2">
+                <Input id="r-visit" type="datetime-local" value={form.visit_at} onChange={e => setForm(f => ({ ...f, visit_at: e.target.value }))} />
+                {form.visit_at && <Button type="button" variant="ghost" size="icon" aria-label="Limpar data da visita" onClick={() => setForm(f => ({ ...f, visit_at: '' }))}><X className="h-4 w-4" /></Button>}
+              </div>
             </div>
           </div>
           <DialogFooter>
