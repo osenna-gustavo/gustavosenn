@@ -9,6 +9,17 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    // Serve Lovable CDN assets (lovable-assets pointers) during development;
+    // production hosting serves /__l5e/assets-v1 itself.
+    proxy:
+      mode === "development"
+        ? {
+            "/__l5e": {
+              target: "https://sennafin.lovable.app",
+              changeOrigin: true,
+            },
+          }
+        : undefined,
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {

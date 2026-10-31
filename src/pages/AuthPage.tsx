@@ -4,7 +4,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { Wallet, Mail, Lock, Loader2 } from 'lucide-react';
+import { Mail, Lock, Loader2 } from 'lucide-react';
+import logoAsset from '@/assets/fluxocaixa-logo.png.asset.json';
+import bannerAsset from '@/assets/fluxocaixa-banner.png.asset.json';
 
 type AuthMode = 'login' | 'signup';
 
@@ -91,12 +93,17 @@ export function AuthPage() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-8">
+        {/* Banner */}
+        <img
+          src={bannerAsset.url}
+          alt="FluxoCaixa — Gestão Financeira"
+          className="w-full rounded-2xl object-cover shadow-lg"
+        />
+
         {/* Logo & Title */}
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-primary/10 flex items-center justify-center">
-              <Wallet className="h-6 w-6 text-primary" />
-            </div>
+            <img src={logoAsset.url} alt="FluxoCaixa" className="h-12 w-12 rounded-xl object-cover" />
             <h1 className="text-3xl font-bold gradient-text">FluxoCaixa</h1>
           </div>
           <p className="text-muted-foreground">
