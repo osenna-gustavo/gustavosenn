@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { describe, it as test } from 'node:test';
 import { strict as assert } from 'node:assert';
 import { DEFAULT_RENTAL_STATUS, RENTAL_STATUSES, formatVisit, visitToInput, visitToISO } from './rental-visits';
