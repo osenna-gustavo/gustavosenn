@@ -250,8 +250,13 @@ async function handle(action: string, params: Record<string, unknown>) {
         : { data: [] as never[] };
       const recById = new Map((recs ?? []).map((r) => [r.id, r]));
 
+      // Recorrências pausadas (is_active = false) não geram previsão.
+      const pendingInstances = (instances ?? []).filter(
+        (i) => recById.get(i.recurrence_id)?.is_active !== false,
+      );
+
       return ok(
-        (instances ?? []).map((i) => {
+        pendingInstances.map((i) => {
           const r = recById.get(i.recurrence_id);
           return {
             nome: r?.name ?? 'Recorrência',
