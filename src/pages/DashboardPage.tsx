@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { DashboardKPIs } from '@/components/dashboard/DashboardKPIs';
+import { CashPositionPanel } from '@/components/dashboard/CashPositionPanel';
 import { CategoryProgress } from '@/components/dashboard/CategoryProgress';
 import { RecentTransactions } from '@/components/dashboard/RecentTransactions';
 import { DrillDownDrawer, type DrillDownFilter } from '@/components/dashboard/DrillDownDrawer';
@@ -48,6 +49,9 @@ export function DashboardPage() {
           {billingDateRange && ` · ${formatDateShort(billingDateRange.start)} a ${formatDateShort(billingDateRange.end)}`}
         </p>
       </div>
+
+      {/* Dinheiro na conta x comprometido (sempre o ciclo de hoje) */}
+      <CashPositionPanel />
 
       <div className="flex items-center gap-2 rounded-lg bg-muted p-1 w-fit">
         <Button size="sm" variant={mode === 'competence' ? 'default' : 'ghost'} onClick={() => setMode('competence')}>Competência</Button>

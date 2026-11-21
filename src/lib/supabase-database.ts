@@ -12,6 +12,7 @@ import type {
   FinancialCycle,
   PaymentMethod,
   Account,
+  AccountBalance,
   TransactionStatus,
 } from '@/types/finance';
 
@@ -236,6 +237,95 @@ export async function getAccounts(): Promise<Account[]> {
     notes: a.notes || undefined,
     createdAt: new Date(a.created_at!),
   }));
+}
+
+export async function addAccount(account: { name: string; kind: string; institution?: string; notes?: string }): Promise<Account> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('accounts')
+    .insert({
+      user_id: userId,
+      name: account.name,
+      kind: account.kind,
+      institution: account.institution || null,
+      notes: account.notes || null,
+      is_active: true,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  return {
+    id: data.id,
+    name: data.name,
+    kind: data.kind,
+    institution: data.institution || undefined,
+    last4: data.last4 || undefined,
+    isActive: data.is_active,
+    notes: data.notes || undefined,
+    createdAt: new Date(data.created_at),
+  };
+}
+
+// ==================== ACCOUNT BALANCES ====================
+
+/** Último saldo informado de cada conta (data de referência mais recente; empate = o mais recente gravado). */
+export async function getLatestAccountBalances(): Promise<AccountBalance[]> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('account_balances')
+    .select('*')
+    .eq('user_id', userId)
+    .order('reference_date', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const latest = new Map<string, AccountBalance>();
+  for (const row of data || []) {
+    if (latest.has(row.account_id)) continue;
+    latest.set(row.account_id, {
+      id: row.id,
+      accountId: row.account_id,
+      balance: Number(row.balance),
+      referenceDate: parseLocalDate(row.reference_date),
+      createdAt: new Date(row.created_at),
+    });
+  }
+  return Array.from(latest.values());
+}
+
+/** Grava novos saldos (um por conta). Não altera nem apaga saldos anteriores. */
+export async function addAccountBalances(
+  balances: Array<{ accountId: string; balance: number; referenceDate: Date }>,
+): Promise<void> {
+  if (balances.length === 0) return;
+  const userId = await getUserId();
+  const { error } = await supabase.from('account_balances').insert(
+    balances.map(item => ({
+      user_id: userId,
+      account_id: item.accountId,
+      balance: Math.round(item.balance * 100) / 100,
+      reference_date: toDateOnly(item.referenceDate),
+    })),
+  );
+  if (error) throw error;
+}
+
+/** Compras no cartão de crédito a partir de uma data (para a fatura em aberto). */
+export async function getCreditCardTransactionsSince(since: Date): Promise<Transaction[]> {
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from('transactions')
+    .select('*')
+    .eq('user_id', userId)
+    .eq('payment_method', 'credit_card')
+    .gt('date', since.toISOString())
+    .order('date', { ascending: false });
+
+  if (error) throw error;
+  return (data || []).map(mapTransaction);
 }
 
 // ==================== TRANSACTIONS ====================

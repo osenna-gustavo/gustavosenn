@@ -13,6 +13,15 @@ export interface Account {
   createdAt: Date;
 }
 
+/** Saldo informado manualmente de uma conta numa data (histórico, nada é sobrescrito). */
+export interface AccountBalance {
+  id: string;
+  accountId: string;
+  balance: number;
+  referenceDate: Date;
+  createdAt: Date;
+}
+
 export interface Category {
   id: string;
   name: string;
