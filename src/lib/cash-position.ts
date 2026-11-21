@@ -227,13 +227,15 @@ export function parseBalanceInput(raw: string): number | null {
     normalized = text;
   }
 
-  const [integerDigits = '', decimalDigits = ''] = normalized.split('.');
+  const [integerDigits = ''] = normalized.split('.');
   if (!/\d/.test(text)) return null;
   if (integerDigits.replace(/^0+(?=\d)/, '').length > 12) return null;
 
   const value = Number(normalized);
   if (!Number.isFinite(value)) return null;
-  return (sign * Math.round(value * 100)) / 100;
+  const rounded = Math.round(value * 100) / 100;
+  // "-0,00" vira 0 (sem sinal).
+  return rounded === 0 ? 0 : sign * rounded;
 }
 
 /**

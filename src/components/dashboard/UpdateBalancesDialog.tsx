@@ -1,5 +1,12 @@
 import { useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { toast as showToast } from '@/hooks/use-toast';
+
+// O app monta o Toaster do radix (hooks/use-toast); o do sonner não aparece na tela.
+const notify = {
+  error: (title: string) => showToast({ title, variant: 'destructive' }),
+  success: (title: string) => showToast({ title }),
+  info: (title: string) => showToast({ title }),
+};
 import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -73,7 +80,7 @@ export function UpdateBalancesDialog({
     const typed = Object.entries(draft).filter(([, row]) => row.value.trim() !== '');
 
     if (typed.length === 0) {
-      toast.error('Digite o saldo de pelo menos uma conta.');
+      notify.error('Digite o saldo de pelo menos uma conta.');
       return;
     }
 
@@ -81,13 +88,13 @@ export function UpdateBalancesDialog({
     for (const [accountId, row] of typed) {
       const balance = parseBalanceInput(row.value);
       if (balance === null) {
-        toast.error(`Valor inválido: "${row.value}". Use o formato 1.234,56.`);
+        notify.error(`Valor inválido: "${row.value}". Use o formato 1.234,56.`);
         return;
       }
       const referenceDate = validateBalanceDate(row.date);
       if (!referenceDate) {
         const accountName = [...cashAccounts, ...reserveAccounts].find(position => position.account.id === accountId)?.account.name ?? 'a conta';
-        toast.error(`Confira a data de ${accountName}: precisa ser hoje ou um dia que já passou.`);
+        notify.error(`Confira a data de ${accountName}: precisa ser hoje ou um dia que já passou.`);
         return;
       }
       rows.push({ accountId, balance, referenceDate });
@@ -96,12 +103,12 @@ export function UpdateBalancesDialog({
     setIsSaving(true);
     try {
       await db.addAccountBalances(rows);
-      toast.success(rows.length === 1 ? 'Saldo atualizado.' : `${rows.length} saldos atualizados.`);
+      notify.success(rows.length === 1 ? 'Saldo atualizado.' : `${rows.length} saldos atualizados.`);
       await onSaved();
       onOpenChange(false);
     } catch (error) {
       console.error('[UpdateBalancesDialog] Erro ao salvar saldos:', error);
-      toast.error('Não foi possível salvar os saldos. Tente de novo.');
+      notify.error('Não foi possível salvar os saldos. Tente de novo.');
     } finally {
       setIsSaving(false);
     }
@@ -110,19 +117,19 @@ export function UpdateBalancesDialog({
   const handleCreateReserve = async () => {
     const name = newReserveName.trim();
     if (!name) {
-      toast.info('Dê um nome para a caixinha.');
+      notify.info('Dê um nome para a caixinha.');
       return;
     }
     setIsCreating(true);
     try {
       await db.addAccount({ name, kind: 'caixinha', institution: newReserveInstitution.trim() || undefined });
-      toast.success(`Caixinha "${name}" criada.`);
+      notify.success(`Caixinha "${name}" criada.`);
       setNewReserveName('');
       setNewReserveInstitution('');
       await onAccountCreated();
     } catch (error) {
       console.error('[UpdateBalancesDialog] Erro ao criar caixinha:', error);
-      toast.error('Não foi possível criar a caixinha. Tente de novo.');
+      notify.error('Não foi possível criar a caixinha. Tente de novo.');
     } finally {
       setIsCreating(false);
     }
