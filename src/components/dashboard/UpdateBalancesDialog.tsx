@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CurrencyInput } from '@/components/ui/currency-input';
-import { parseBRLToNumber } from '@/lib/currencyInput';
 import { formatCurrency, formatDateShort } from '@/lib/formatters';
 import * as db from '@/lib/supabase-database';
-import type { AccountPosition } from '@/lib/cash-position';
+import { cn } from '@/lib/utils';
+import { parseBalanceInput, type AccountPosition } from '@/lib/cash-position';
 
 interface UpdateBalancesDialogProps {
   open: boolean;
@@ -31,6 +30,16 @@ function parseInputDate(value: string): Date | null {
   const [year, month, day] = value.split('-').map(Number);
   if (!year || !month || !day) return null;
   return new Date(year, month - 1, day);
+}
+
+/** Data do saldo: válida, a partir de 2000 e nunca no futuro. */
+function validateBalanceDate(value: string): Date | null {
+  const date = parseInputDate(value);
+  if (!date || date.getFullYear() < 2000) return null;
+  const today = new Date();
+  const endOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+  if (date > endOfToday) return null;
+  return date;
 }
 
 type Draft = Record<string, { value: string; date: string }>;
@@ -61,22 +70,31 @@ export function UpdateBalancesDialog({
   };
 
   const handleSave = async () => {
-    const rows = Object.entries(draft)
-      .filter(([, row]) => row.value.trim() !== '')
-      .map(([accountId, row]) => ({ accountId, balance: parseBRLToNumber(row.value), referenceDate: parseInputDate(row.date) }));
+    const typed = Object.entries(draft).filter(([, row]) => row.value.trim() !== '');
 
-    if (rows.length === 0) {
+    if (typed.length === 0) {
       toast.info('Digite o saldo de pelo menos uma conta.');
       return;
     }
-    if (rows.some(row => !row.referenceDate)) {
-      toast.error('Confira a data de todos os saldos digitados.');
-      return;
+
+    const rows: Array<{ accountId: string; balance: number; referenceDate: Date }> = [];
+    for (const [accountId, row] of typed) {
+      const balance = parseBalanceInput(row.value);
+      if (balance === null) {
+        toast.error(`Valor inválido: "${row.value}". Use o formato 1.234,56.`);
+        return;
+      }
+      const referenceDate = validateBalanceDate(row.date);
+      if (!referenceDate) {
+        toast.error('Confira a data: precisa ser hoje ou um dia que já passou.');
+        return;
+      }
+      rows.push({ accountId, balance, referenceDate });
     }
 
     setIsSaving(true);
     try {
-      await db.addAccountBalances(rows.map(row => ({ accountId: row.accountId, balance: row.balance, referenceDate: row.referenceDate as Date })));
+      await db.addAccountBalances(rows);
       toast.success(rows.length === 1 ? 'Saldo atualizado.' : `${rows.length} saldos atualizados.`);
       await onSaved();
       onOpenChange(false);
@@ -111,25 +129,37 @@ export function UpdateBalancesDialog({
 
   const renderRow = (position: AccountPosition) => {
     const row = draft[position.account.id];
+    const preview = row?.value?.trim() ? parseBalanceInput(row.value) : null;
     return (
       <div key={position.account.id} className="grid grid-cols-1 sm:grid-cols-[1fr_9rem_9rem] gap-2 items-end">
         <div className="min-w-0">
           <p className="text-sm font-medium truncate">{position.account.name}</p>
           <p className="text-xs text-muted-foreground">
             {position.balance !== null && position.referenceDate
-              ? `Atual: ${formatCurrency(position.balance)} em ${formatDateShort(position.referenceDate)}`
+              ? `Atual: ${formatCurrency(position.balance)}, atualizado em ${formatDateShort(position.referenceDate)}`
               : 'Sem saldo informado'}
           </p>
         </div>
-        <CurrencyInput
-          aria-label={`Saldo de ${position.account.name}`}
-          placeholder="0,00"
-          value={row?.value ?? ''}
-          onChange={value => setRow(position.account.id, { value })}
-        />
+        <div>
+          <Input
+            inputMode="decimal"
+            aria-label={`Saldo de ${position.account.name}`}
+            placeholder="0,00"
+            className="font-mono text-right"
+            value={row?.value ?? ''}
+            onChange={event => setRow(position.account.id, { value: event.target.value })}
+          />
+          {row?.value?.trim() ? (
+            <p className={cn('text-[11px] mt-1 text-right', preview === null ? 'text-destructive' : 'text-muted-foreground')}>
+              {preview === null ? 'valor inválido' : `= ${formatCurrency(preview)}`}
+            </p>
+          ) : null}
+        </div>
         <Input
           type="date"
           aria-label={`Data do saldo de ${position.account.name}`}
+          max={todayInputValue()}
+          min="2000-01-01"
           value={row?.date ?? todayInputValue()}
           onChange={event => setRow(position.account.id, { date: event.target.value })}
         />
@@ -156,7 +186,7 @@ export function UpdateBalancesDialog({
           </section>
 
           <section className="space-y-3">
-            <h3 className="text-sm font-semibold">Caixinhas e reservas (não entram no livre)</h3>
+            <h3 className="text-sm font-semibold">Reservas e caixinhas (não entram no livre)</h3>
             {reserveAccounts.length === 0
               ? <p className="text-sm text-muted-foreground">Nenhuma caixinha cadastrada ainda.</p>
               : reserveAccounts.map(renderRow)}

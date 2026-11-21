@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AlertTriangle, ChevronDown, Clock3, PiggyBank, RefreshCw, Wallet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
@@ -23,8 +23,12 @@ export function CashPositionPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
+    // Antes de o app carregar as contas não há o que calcular (evita R$ 0,00 provisório).
+    if (accounts.length === 0) return;
+    const requestId = ++requestIdRef.current;
     try {
       const today = new Date();
       const closeDay = billingCloseDay ?? DEFAULT_CLOSE_DAY;
@@ -49,6 +53,8 @@ export function CashPositionPanel() {
         db.getCreditCardTransactionsSince(getLastPaidInvoiceClose(today)),
       ]);
 
+      // Uma resposta antiga não pode sobrescrever uma mais nova.
+      if (requestId !== requestIdRef.current) return;
       setPosition(computeCashPosition({
         today,
         cycle: { month, year, start, end },
@@ -62,6 +68,7 @@ export function CashPositionPanel() {
       }));
       setLoadError(null);
     } catch (error) {
+      if (requestId !== requestIdRef.current) return;
       console.error('[CashPositionPanel] Falha ao calcular posição de caixa:', error);
       setLoadError(error instanceof Error ? error.message : String(error));
     }
@@ -96,7 +103,8 @@ export function CashPositionPanel() {
   }
 
   const cycleEndLabel = formatDateShort(position.cycle.end);
-  const freeIsNegative = position.freeTotal < 0;
+  const freeIsNegative = position.hasAnyCashBalance && position.freeTotal < 0;
+  const freeTone = !position.hasAnyCashBalance ? 'neutral' : freeIsNegative ? 'negative' : 'positive';
 
   return (
     <section className="space-y-3" aria-label="Dinheiro na conta e comprometido">
@@ -104,7 +112,7 @@ export function CashPositionPanel() {
         <div>
           <h2 className="text-lg font-semibold">Dinheiro hoje</h2>
           <p className="text-xs text-muted-foreground">
-            O que está na conta, o que já tem destino até {cycleEndLabel} e o que sobra de verdade.
+            O que está na conta, o que já tem destino (contas até {cycleEndLabel} e cartão não pago) e o que sobra de verdade.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => setIsDialogOpen(true)}>
@@ -133,7 +141,7 @@ export function CashPositionPanel() {
                 <span className="text-muted-foreground truncate">{item.account.name}</span>
                 <span className={cn('font-mono whitespace-nowrap', item.isStale && 'text-warning')}>
                   {item.balance !== null && item.referenceDate
-                    ? `${formatCurrency(item.balance)} · ${formatDateShort(item.referenceDate)}`
+                    ? `${formatCurrency(item.balance)} · atualizado em ${formatDateShort(item.referenceDate)}`
                     : 'sem saldo'}
                 </span>
               </li>
@@ -149,7 +157,7 @@ export function CashPositionPanel() {
             <div className="flex items-center justify-between text-xs">
               <span className="flex items-center gap-1 text-muted-foreground">
                 <PiggyBank className="h-3 w-3" />
-                Caixinhas (não entram no livre)
+                Reservas (não entram no livre)
               </span>
               <span className="font-mono">{formatCurrency(position.reserveTotal)}</span>
             </div>
@@ -162,7 +170,7 @@ export function CashPositionPanel() {
                     <span className="text-muted-foreground truncate">{item.account.name}</span>
                     <span className="font-mono whitespace-nowrap">
                       {item.balance !== null && item.referenceDate
-                        ? `${formatCurrency(item.balance)} · ${formatDateShort(item.referenceDate)}`
+                        ? `${formatCurrency(item.balance)} · atualizado em ${formatDateShort(item.referenceDate)}`
                         : 'sem saldo'}
                     </span>
                   </li>
@@ -179,7 +187,7 @@ export function CashPositionPanel() {
             <Clock3 className="h-4 w-4 text-warning" />
           </div>
           <span className="text-xl lg:text-2xl font-bold font-mono text-warning">{formatCurrency(position.committedTotal)}</span>
-          <p className="text-xs text-muted-foreground mt-1">ainda vai sair, até {cycleEndLabel}</p>
+          <p className="text-xs text-muted-foreground mt-1">contas do ciclo até {cycleEndLabel} + cartão ainda não pago</p>
           <ul className="mt-2 space-y-1 text-xs">
             <li className="flex justify-between gap-2">
               <span className="text-muted-foreground">Contas fixas pendentes ({position.recurringItems.length})</span>
@@ -206,14 +214,14 @@ export function CashPositionPanel() {
 
         {/* Livre de fato */}
         <div
-          className={cn('stat-card border-l-4', freeIsNegative ? 'border-l-destructive' : 'border-l-success')}
+          className={cn('stat-card border-l-4', freeTone === 'negative' && 'border-l-destructive', freeTone === 'positive' && 'border-l-success', freeTone === 'neutral' && 'border-l-primary/50')}
           data-testid="card-livre"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Livre de fato</span>
-            <Wallet className={cn('h-4 w-4', freeIsNegative ? 'text-destructive' : 'text-success')} />
+            <Wallet className={cn('h-4 w-4', freeTone === 'negative' && 'text-destructive', freeTone === 'positive' && 'text-success', freeTone === 'neutral' && 'text-muted-foreground')} />
           </div>
-          <span className={cn('text-xl lg:text-2xl font-bold font-mono', freeIsNegative ? 'text-destructive' : 'text-success')}>
+          <span className={cn('text-xl lg:text-2xl font-bold font-mono', freeTone === 'negative' && 'text-destructive', freeTone === 'positive' && 'text-success', freeTone === 'neutral' && 'text-muted-foreground')}>
             {position.hasAnyCashBalance ? formatCurrency(position.freeTotal) : '—'}
           </span>
           <p className="text-xs text-muted-foreground mt-1">
@@ -221,7 +229,7 @@ export function CashPositionPanel() {
               ? 'na conta menos comprometido'
               : 'aparece depois de informar os saldos'}
           </p>
-          {freeIsNegative && position.hasAnyCashBalance && (
+          {freeIsNegative && (
             <p className="text-xs text-destructive mt-2">Faltam {formatCurrency(Math.abs(position.freeTotal))} para cobrir o que já tem destino.</p>
           )}
         </div>

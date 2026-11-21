@@ -141,8 +141,9 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
   const reserveCategoryIds = new Set(
     categories.filter(category => RESERVE_CATEGORY_PATTERN.test(category.name)).map(category => category.id),
   );
-  // Mesma entrada que o Dashboard usa: qualquer lançamento vinculado tira a recorrência do comprometido.
-  const commitments = computeCycleCommitments(recurrences, instances, cycleTransactions, cycle.month, cycle.year);
+  // Lançamento ignorado não paga a recorrência: só lançamentos válidos a tiram do comprometido.
+  const countedCycleTransactions = cycleTransactions.filter(transaction => transaction.status !== 'ignored');
+  const commitments = computeCycleCommitments(recurrences, instances, countedCycleTransactions, cycle.month, cycle.year);
   const pendingItems = commitments.committedExpenseItems
     .filter(item => !reserveCategoryIds.has(item.categoryId))
     .sort((a, b) => b.amount - a.amount);
@@ -193,4 +194,40 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     committedTotal,
     freeTotal: round2(cashTotal - committedTotal),
   };
+}
+
+/**
+ * Lê o saldo como aparece no app do banco: "1.234,56", "1234,56", "1.000", "-50,00", "R$ 7.234,96".
+ * Devolve null quando o texto não é um valor válido (nada é gravado nesse caso).
+ */
+export function parseBalanceInput(raw: string): number | null {
+  let text = raw.replace(/R\$/gi, '').replace(/\s/g, '');
+  if (!text) return null;
+  let sign = 1;
+  if (text.startsWith('-')) {
+    sign = -1;
+    text = text.slice(1);
+  }
+  if (!/^[\d.,]+$/.test(text)) return null;
+
+  let normalized: string;
+  if (text.includes(',')) {
+    // Vírgula = decimal; pontos = milhar.
+    if ((text.match(/,/g) || []).length > 1) return null;
+    const [intPart, decPart] = text.split(',');
+    if (decPart.length > 2) return null;
+    if (intPart.includes('.') && !/^\d{1,3}(\.\d{3})+$/.test(intPart)) return null;
+    normalized = `${intPart.replace(/\./g, '') || '0'}.${decPart || '0'}`;
+  } else if (text.includes('.')) {
+    // Sem vírgula: "1.000" e "12.345.678" = milhar; "1234.5" = decimal.
+    if (/^\d{1,3}(\.\d{3})+$/.test(text)) normalized = text.replace(/\./g, '');
+    else if (/^\d+\.\d{1,2}$/.test(text)) normalized = text;
+    else return null;
+  } else {
+    normalized = text;
+  }
+
+  const value = Number(normalized);
+  if (!Number.isFinite(value)) return null;
+  return (sign * Math.round(value * 100)) / 100;
 }
