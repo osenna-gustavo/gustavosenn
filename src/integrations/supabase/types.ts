@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      account_balances: {
+        Row: {
+          account_id: string
+          balance: number
+          created_at: string
+          id: string
+          reference_date: string
+          user_id: string
+        }
+        Insert: {
+          account_id: string
+          balance: number
+          created_at?: string
+          id?: string
+          reference_date?: string
+          user_id: string
+        }
+        Update: {
+          account_id?: string
+          balance?: number
+          created_at?: string
+          id?: string
+          reference_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "account_balances_account_id_fkey"
+            columns: ["account_id"]
+            isOneToOne: false
+            referencedRelation: "accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       accounts: {
         Row: {
           created_at: string
