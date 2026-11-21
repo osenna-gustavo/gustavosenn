@@ -85,24 +85,21 @@ export interface CommittedExpenseItem {
   dueDate: Date;
 }
 
-/** Janela para reconhecer o pagamento de uma ocorrência (pago até 20 dias antes do vencimento). */
-const PAYMENT_LOOKBACK_DAYS = 20;
-
-/** Vencimentos de uma recorrência mensal que caem dentro do ciclo [start, end]. */
-export function getRecurrenceDueDatesInCycle(recurrence: Recurrence, start: Date, end: Date): Array<{ dueDate: Date; installmentNumber: number | null }> {
+/** Vencimentos mensais de uma recorrência dentro de [from, to] (respeita início, fim e nº de parcelas). */
+export function getRecurrenceDueDates(recurrence: Recurrence, from: Date, to: Date): Array<{ dueDate: Date; installmentNumber: number | null }> {
   const result: Array<{ dueDate: Date; installmentNumber: number | null }> = [];
+  if (recurrence.frequency && recurrence.frequency !== 'monthly') return result;
   const firstDue = startOfDay(recurrence.startDate);
   const lastDue = recurrence.endDate ? endOfDay(recurrence.endDate) : null;
   const dueDay = firstDue.getDate();
-  const months = [
-    { year: start.getFullYear(), month: start.getMonth() },
-    { year: end.getFullYear(), month: end.getMonth() },
-  ].filter((item, index, list) => list.findIndex(other => other.year === item.year && other.month === item.month) === index);
+  const fromDay = startOfDay(from);
 
-  for (const { year, month } of months) {
+  for (let year = from.getFullYear(), month = from.getMonth();
+    year < to.getFullYear() || (year === to.getFullYear() && month <= to.getMonth());
+    month === 11 ? (year += 1, month = 0) : (month += 1)) {
     const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
     const dueDate = new Date(year, month, Math.min(dueDay, lastDayOfMonth));
-    if (dueDate < startOfDay(start) || dueDate > end) continue;
+    if (dueDate < fromDay || dueDate > to) continue;
     if (dueDate < firstDue) continue;
     if (lastDue && dueDate > lastDue) continue;
     let installmentNumber: number | null = null;
@@ -113,6 +110,42 @@ export function getRecurrenceDueDatesInCycle(recurrence: Recurrence, start: Date
     result.push({ dueDate, installmentNumber });
   }
   return result;
+}
+
+/** Vencimentos de uma recorrência mensal que caem dentro do ciclo [start, end]. */
+export function getRecurrenceDueDatesInCycle(recurrence: Recurrence, start: Date, end: Date) {
+  return getRecurrenceDueDates(recurrence, start, end);
+}
+
+/** Início do ciclo anterior (mesmo dia, um mês antes). */
+export function getPreviousCycleStart(cycleStart: Date): Date {
+  return new Date(cycleStart.getFullYear(), cycleStart.getMonth() - 1, cycleStart.getDate());
+}
+
+/** Quantos dias antes do ciclo anterior buscar lançamentos para reconhecer pagamentos antecipados. */
+export const PAYMENT_SEARCH_DAYS_BEFORE_PREVIOUS_CYCLE = 75;
+
+/**
+ * Casa pagamentos com vencimentos de UMA recorrência, 1 pagamento por vencimento.
+ * Do vencimento mais novo para o mais antigo, cada um leva o pagamento mais recente ainda livre
+ * feito depois do dia do vencimento anterior (inclui pagamento antecipado, até no ciclo anterior).
+ * Devolve os vencimentos que ficaram sem pagamento.
+ */
+export function matchRecurrencePayments(dueDates: Date[], payments: Date[], until: Date): Date[] {
+  const available = payments.filter(date => date <= until).sort((x, y) => y.getTime() - x.getTime());
+  const used = new Set<number>();
+  const unpaid: Date[] = [];
+  const ordered = [...dueDates].sort((x, y) => y.getTime() - x.getTime());
+  for (const dueDate of ordered) {
+    const previousMonthLastDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), 0).getDate();
+    const previousDue = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, Math.min(dueDate.getDate(), previousMonthLastDay));
+    // Pagamento feito no próprio dia do vencimento anterior pertence ao vencimento anterior.
+    const threshold = endOfDay(previousDue);
+    const index = available.findIndex((date, position) => !used.has(position) && date > threshold);
+    if (index === -1) unpaid.push(dueDate);
+    else used.add(index);
+  }
+  return unpaid.sort((x, y) => x.getTime() - y.getTime());
 }
 
 export interface OpenInvoice {
@@ -129,6 +162,9 @@ export interface CashPosition {
   reserveTotal: number;
   hasAnyCashBalance: boolean;
   hasStaleBalance: boolean;
+  /** Vencidos no ciclo anterior e ainda não pagos (continuam saindo). */
+  overdueItems: CommittedExpenseItem[];
+  overdueTotal: number;
   recurringItems: CommittedExpenseItem[];
   installmentItems: CommittedExpenseItem[];
   recurringTotal: number;
@@ -148,7 +184,7 @@ export interface CashPositionInput {
   recurrences: Recurrence[];
   /** Instâncias de recorrência dos meses que o ciclo toca (para reconhecer vínculo e "ignorar"). */
   instances: RecurrenceInstance[];
-  /** Lançamentos de (início do ciclo − 25 dias) até o fim do ciclo, para reconhecer pagamentos. */
+  /** Lançamentos de (início do ciclo anterior − 75 dias) até o fim do ciclo, para reconhecer pagamentos. */
   recentTransactions: Transaction[];
   cardTransactions: Transaction[];
 }
@@ -196,30 +232,38 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     paymentsByRecurrence.set(recurrenceId, list);
   }
 
+  const previousCycleStart = getPreviousCycleStart(cycle.start);
   const pendingItems: CommittedExpenseItem[] = [];
+  const overdueItems: CommittedExpenseItem[] = [];
   for (const recurrence of recurrences) {
     if (!recurrence.isActive || recurrence.type !== 'despesa') continue;
     if (reserveCategoryIds.has(recurrence.categoryId)) continue;
-    for (const { dueDate } of getRecurrenceDueDatesInCycle(recurrence, cycle.start, cycle.end)) {
-      const dueCycle = getCycleForDate(dueDate, cycle.end.getDate());
-      const ignored = instances.some(instance =>
-        instance.recurrenceId === recurrence.id && instance.status === 'ignored'
-        && instance.month === dueCycle.month && instance.year === dueCycle.year);
-      if (ignored) continue;
-      const windowStart = new Date(dueDate.getTime() - PAYMENT_LOOKBACK_DAYS * DAY_MS);
-      const paid = (paymentsByRecurrence.get(recurrence.id) ?? []).some(date => date >= windowStart && date <= cycle.end);
-      if (paid) continue;
-      pendingItems.push({
+    // Vencimentos do ciclo anterior (podem estar atrasados) e do ciclo de hoje.
+    const dueDates = getRecurrenceDueDates(recurrence, previousCycleStart, cycle.end)
+      .map(item => item.dueDate)
+      .filter(dueDate => {
+        const dueCycle = getCycleForDate(dueDate, cycle.end.getDate());
+        return !instances.some(instance =>
+          instance.recurrenceId === recurrence.id && instance.status === 'ignored'
+          && instance.month === dueCycle.month && instance.year === dueCycle.year);
+      });
+    const unpaid = matchRecurrencePayments(dueDates, paymentsByRecurrence.get(recurrence.id) ?? [], cycle.end);
+    for (const dueDate of unpaid) {
+      const item: CommittedExpenseItem = {
         recurrenceId: recurrence.id,
         name: recurrence.name,
         amount: recurrence.amount,
         categoryId: recurrence.categoryId,
         isInstallment: Boolean(recurrence.totalInstallments),
         dueDate,
-      });
+      };
+      if (dueDate < startOfDay(cycle.start)) overdueItems.push(item);
+      else pendingItems.push(item);
     }
   }
   pendingItems.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || b.amount - a.amount);
+  overdueItems.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || b.amount - a.amount);
+  const overdueTotal = round2(overdueItems.reduce((sum, item) => sum + item.amount, 0));
   const recurringItems = pendingItems.filter(item => !item.isInstallment);
   const installmentItems = pendingItems.filter(item => item.isInstallment);
   const recurringTotal = round2(recurringItems.reduce((sum, item) => sum + item.amount, 0));
@@ -250,7 +294,7 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     .sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   const openInvoiceTotal = round2(openInvoices.reduce((sum, invoice) => sum + invoice.amount, 0));
 
-  const committedTotal = round2(recurringTotal + installmentTotal + openInvoiceTotal);
+  const committedTotal = round2(overdueTotal + recurringTotal + installmentTotal + openInvoiceTotal);
 
   return {
     cycle,
@@ -260,6 +304,8 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     reserveTotal,
     hasAnyCashBalance: cashAccounts.some(position => position.balance !== null),
     hasStaleBalance: cashAccounts.some(position => position.isStale),
+    overdueItems,
+    overdueTotal,
     recurringItems,
     installmentItems,
     recurringTotal,

@@ -11,6 +11,8 @@ import {
   computeCashPosition,
   getCycleRangeForDate,
   getLastPaidInvoiceClose,
+  getPreviousCycleStart,
+  PAYMENT_SEARCH_DAYS_BEFORE_PREVIOUS_CYCLE,
   STALE_BALANCE_DAYS,
   type CashPosition,
 } from '@/lib/cash-position';
@@ -48,7 +50,8 @@ export function CashPositionPanel() {
       }
 
       const previous = month === 0 ? { month: 11, year: year - 1 } : { month: month - 1, year };
-      const lookbackStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 25);
+      const previousStart = getPreviousCycleStart(start);
+      const lookbackStart = new Date(previousStart.getFullYear(), previousStart.getMonth(), previousStart.getDate() - PAYMENT_SEARCH_DAYS_BEFORE_PREVIOUS_CYCLE);
       const [latestBalances, currentInstances, previousInstances, recentTransactions, cardTransactions] = await Promise.all([
         db.getLatestAccountBalances(),
         db.getRecurrenceInstances(month, year),
@@ -193,8 +196,14 @@ export function CashPositionPanel() {
             <Clock3 className="h-4 w-4 text-warning" />
           </div>
           <span className="text-xl lg:text-2xl font-bold font-mono text-warning">{formatCurrency(position.committedTotal)}</span>
-          <p className="text-xs text-muted-foreground mt-1">tudo que vence de {cycleStartLabel} a {cycleEndLabel}</p>
+          <p className="text-xs text-muted-foreground mt-1">tudo que vence de {cycleStartLabel} a {cycleEndLabel}, mais o que venceu e não foi pago</p>
           <ul className="mt-2 space-y-1 text-xs">
+            {position.overdueItems.length > 0 && (
+              <li className="flex justify-between gap-2 text-destructive">
+                <span>Vencidos e não pagos ({position.overdueItems.length})</span>
+                <span className="font-mono">{formatCurrency(position.overdueTotal)}</span>
+              </li>
+            )}
             <li className="flex justify-between gap-2">
               <span className="text-muted-foreground">Contas fixas pendentes ({position.recurringItems.length})</span>
               <span className="font-mono">{formatCurrency(position.recurringTotal)}</span>
@@ -250,12 +259,25 @@ export function CashPositionPanel() {
         </CollapsibleTrigger>
         <CollapsibleContent>
           <div className="stat-card mt-2 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            {position.overdueItems.length > 0 && (
+              <div className="md:col-span-2">
+                <p className="font-semibold mb-1 text-destructive">Vencidos e não pagos</p>
+                <ul className="space-y-1">
+                  {position.overdueItems.map(item => (
+                    <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
+                      <span className="font-mono">{formatCurrency(item.amount)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
             <div>
               <p className="font-semibold mb-1">Contas fixas pendentes</p>
               {position.recurringItems.length === 0 ? <p className="text-muted-foreground">Nenhuma.</p> : (
                 <ul className="space-y-1">
                   {position.recurringItems.map(item => (
-                    <li key={item.recurrenceId} className="flex justify-between gap-2">
+                    <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
                       <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
@@ -268,7 +290,7 @@ export function CashPositionPanel() {
               {position.installmentItems.length === 0 ? <p className="text-muted-foreground">Nenhuma.</p> : (
                 <ul className="space-y-1">
                   {position.installmentItems.map(item => (
-                    <li key={item.recurrenceId} className="flex justify-between gap-2">
+                    <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
                       <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>

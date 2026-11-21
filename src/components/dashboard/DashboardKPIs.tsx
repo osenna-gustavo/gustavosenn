@@ -16,8 +16,8 @@ export function DashboardKPIs({ onDrillDown, mode = 'competence' }: DashboardKPI
 
   if (!monthSummary) {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, index) => (
+      <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-4', mode === 'cash' ? 'xl:grid-cols-5' : 'xl:grid-cols-4')}>
+        {[...Array(mode === 'cash' ? 5 : 4)].map((_, index) => (
           <div key={index} className="stat-card animate-pulse">
             <div className="h-4 bg-muted rounded w-24 mb-2" />
             <div className="h-8 bg-muted rounded w-32" />
