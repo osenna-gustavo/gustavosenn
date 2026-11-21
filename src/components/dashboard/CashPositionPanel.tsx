@@ -265,7 +265,7 @@ export function CashPositionPanel() {
                 <ul className="space-y-1">
                   {position.overdueItems.map(item => (
                     <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
-                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}{item.onCard ? ' (fatura C6)' : ''}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
                   ))}
@@ -278,7 +278,7 @@ export function CashPositionPanel() {
                 <ul className="space-y-1">
                   {position.recurringItems.map(item => (
                     <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
-                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}{item.onCard ? ' (fatura C6)' : ''}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
                   ))}
@@ -291,7 +291,7 @@ export function CashPositionPanel() {
                 <ul className="space-y-1">
                   {position.installmentItems.map(item => (
                     <li key={`${item.recurrenceId}-${item.dueDate.toISOString()}`} className="flex justify-between gap-2">
-                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}{item.onCard ? ' (fatura C6)' : ''}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
                   ))}

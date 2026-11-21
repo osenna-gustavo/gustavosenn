@@ -82,7 +82,21 @@ export interface CommittedExpenseItem {
   amount: number;
   categoryId: string;
   isInstallment: boolean;
+  /** Data em que o dinheiro sai: vencimento da conta, ou vencimento da fatura quando é cobrada no cartão. */
   dueDate: Date;
+  /** Cobrada no cartão de crédito (sai do caixa no pagamento da fatura). */
+  onCard: boolean;
+}
+
+const CARD_NAME_PATTERN = /\bC6\b/i;
+
+/**
+ * Recorrência cobrada no cartão: o último lançamento vinculado foi no cartão de crédito
+ * ou o nome cita o cartão C6 (decisão do CFO pela regra do Gustavo, 21/11/2026).
+ */
+export function isCardRecurrence(recurrence: Recurrence, lastLinkedPaymentMethod: string | undefined): boolean {
+  if (lastLinkedPaymentMethod) return lastLinkedPaymentMethod === 'credit_card';
+  return CARD_NAME_PATTERN.test(recurrence.name);
 }
 
 /** Vencimentos mensais de uma recorrência dentro de [from, to] (respeita início, fim e nº de parcelas). */
@@ -255,6 +269,7 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
   const instanceRecurrence = new Map(instances.map(instance => [instance.id, instance.recurrenceId]));
   // Lançamento ignorado não paga a recorrência: só lançamentos válidos contam como pagamento.
   const paymentsByRecurrence = new Map<string, Date[]>();
+  const lastPaymentByRecurrence = new Map<string, { date: Date; method: string }>();
   for (const transaction of recentTransactions) {
     if (transaction.status === 'ignored') continue;
     const recurrenceId = transaction.recurrenceId
@@ -263,6 +278,10 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     const list = paymentsByRecurrence.get(recurrenceId) ?? [];
     list.push(transaction.date);
     paymentsByRecurrence.set(recurrenceId, list);
+    const last = lastPaymentByRecurrence.get(recurrenceId);
+    if (!last || transaction.date > last.date) {
+      lastPaymentByRecurrence.set(recurrenceId, { date: transaction.date, method: transaction.paymentMethod });
+    }
   }
 
   const previousCycleStart = getPreviousCycleStart(cycle.start);
@@ -282,8 +301,17 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
           && instance.month === dueCycle.month && instance.year === dueCycle.year);
       });
     const unpaid = matchRecurrencePayments(dueDates, paymentsByRecurrence.get(recurrence.id) ?? [], cycle.end);
-    for (const dueDate of unpaid) {
-      if (dueDate < startOfDay(previousCycleStart)) continue;
+    const onCard = isCardRecurrence(recurrence, lastPaymentByRecurrence.get(recurrence.id)?.method);
+    for (const chargeDate of unpaid) {
+      // No cartão, o dinheiro sai no vencimento da fatura em que a cobrança cai.
+      const dueDate = onCard ? getInvoiceDueDate(chargeDate) : chargeDate;
+      if (dueDate > cycle.end) continue;
+      if (onCard) {
+        // Fatura já vencida = já paga (o saldo informado já reflete); só conta a que ainda vai vencer.
+        if (dueDate < startOfDay(cycle.start)) continue;
+      } else if (dueDate < startOfDay(previousCycleStart)) {
+        continue;
+      }
       const item: CommittedExpenseItem = {
         recurrenceId: recurrence.id,
         name: recurrence.name,
@@ -291,6 +319,7 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
         categoryId: recurrence.categoryId,
         isInstallment: Boolean(recurrence.totalInstallments),
         dueDate,
+        onCard,
       };
       if (dueDate < startOfDay(cycle.start)) overdueItems.push(item);
       else pendingItems.push(item);
