@@ -303,8 +303,10 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     const unpaid = matchRecurrencePayments(dueDates, paymentsByRecurrence.get(recurrence.id) ?? [], cycle.end);
     const onCard = isCardRecurrence(recurrence, lastPaymentByRecurrence.get(recurrence.id)?.method);
     for (const chargeDate of unpaid) {
-      // No cartão, o dinheiro sai no vencimento da fatura em que a cobrança cai.
-      const dueDate = onCard ? getInvoiceDueDate(chargeDate) : chargeDate;
+      // No cartão, o dinheiro sai no vencimento da fatura em que a cobrança cai. Cobrança ainda não
+      // lançada com data já passada só pode cair numa fatura que ainda vai fechar (a partir de hoje).
+      const effectiveCharge = onCard && chargeDate < startOfDay(today) ? startOfDay(today) : chargeDate;
+      const dueDate = onCard ? getInvoiceDueDate(effectiveCharge) : chargeDate;
       if (dueDate > cycle.end) continue;
       if (onCard) {
         // Fatura já vencida = já paga (o saldo informado já reflete); só conta a que ainda vai vencer.
