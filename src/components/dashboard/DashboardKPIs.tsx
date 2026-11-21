@@ -72,7 +72,7 @@ export function DashboardKPIs({ onDrillDown, mode = 'competence' }: DashboardKPI
       value: monthSummary.committedExpenses,
       icon: Clock3,
       trend: monthSummary.committedExpenses > 0 ? 'warning' : 'positive',
-      description: 'recorrências e parcelas pendentes no orçamento deste ciclo (inclui reservas, sem cartão)',
+      description: 'recorrências e parcelas pendentes',
     },
     {
       label: 'Disponível',

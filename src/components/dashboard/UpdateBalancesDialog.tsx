@@ -73,7 +73,7 @@ export function UpdateBalancesDialog({
     const typed = Object.entries(draft).filter(([, row]) => row.value.trim() !== '');
 
     if (typed.length === 0) {
-      toast.info('Digite o saldo de pelo menos uma conta.');
+      toast.error('Digite o saldo de pelo menos uma conta.');
       return;
     }
 
@@ -86,7 +86,8 @@ export function UpdateBalancesDialog({
       }
       const referenceDate = validateBalanceDate(row.date);
       if (!referenceDate) {
-        toast.error('Confira a data: precisa ser hoje ou um dia que já passou.');
+        const accountName = [...cashAccounts, ...reserveAccounts].find(position => position.account.id === accountId)?.account.name ?? 'a conta';
+        toast.error(`Confira a data de ${accountName}: precisa ser hoje ou um dia que já passou.`);
         return;
       }
       rows.push({ accountId, balance, referenceDate });

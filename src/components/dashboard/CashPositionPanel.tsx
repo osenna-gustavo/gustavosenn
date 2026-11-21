@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { formatCurrency, formatDateShort } from '@/lib/formatters';
 import * as db from '@/lib/supabase-database';
 import {
+  canComputeCashPosition,
   computeCashPosition,
   getCycleRangeForDate,
   getLastPaidInvoiceClose,
@@ -18,7 +19,7 @@ import { UpdateBalancesDialog } from './UpdateBalancesDialog';
 const DEFAULT_CLOSE_DAY = 20;
 
 export function CashPositionPanel() {
-  const { accounts, categories, recurrences, transactions, billingCloseDay, refreshData } = useApp();
+  const { accounts, categories, recurrences, transactions, billingCloseDay, refreshData, isInitialized, isLoading } = useApp();
   const [position, setPosition] = useState<CashPosition | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -26,8 +27,8 @@ export function CashPositionPanel() {
   const requestIdRef = useRef(0);
 
   const load = useCallback(async () => {
-    // Antes de o app carregar as contas não há o que calcular (evita R$ 0,00 provisório).
-    if (accounts.length === 0) return;
+    // Só calcula depois que o app terminou de carregar (evita R$ 0,00 provisório e nunca trava sem contas).
+    if (!canComputeCashPosition({ isInitialized, isLoading })) return;
     const requestId = ++requestIdRef.current;
     try {
       const today = new Date();
@@ -72,7 +73,7 @@ export function CashPositionPanel() {
       console.error('[CashPositionPanel] Falha ao calcular posição de caixa:', error);
       setLoadError(error instanceof Error ? error.message : String(error));
     }
-  }, [accounts, categories, recurrences, billingCloseDay]);
+  }, [accounts, categories, recurrences, billingCloseDay, isInitialized, isLoading]);
 
   // Recalcula quando os dados do app mudam (lançamento novo, recorrência editada etc.).
   useEffect(() => {
@@ -137,8 +138,8 @@ export function CashPositionPanel() {
           )}
           <ul className="mt-2 space-y-1">
             {position.cashAccounts.map(item => (
-              <li key={item.account.id} className="flex justify-between gap-2 text-xs">
-                <span className="text-muted-foreground truncate">{item.account.name}</span>
+              <li key={item.account.id} className="flex flex-wrap justify-between gap-x-2 text-xs">
+                <span className="text-muted-foreground">{item.account.name}</span>
                 <span className={cn('font-mono whitespace-nowrap', item.isStale && 'text-warning')}>
                   {item.balance !== null && item.referenceDate
                     ? `${formatCurrency(item.balance)} · atualizado em ${formatDateShort(item.referenceDate)}`
@@ -166,8 +167,8 @@ export function CashPositionPanel() {
             ) : (
               <ul className="mt-1 space-y-1">
                 {position.reserveAccounts.map(item => (
-                  <li key={item.account.id} className="flex justify-between gap-2 text-xs">
-                    <span className="text-muted-foreground truncate">{item.account.name}</span>
+                  <li key={item.account.id} className="flex flex-wrap justify-between gap-x-2 text-xs">
+                    <span className="text-muted-foreground">{item.account.name}</span>
                     <span className="font-mono whitespace-nowrap">
                       {item.balance !== null && item.referenceDate
                         ? `${formatCurrency(item.balance)} · atualizado em ${formatDateShort(item.referenceDate)}`

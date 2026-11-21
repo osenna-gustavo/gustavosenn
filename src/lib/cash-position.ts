@@ -227,7 +227,19 @@ export function parseBalanceInput(raw: string): number | null {
     normalized = text;
   }
 
+  const [integerDigits = '', decimalDigits = ''] = normalized.split('.');
+  if (!/\d/.test(text)) return null;
+  if (integerDigits.replace(/^0+(?=\d)/, '').length > 12) return null;
+
   const value = Number(normalized);
   if (!Number.isFinite(value)) return null;
   return (sign * Math.round(value * 100)) / 100;
+}
+
+/**
+ * O painel só calcula depois que o app terminou de carregar os dados (com ou sem contas).
+ * Enquanto carrega, mostra o esqueleto; terminou (mesmo com lista vazia ou erro), calcula e mostra o estado real.
+ */
+export function canComputeCashPosition(appState: { isInitialized: boolean; isLoading: boolean }): boolean {
+  return appState.isInitialized && !appState.isLoading;
 }
