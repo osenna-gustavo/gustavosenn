@@ -47,12 +47,16 @@ export function CashPositionPanel() {
         console.error('[CashPositionPanel] Falha ao ler ciclo salvo, usando dia de fechamento:', cycleError);
       }
 
-      const [latestBalances, instances, cycleTransactions, cardTransactions] = await Promise.all([
+      const previous = month === 0 ? { month: 11, year: year - 1 } : { month: month - 1, year };
+      const lookbackStart = new Date(start.getFullYear(), start.getMonth(), start.getDate() - 25);
+      const [latestBalances, currentInstances, previousInstances, recentTransactions, cardTransactions] = await Promise.all([
         db.getLatestAccountBalances(),
         db.getRecurrenceInstances(month, year),
-        db.getTransactions(month, year, { start, end }),
+        db.getRecurrenceInstances(previous.month, previous.year),
+        db.getTransactions(undefined, undefined, { start: lookbackStart, end }),
         db.getCreditCardTransactionsSince(getLastPaidInvoiceClose(today)),
       ]);
+      const instances = [...currentInstances, ...previousInstances];
 
       // Uma resposta antiga não pode sobrescrever uma mais nova.
       if (requestId !== requestIdRef.current) return;
@@ -64,7 +68,7 @@ export function CashPositionPanel() {
         categories,
         recurrences,
         instances,
-        cycleTransactions,
+        recentTransactions,
         cardTransactions,
       }));
       setLoadError(null);
@@ -103,6 +107,7 @@ export function CashPositionPanel() {
     );
   }
 
+  const cycleStartLabel = formatDateShort(position.cycle.start);
   const cycleEndLabel = formatDateShort(position.cycle.end);
   const freeIsNegative = position.hasAnyCashBalance && position.freeTotal < 0;
   const freeTone = !position.hasAnyCashBalance ? 'neutral' : freeIsNegative ? 'negative' : 'positive';
@@ -113,7 +118,7 @@ export function CashPositionPanel() {
         <div>
           <h2 className="text-lg font-semibold">Dinheiro hoje</h2>
           <p className="text-xs text-muted-foreground">
-            O que está na conta, o que já tem destino (contas até {cycleEndLabel} e cartão não pago) e o que sobra de verdade.
+            O que está na conta, o que vence até {cycleEndLabel} e o que sobra de verdade.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={() => setIsDialogOpen(true)}>
@@ -188,7 +193,7 @@ export function CashPositionPanel() {
             <Clock3 className="h-4 w-4 text-warning" />
           </div>
           <span className="text-xl lg:text-2xl font-bold font-mono text-warning">{formatCurrency(position.committedTotal)}</span>
-          <p className="text-xs text-muted-foreground mt-1">contas do ciclo até {cycleEndLabel} + cartão ainda não pago</p>
+          <p className="text-xs text-muted-foreground mt-1">tudo que vence de {cycleStartLabel} a {cycleEndLabel}</p>
           <ul className="mt-2 space-y-1 text-xs">
             <li className="flex justify-between gap-2">
               <span className="text-muted-foreground">Contas fixas pendentes ({position.recurringItems.length})</span>
@@ -251,7 +256,7 @@ export function CashPositionPanel() {
                 <ul className="space-y-1">
                   {position.recurringItems.map(item => (
                     <li key={item.recurrenceId} className="flex justify-between gap-2">
-                      <span className="truncate">{item.name}</span>
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
                   ))}
@@ -264,7 +269,7 @@ export function CashPositionPanel() {
                 <ul className="space-y-1">
                   {position.installmentItems.map(item => (
                     <li key={item.recurrenceId} className="flex justify-between gap-2">
-                      <span className="truncate">{item.name}</span>
+                      <span className="truncate">{formatDateShort(item.dueDate)} · {item.name}</span>
                       <span className="font-mono">{formatCurrency(item.amount)}</span>
                     </li>
                   ))}

@@ -1,5 +1,4 @@
 import type { Account, AccountBalance, Category, Recurrence, RecurrenceInstance, Transaction } from '@/types/finance';
-import { computeCycleCommitments, type CommittedExpenseItem } from '@/lib/cycle-commitments';
 import { getBillingPeriod } from '@/lib/formatters';
 
 /**
@@ -8,8 +7,10 @@ import { getBillingPeriod } from '@/lib/formatters';
  * Regras (pedido do Gustavo de 20/11/2026, premissas do CFO pessoal):
  * - "Na conta" = último saldo informado de cada conta corrente/dinheiro ativa.
  * - Caixinhas (kind = 'caixinha') aparecem como reserva e NÃO entram no livre.
- * - "Comprometido" = recorrências e parcelas ainda pendentes no ciclo de hoje
- *   (mesma regra do restante do app) + compras no cartão de crédito ainda não pagas.
+ * - "Comprometido" conta cada item pela DATA DE VENCIMENTO (ordem do Gustavo, 21/11/2026:
+ *   "O que vence depois da data de corte, entra pro outro mês"): só entra o que vence entre
+ *   o início e o fim do ciclo de hoje (dia 21 a 20). Recorrência/parcela vence no dia do mês
+ *   da data de início dela; fatura do cartão vence no dia CREDIT_CARD_DUE_DAY.
  * - Recorrências de categorias de reserva/aporte não contam como gasto.
  * - Lançamentos ignorados ou com affects_budget = false ficam fora.
  */
@@ -75,6 +76,45 @@ export interface AccountPosition {
   isStale: boolean;
 }
 
+export interface CommittedExpenseItem {
+  recurrenceId: string;
+  name: string;
+  amount: number;
+  categoryId: string;
+  isInstallment: boolean;
+  dueDate: Date;
+}
+
+/** Janela para reconhecer o pagamento de uma ocorrência (pago até 20 dias antes do vencimento). */
+const PAYMENT_LOOKBACK_DAYS = 20;
+
+/** Vencimentos de uma recorrência mensal que caem dentro do ciclo [start, end]. */
+export function getRecurrenceDueDatesInCycle(recurrence: Recurrence, start: Date, end: Date): Array<{ dueDate: Date; installmentNumber: number | null }> {
+  const result: Array<{ dueDate: Date; installmentNumber: number | null }> = [];
+  const firstDue = startOfDay(recurrence.startDate);
+  const lastDue = recurrence.endDate ? endOfDay(recurrence.endDate) : null;
+  const dueDay = firstDue.getDate();
+  const months = [
+    { year: start.getFullYear(), month: start.getMonth() },
+    { year: end.getFullYear(), month: end.getMonth() },
+  ].filter((item, index, list) => list.findIndex(other => other.year === item.year && other.month === item.month) === index);
+
+  for (const { year, month } of months) {
+    const lastDayOfMonth = new Date(year, month + 1, 0).getDate();
+    const dueDate = new Date(year, month, Math.min(dueDay, lastDayOfMonth));
+    if (dueDate < startOfDay(start) || dueDate > end) continue;
+    if (dueDate < firstDue) continue;
+    if (lastDue && dueDate > lastDue) continue;
+    let installmentNumber: number | null = null;
+    if (recurrence.totalInstallments) {
+      installmentNumber = (year - firstDue.getFullYear()) * 12 + (month - firstDue.getMonth()) + 1;
+      if (installmentNumber < 1 || installmentNumber > recurrence.totalInstallments) continue;
+    }
+    result.push({ dueDate, installmentNumber });
+  }
+  return result;
+}
+
 export interface OpenInvoice {
   dueDate: Date;
   amount: number;
@@ -106,8 +146,10 @@ export interface CashPositionInput {
   latestBalances: AccountBalance[];
   categories: Category[];
   recurrences: Recurrence[];
+  /** Instâncias de recorrência dos meses que o ciclo toca (para reconhecer vínculo e "ignorar"). */
   instances: RecurrenceInstance[];
-  cycleTransactions: Transaction[];
+  /** Lançamentos de (início do ciclo − 25 dias) até o fim do ciclo, para reconhecer pagamentos. */
+  recentTransactions: Transaction[];
   cardTransactions: Transaction[];
 }
 
@@ -116,7 +158,7 @@ function round2(value: number): number {
 }
 
 export function computeCashPosition(input: CashPositionInput): CashPosition {
-  const { today, cycle, accounts, latestBalances, categories, recurrences, instances, cycleTransactions, cardTransactions } = input;
+  const { today, cycle, accounts, latestBalances, categories, recurrences, instances, recentTransactions, cardTransactions } = input;
   const balanceByAccount = new Map(latestBalances.map(balance => [balance.accountId, balance]));
 
   const toPosition = (account: Account): AccountPosition => {
@@ -137,16 +179,47 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
   const cashTotal = round2(cashAccounts.reduce((sum, position) => sum + (position.balance ?? 0), 0));
   const reserveTotal = round2(reserveAccounts.reduce((sum, position) => sum + (position.balance ?? 0), 0));
 
-  // Recorrências e parcelas pendentes do ciclo de hoje (mesma regra do orçamento).
+  // Recorrências e parcelas que VENCEM dentro do ciclo de hoje e ainda não foram pagas.
   const reserveCategoryIds = new Set(
     categories.filter(category => RESERVE_CATEGORY_PATTERN.test(category.name)).map(category => category.id),
   );
-  // Lançamento ignorado não paga a recorrência: só lançamentos válidos a tiram do comprometido.
-  const countedCycleTransactions = cycleTransactions.filter(transaction => transaction.status !== 'ignored');
-  const commitments = computeCycleCommitments(recurrences, instances, countedCycleTransactions, cycle.month, cycle.year);
-  const pendingItems = commitments.committedExpenseItems
-    .filter(item => !reserveCategoryIds.has(item.categoryId))
-    .sort((a, b) => b.amount - a.amount);
+  const instanceRecurrence = new Map(instances.map(instance => [instance.id, instance.recurrenceId]));
+  // Lançamento ignorado não paga a recorrência: só lançamentos válidos contam como pagamento.
+  const paymentsByRecurrence = new Map<string, Date[]>();
+  for (const transaction of recentTransactions) {
+    if (transaction.status === 'ignored') continue;
+    const recurrenceId = transaction.recurrenceId
+      ?? (transaction.recurrenceInstanceId ? instanceRecurrence.get(transaction.recurrenceInstanceId) : undefined);
+    if (!recurrenceId) continue;
+    const list = paymentsByRecurrence.get(recurrenceId) ?? [];
+    list.push(transaction.date);
+    paymentsByRecurrence.set(recurrenceId, list);
+  }
+
+  const pendingItems: CommittedExpenseItem[] = [];
+  for (const recurrence of recurrences) {
+    if (!recurrence.isActive || recurrence.type !== 'despesa') continue;
+    if (reserveCategoryIds.has(recurrence.categoryId)) continue;
+    for (const { dueDate } of getRecurrenceDueDatesInCycle(recurrence, cycle.start, cycle.end)) {
+      const dueCycle = getCycleForDate(dueDate, cycle.end.getDate());
+      const ignored = instances.some(instance =>
+        instance.recurrenceId === recurrence.id && instance.status === 'ignored'
+        && instance.month === dueCycle.month && instance.year === dueCycle.year);
+      if (ignored) continue;
+      const windowStart = new Date(dueDate.getTime() - PAYMENT_LOOKBACK_DAYS * DAY_MS);
+      const paid = (paymentsByRecurrence.get(recurrence.id) ?? []).some(date => date >= windowStart && date <= cycle.end);
+      if (paid) continue;
+      pendingItems.push({
+        recurrenceId: recurrence.id,
+        name: recurrence.name,
+        amount: recurrence.amount,
+        categoryId: recurrence.categoryId,
+        isInstallment: Boolean(recurrence.totalInstallments),
+        dueDate,
+      });
+    }
+  }
+  pendingItems.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime() || b.amount - a.amount);
   const recurringItems = pendingItems.filter(item => !item.isInstallment);
   const installmentItems = pendingItems.filter(item => item.isInstallment);
   const recurringTotal = round2(recurringItems.reduce((sum, item) => sum + item.amount, 0));
@@ -164,6 +237,8 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     if (transaction.status === 'ignored' || transaction.affectsBudget === false) continue;
     if (transaction.date <= lastPaidClose) continue;
     const dueDate = getInvoiceDueDate(transaction.date);
+    // Fatura que vence depois do fim do ciclo é paga no ciclo seguinte.
+    if (dueDate > cycle.end) continue;
     const key = dueDate.toISOString();
     const invoice = invoices.get(key) ?? { dueDate, amount: 0, count: 0 };
     invoice.amount += transaction.type === 'receita' ? -transaction.amount : transaction.amount;

@@ -13,16 +13,6 @@ export interface CycleCommitments {
   expectedInstallmentExpenses: number;
   committedRecurringExpenses: number;
   committedInstallmentExpenses: number;
-  /** Despesas ainda comprometidas no ciclo, item a item (mesma regra dos totais). */
-  committedExpenseItems: CommittedExpenseItem[];
-}
-
-export interface CommittedExpenseItem {
-  recurrenceId: string;
-  name: string;
-  amount: number;
-  categoryId: string;
-  isInstallment: boolean;
 }
 
 function appliesToCycle(rec: Recurrence, month: number, year: number): boolean {
@@ -75,7 +65,6 @@ export function computeCycleCommitments(
     expectedInstallmentExpenses: 0,
     committedRecurringExpenses: 0,
     committedInstallmentExpenses: 0,
-    committedExpenseItems: [],
   };
 
   for (const recurrence of recurrences) {
@@ -113,13 +102,6 @@ export function computeCycleCommitments(
     }
 
     if (isStillCommitted) {
-      summary.committedExpenseItems.push({
-        recurrenceId: recurrence.id,
-        name: recurrence.name,
-        amount,
-        categoryId: recurrence.categoryId,
-        isInstallment: Boolean(recurrence.totalInstallments),
-      });
       summary.committedExpenses += amount;
       if (recurrence.totalInstallments) summary.committedInstallmentExpenses += amount;
       else summary.committedRecurringExpenses += amount;

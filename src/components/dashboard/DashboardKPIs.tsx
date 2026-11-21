@@ -68,13 +68,6 @@ export function DashboardKPIs({ onDrillDown, mode = 'competence' }: DashboardKPI
       drillDownFilter: { type: 'expenses', title: 'Gastos do ciclo' },
     },
     {
-      label: 'Ainda comprometido',
-      value: monthSummary.committedExpenses,
-      icon: Clock3,
-      trend: monthSummary.committedExpenses > 0 ? 'warning' : 'positive',
-      description: 'recorrências e parcelas pendentes',
-    },
-    {
       label: 'Disponível',
       value: monthSummary.availableBudget,
       icon: CircleDollarSign,
@@ -86,7 +79,7 @@ export function DashboardKPIs({ onDrillDown, mode = 'competence' }: DashboardKPI
   ];
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+    <div className={cn('grid grid-cols-1 sm:grid-cols-2 gap-4', kpis.length === 4 ? 'xl:grid-cols-4' : 'xl:grid-cols-5')}>
       {kpis.map(kpi => {
         const Icon = kpi.icon;
         const isClickable = Boolean(kpi.drillDownFilter && onDrillDown);
