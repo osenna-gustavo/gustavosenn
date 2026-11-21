@@ -88,6 +88,7 @@ export interface CommittedExpenseItem {
 /** Vencimentos mensais de uma recorrência dentro de [from, to] (respeita início, fim e nº de parcelas). */
 export function getRecurrenceDueDates(recurrence: Recurrence, from: Date, to: Date): Array<{ dueDate: Date; installmentNumber: number | null }> {
   const result: Array<{ dueDate: Date; installmentNumber: number | null }> = [];
+  // Só recorrência mensal gera vencimento aqui (o app hoje só cadastra mensal).
   if (recurrence.frequency && recurrence.frequency !== 'monthly') return result;
   const firstDue = startOfDay(recurrence.startDate);
   const lastDue = recurrence.endDate ? endOfDay(recurrence.endDate) : null;
@@ -112,11 +113,6 @@ export function getRecurrenceDueDates(recurrence: Recurrence, from: Date, to: Da
   return result;
 }
 
-/** Vencimentos de uma recorrência mensal que caem dentro do ciclo [start, end]. */
-export function getRecurrenceDueDatesInCycle(recurrence: Recurrence, start: Date, end: Date) {
-  return getRecurrenceDueDates(recurrence, start, end);
-}
-
 /** Início do ciclo anterior (mesmo dia, um mês antes). */
 export function getPreviousCycleStart(cycleStart: Date): Date {
   return new Date(cycleStart.getFullYear(), cycleStart.getMonth() - 1, cycleStart.getDate());
@@ -125,23 +121,60 @@ export function getPreviousCycleStart(cycleStart: Date): Date {
 /** Quantos dias antes do ciclo anterior buscar lançamentos para reconhecer pagamentos antecipados. */
 export const PAYMENT_SEARCH_DAYS_BEFORE_PREVIOUS_CYCLE = 75;
 
+/** Pagamento feito do dia do vencimento até esses dias depois paga ESSE vencimento (atraso curto). */
+export const LATE_PAYMENT_GRACE_DAYS = 7;
+/** Pagamento feito até esses dias antes do vencimento também paga ESSE vencimento (ex.: Gás pago 20 para vencer 21). */
+export const EARLY_PAYMENT_NEAR_DAYS = 5;
+
 /**
- * Casa pagamentos com vencimentos de UMA recorrência, 1 pagamento por vencimento.
- * Do vencimento mais novo para o mais antigo, cada um leva o pagamento mais recente ainda livre
- * feito depois do dia do vencimento anterior (inclui pagamento antecipado, até no ciclo anterior).
+ * Casa pagamentos com vencimentos de UMA recorrência, 1 pagamento por vencimento, em 2 passos:
+ * 1) lançamento vinculado feito de EARLY_PAYMENT_NEAR_DAYS antes até LATE_PAYMENT_GRACE_DAYS depois do vencimento
+ *    paga esse vencimento (vale o mais próximo);
+ * 2) para os vencimentos que sobraram, do mais novo para o mais antigo, cada um leva o pagamento mais
+ *    recente ainda livre feito depois do dia do vencimento anterior (pagamento antecipado, até no ciclo anterior).
  * Devolve os vencimentos que ficaram sem pagamento.
  */
 export function matchRecurrencePayments(dueDates: Date[], payments: Date[], until: Date): Date[] {
-  const available = payments.filter(date => date <= until).sort((x, y) => y.getTime() - x.getTime());
+  const available = payments.filter(date => date <= until).sort((x, y) => x.getTime() - y.getTime());
   const used = new Set<number>();
+  const paidDues = new Set<number>();
+  const ascending = [...dueDates].sort((x, y) => x.getTime() - y.getTime());
+
+  // Passo 1: pago perto do vencimento (poucos dias antes até LATE_PAYMENT_GRACE_DAYS depois); vale o mais próximo.
+  for (const dueDate of ascending) {
+    const from = startOfDay(new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() - EARLY_PAYMENT_NEAR_DAYS));
+    const to = endOfDay(new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate() + LATE_PAYMENT_GRACE_DAYS));
+    let index = -1;
+    let bestDistance = Infinity;
+    available.forEach((date, position) => {
+      if (used.has(position) || date < from || date > to) return;
+      const distance = Math.abs(date.getTime() - dueDate.getTime());
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        index = position;
+      }
+    });
+    if (index !== -1) {
+      used.add(index);
+      paidDues.add(dueDate.getTime());
+    }
+  }
+
+  // Passo 2: pagamento antecipado (ou atraso longo) para o que sobrou.
   const unpaid: Date[] = [];
-  const ordered = [...dueDates].sort((x, y) => y.getTime() - x.getTime());
-  for (const dueDate of ordered) {
+  for (const dueDate of [...ascending].reverse()) {
+    if (paidDues.has(dueDate.getTime())) continue;
     const previousMonthLastDay = new Date(dueDate.getFullYear(), dueDate.getMonth(), 0).getDate();
     const previousDue = new Date(dueDate.getFullYear(), dueDate.getMonth() - 1, Math.min(dueDate.getDate(), previousMonthLastDay));
     // Pagamento feito no próprio dia do vencimento anterior pertence ao vencimento anterior.
     const threshold = endOfDay(previousDue);
-    const index = available.findIndex((date, position) => !used.has(position) && date > threshold);
+    let index = -1;
+    for (let position = available.length - 1; position >= 0; position -= 1) {
+      if (!used.has(position) && available[position] > threshold) {
+        index = position;
+        break;
+      }
+    }
     if (index === -1) unpaid.push(dueDate);
     else used.add(index);
   }
@@ -239,7 +272,8 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
     if (!recurrence.isActive || recurrence.type !== 'despesa') continue;
     if (reserveCategoryIds.has(recurrence.categoryId)) continue;
     // Vencimentos do ciclo anterior (podem estar atrasados) e do ciclo de hoje.
-    const dueDates = getRecurrenceDueDates(recurrence, previousCycleStart, cycle.end)
+    // Inclui um vencimento antes do ciclo anterior só para casar o pagamento dele (não é exibido).
+    const dueDates = getRecurrenceDueDates(recurrence, getPreviousCycleStart(previousCycleStart), cycle.end)
       .map(item => item.dueDate)
       .filter(dueDate => {
         const dueCycle = getCycleForDate(dueDate, cycle.end.getDate());
@@ -249,6 +283,7 @@ export function computeCashPosition(input: CashPositionInput): CashPosition {
       });
     const unpaid = matchRecurrencePayments(dueDates, paymentsByRecurrence.get(recurrence.id) ?? [], cycle.end);
     for (const dueDate of unpaid) {
+      if (dueDate < startOfDay(previousCycleStart)) continue;
       const item: CommittedExpenseItem = {
         recurrenceId: recurrence.id,
         name: recurrence.name,
